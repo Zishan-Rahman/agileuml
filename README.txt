@@ -15,6 +15,7 @@ Build the executable with:
 
 jar cvfm umlrsds.jar Manifest.txt *.class
 
+then run umlrsds.jar as previously described.
 
 Options on the File menu include: 
 

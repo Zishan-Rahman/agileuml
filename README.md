@@ -16,6 +16,12 @@ To build the executable, run the following from the command line:
 ```bash
 jar cvfm umlrsds.jar Manifest.txt *.class
 ```
+then run umlrsds.jar from the command line like so:
+
+```bash
+chmod +x umlrsds.jar # needed on Unix/Unix-like systems to make the JAR file executable
+java -jar umlrsds.jar
+```
 
 Further information, and a manual for the toolset, can be found in the file umlrsds20.pdf and at https://nms.kcl.ac.uk/kevin.lano/uml2web/
 
