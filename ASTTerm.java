@@ -11,6 +11,9 @@ import java.util.Vector;
 import java.io.*; 
 import javax.swing.*;
 
+import java.lang.reflect.Method;
+
+
 public abstract class ASTTerm
 { String id = ""; 
   // Vector stereotypes = new Vector(); 
@@ -296,7 +299,7 @@ public abstract class ASTTerm
     }
 
     // JOptionPane.showMessageDialog(null, 
-    //    "*** addStereotype " + str + " to " + lit + " Metafeatures of " + lit + " are " + stereotypes,   "",
+    //    "*** addStereotype " + str + " to " + lit + " Metafeature values of " + lit + " are " + stereotypes,   "",
     //          JOptionPane.INFORMATION_MESSAGE); 
   } 
 
@@ -320,14 +323,18 @@ public abstract class ASTTerm
 
       if (stereotypes.contains(str)) {} 
       else 
-      { stereotypes.add(str); 
+      { stereotypes.add(0,str); 
         ASTTerm.metafeatures.put(lit, stereotypes); 
       }
     } 
 
     // JOptionPane.showMessageDialog(null, 
-    //    "*** addStereo " + str + " to " + lit + " Metafeatures of " + lit + " are " + mfs,   "",
+    //    "*** addStereo " + str + " to " + lit + " Metafeature values of " + lit + " are " + mfs,   "",
     //          JOptionPane.INFORMATION_MESSAGE); 
+
+    System.out.println("*** " + lit + " metafeature values set to " +
+                       ASTTerm.metafeatures.get(lit));  
+
   } 
 
   public static void setTaggedValue(ASTTerm ast, String mf, String val) 
@@ -341,8 +348,8 @@ public abstract class ASTTerm
 
   public static void setTaggedValue(String lit, String mf, String val) 
   { Object mfs = ASTTerm.metafeatures.get(lit); 
-    System.out.println("*** " + lit + " has tagged values: " + 
-                       mfs); 
+    // System.out.println("*** " + lit + " has tagged values: " + 
+    //                    mfs); 
 
     if (mfs == null) 
     { mfs = new Vector(); 
@@ -354,14 +361,16 @@ public abstract class ASTTerm
       Vector newstereos = new Vector(); 
       for (int x = 0; x < stereos.size(); x++) 
       { String stereo = (String) stereos.get(x); 
-        if (stereo.startsWith(mf + "="))
+        if (stereo.startsWith(mf + "=") ||
+            stereo.startsWith(mf + " ="))
         { }
         else 
         { newstereos.add(stereo); } 
       } 
       newstereos.add(mf + "=" + val); 
       ASTTerm.metafeatures.put(lit,newstereos); 
-      System.out.println("*** Set " + lit + " tagged values: " + 
+      System.out.println("*** Set " + lit + 
+                         " tagged values: " + 
                          newstereos); 
     } 
   }
@@ -384,6 +393,9 @@ public abstract class ASTTerm
       stereotypes.removeAll(removed);
       ASTTerm.metafeatures.put(lit,stereotypes);  
     } 
+
+    System.out.println(">>> " + lit + " metafeature values = " +
+                       ASTTerm.metafeatures.get(lit));  
   } 
 
   public static void removeStereo(String lit, String str) 
@@ -399,6 +411,9 @@ public abstract class ASTTerm
       removed.add(str); 
       stereotypes.removeAll(removed);
     }   
+
+    System.out.println("*** " + lit + " metafeature values= " +
+                       ASTTerm.metafeatures.get(lit));  
   } 
 
   public boolean hasStereotype(String str) 
@@ -478,9 +493,9 @@ public abstract class ASTTerm
       ASTTerm.metafeatures.put(lit,mfs); 
     } 
 
-    System.out.println("*** " + lit + 
-                       " gets tagged values: " + 
-                       mfs); 
+    // System.out.println("*** " + lit + 
+    //                    " gets tagged values: " + 
+    //                    mfs); 
 
     if (mfs instanceof Vector)
     { Vector stereotypes = (Vector) mfs; 
@@ -494,6 +509,124 @@ public abstract class ASTTerm
     }  
 
     return null; 
+  } 
+
+  public static String cgtlOperation(String opname, Vector eargs)
+  { System.out.println(">>> External operation: " + opname + " on " + eargs); 
+
+    if ("symbolicAddition".equals(opname) && 
+        eargs.size() == 2)
+    { ASTTerm e1 = (ASTTerm) eargs.get(0); 
+      ASTTerm e2 = (ASTTerm) eargs.get(1); 
+      return ASTTerm.symbolicAddition(e1,e2); 
+    } 
+
+    if ("symbolicSubtraction".equals(opname) && 
+        eargs.size() == 2)
+    { ASTTerm e1 = (ASTTerm) eargs.get(0); 
+      ASTTerm e2 = (ASTTerm) eargs.get(1); 
+      return ASTTerm.symbolicSubtraction(e1,e2); 
+    } 
+
+    if ("pythonEval".equals(opname) && 
+        eargs.size() == 1)
+    { // (trailer (arguments ( 
+      //   (arglist (argument ... "text" ...)) ) ))
+
+      ASTTerm e2 = (ASTTerm) eargs.get(0);
+      String arg = e2.literalForm(); 
+      if (arg.startsWith("(") &&
+          arg.endsWith(")"))
+      { arg = arg.substring(1,arg.length()-1); }
+
+      if (arg.startsWith("\"") &&
+          arg.endsWith("\""))
+      { arg = arg.substring(1,arg.length()-1); }
+        
+      String astexpr = 
+            PreProcessModels.applyAntlr("Python",
+                                   "expr",
+                                   arg);
+      if (astexpr == null || 
+          "".equals(astexpr))
+      { return "null"; } 
+
+      Compiler2 c = new Compiler2();    
+
+      ASTTerm xx =
+             c.parseGeneralAST(astexpr); 
+
+      if (xx == null) 
+      { return "null"; } 
+
+      return PreProcessModels.applyCGTL(xx, 
+                                        "cg/python2UML.cstl"); 
+    }       
+
+    if ("pythonExec".equals(opname) && 
+        eargs.size() == 1)
+    { // (trailer (arguments ( 
+      //   (arglist (argument ... "text" ...)) ) ))
+
+      ASTTerm e2 = (ASTTerm) eargs.get(0);
+      String arg = e2.literalForm(); 
+      if (arg.startsWith("(") &&
+          arg.endsWith(")"))
+      { arg = arg.substring(1,arg.length()-1); }
+
+      if (arg.startsWith("\"") &&
+          arg.endsWith("\""))
+      { arg = arg.substring(1,arg.length()-1); }
+        
+      String astexpr = 
+            PreProcessModels.applyAntlr("Python",
+                                   "stmt",
+                                   arg);
+      if (astexpr == null || 
+          "".equals(astexpr))
+      { return "null"; } 
+
+      Compiler2 c = new Compiler2();    
+
+      ASTTerm xx =
+             c.parseGeneralAST(astexpr); 
+
+      if (xx == null) 
+      { return "null"; } 
+
+      return PreProcessModels.applyCGTL(xx, 
+                                        "cg/python2UML.cstl"); 
+    }       
+
+    int dotind = opname.indexOf("."); 
+    // System.out.println(dotind); 
+    if (dotind > 0)
+    { String cname = opname.substring(0,dotind); 
+      String mname = opname.substring(dotind + 1); 
+
+      try { 
+        Class cl = Class.forName(cname); 
+        Object xinst = cl.newInstance();
+        Method[] mets = cl.getDeclaredMethods(); 
+
+        // System.out.println(">> Found class: " + cl + " methods " + mets.length);
+ 
+        for (int i = 0; i < mets.length; i++)
+        { Method m = mets[i]; 
+
+          // System.out.println(m.getName()); 
+
+          if (m.getName().equals(mname))
+          { Object[] args = eargs.toArray(); 
+            return (String) m.invoke(xinst,args); 
+          } 
+        } 
+      }
+      catch (Throwable _x) 
+      { System.err.println("!! No class/method: " + cname + " " + mname); } 
+    }
+
+    return opname + "(" + eargs + ")"; 
   } 
 
   public static void addRequiredLibrary(String lib) 
@@ -615,7 +748,8 @@ public abstract class ASTTerm
     if ("integer".equalsIgnoreCase(str) || 
         "int".equals(str))
     { return isInteger(); } 
-    if ("real".equalsIgnoreCase(str))
+    if ("real".equalsIgnoreCase(str) || 
+        "double".equals(str))
     { return isReal(); } 
     if ("boolean".equalsIgnoreCase(str))
     { return isBoolean(); }
@@ -4709,6 +4843,55 @@ public abstract class ASTTerm
     return expr.literalForm(); 
   }  
 
+  public static String symbolicAddition(ASTTerm e1, ASTTerm e2)
+  { String a = e1.literalForm(); 
+    String b = e2.literalForm(); 
+
+    if (e1.getTag().equals("additiveExpression") && 
+        "+".equals(e1.getTerm(1) + ""))
+    { a = symbolicAddition(e1.getTerm(0), e1.getTerm(2)); } 
+    else if (e1.getTag().equals("additiveExpression") && 
+        "-".equals(e1.getTerm(1) + ""))
+    { a = symbolicSubtraction(e1.getTerm(0), e1.getTerm(2)); }
+
+    if (e2.getTag().equals("additiveExpression") && 
+        "+".equals(e2.getTerm(1) + ""))
+    { b = symbolicAddition(e2.getTerm(0), e2.getTerm(2)); } 
+
+    if (AuxMath.isNumeric(a) && AuxMath.isNumeric(b))
+    { Double aval = Double.parseDouble("" + a); 
+      Double bval = Double.parseDouble("" + b); 
+      return "" + (aval+bval); 
+    }
+    
+    return a + " + " + b; 
+  }  
+     
+  public static String symbolicSubtraction(ASTTerm e1, ASTTerm e2)
+  { String a = e1.literalForm(); 
+    String b = e2.literalForm(); 
+
+    if (e1.getTag().equals("additiveExpression") && 
+        "+".equals(e1.getTerm(1) + ""))
+    { a = symbolicAddition(e1.getTerm(0), e1.getTerm(2)); } 
+    else if (e1.getTag().equals("additiveExpression") && 
+        "-".equals(e1.getTerm(1) + ""))
+    { a = symbolicSubtraction(e1.getTerm(0), e1.getTerm(2)); }
+
+    if (e2.getTag().equals("additiveExpression") && 
+        "+".equals(e2.getTerm(1) + ""))
+    { b = symbolicAddition(e2.getTerm(0), e2.getTerm(2)); } 
+
+    if (AuxMath.isNumeric(a) && AuxMath.isNumeric(b))
+    { Double aval = Double.parseDouble("" + a); 
+      Double bval = Double.parseDouble("" + b); 
+      return "" + (aval-bval); 
+    }
+    
+    return a + " - " + b; 
+  }  
+     
+
   public static String symbolicMultiplication(
                             String var, ASTTerm expr)
   { // result is var*expr
@@ -4865,7 +5048,7 @@ public abstract class ASTTerm
     // System.out.println(t.isInteger()); 
     // System.out.println(t.isBoolean());
 
-    ASTBasicTerm tt1 = new ASTBasicTerm("t1", "aa"); 
+   /* ASTBasicTerm tt1 = new ASTBasicTerm("t1", "aa"); 
     ASTBasicTerm tt2 = new ASTBasicTerm("t2", "bb");
     ASTSymbolTerm tts = new ASTSymbolTerm("&"); 
  
@@ -4886,7 +5069,13 @@ public abstract class ASTTerm
 
     System.out.println(ttc);  
     ASTTerm subst = ttc.substituteEq("bb", tt1); 
-    System.out.println(subst);  
+    System.out.println(subst);  */ 
+
+    ASTTerm.setTaggedValue("x", "defined", "true");
+    ASTTerm.addStereo("x", "int");  
+    ASTTerm.setTaggedValue("x", "defined", "false");
+    ASTTerm.addStereo("x", "String");  
+    System.out.println(ASTTerm.metafeatures.get("x")); 
   }
 } 
 

@@ -352,6 +352,12 @@ class BasicExpression extends Expression
     } 
   } 
 
+  public boolean isNotLocalVariable() 
+  { if (umlkind == VARIABLE && objectRef == null) 
+    { return false; } 
+    return true; 
+  } 
+
   public void setVariableType(Type t) 
   { if (variable != null) 
     { variable.setType(t); } 
@@ -1824,6 +1830,9 @@ class BasicExpression extends Expression
       } // the result type of the op is needed in type. 
     }
 
+    if (type != null)
+    { return "Sequence".equals(type.getName()); } 
+      
     return false;  // but it could be a singleton
   }
 
@@ -2986,12 +2995,12 @@ class BasicExpression extends Expression
               if (var == null)
               { var = entity.searchForSuperclassJava(env); 
                 if (var == null) 
-                { System.err.println("ERROR: No variable in scope of class " + nme); 
+                { System.err.println("!! ERROR: No variable in scope of class " + nme); 
                   // var = nme.toLowerCase() + "x";
                   res = data;  
                 }
                 else 
-                { var = var + ".oclAsType(" + nme + ")"; 
+                { var = "(" + var + "->oclAsType(" + nme + "))"; 
                   res = var + "." + data; 
                 }
               } 
@@ -4121,8 +4130,16 @@ class BasicExpression extends Expression
         } 
         else 
         { JOptionPane.showMessageDialog(null, data + " is not a function parameter or known function in " + this + ".\n" + 
-                                        "Please re-type-check or correct your specification.", 
-                                        "Type warning", JOptionPane.WARNING_MESSAGE);
+            "Please re-type-check or correct your specification.", 
+            "Type warning", JOptionPane.WARNING_MESSAGE);
+
+          if (parameters != null && parameters.size() == 1)
+          { // assume it is a function
+            type = new Type("Function", null); 
+            Expression par1 = (Expression) parameters.get(0); 
+            type.keyType = par1.getType();
+            type.elementType = new Type("OclAny", null);  
+          } // data->apply(par1)
         }
       } // default
       else if (objectRef != null)
@@ -5103,7 +5120,7 @@ class BasicExpression extends Expression
       if ("OclFile".equals(data))
       { return "OclFile.OclFile_index.get(" + ind + ")"; } 
       if (data.equals("OclType"))
-      { return "OclType.getOclTypeByPK(" + ind + ")"; } 
+      { return "OclType.getByPKOclType(" + ind + ")"; } 
       return cont + ".get" + data + "ByPK(" + ind + ")"; 
     } 
     return cont + "." + data.toLowerCase() + "s";  
@@ -5126,7 +5143,7 @@ class BasicExpression extends Expression
       if ("OclFile".equals(data))
       { return "OclFile.OclFile_index.get(" + ind + ")"; } 
       if (data.equals("OclType"))
-      { return "OclType.getOclTypeByPK(" + ind + ")"; } 
+      { return "OclType.getByPKOclType(" + ind + ")"; } 
       return cont + ".get" + data + "ByPK(" + ind + ")"; 
     } 
     return cont + "." + data.toLowerCase() + "s";  
@@ -5149,7 +5166,7 @@ class BasicExpression extends Expression
       if ("OclFile".equals(data))
       { return "OclFile.OclFile_index.get(" + ind + ")"; } 
       if (data.equals("OclType"))
-      { return "OclType.getOclTypeByPK(" + ind + ")"; } 
+      { return "OclType.getByPKOclType(" + ind + ")"; } 
       return cont + ".get" + data + "ByPK(" + ind + ")"; 
     } 
     return cont + "." + data.toLowerCase() + "s";  
@@ -5427,6 +5444,11 @@ class BasicExpression extends Expression
     { 
       if (arrayIndex != null)
       { String ind = arrayIndex.queryForm(env,local);
+        if ("OclFile".equals(data))
+        { return "OclFile.OclFile_index.get(" + ind + ")"; } 
+        if (data.equals("OclType"))
+        { return "OclType.getByPKOclType(" + ind + ")"; } 
+      
         return cont + ".get" + data + "ByPK(" + ind + ")"; 
       } 
       return data;  // But library classes may map to language-specific name
@@ -5972,6 +5994,11 @@ class BasicExpression extends Expression
     if (umlkind == CLASSID)
     { if (arrayIndex != null)
       { String ind = arrayIndex.queryFormJava6(env,local);
+        if ("OclFile".equals(data))
+        { return "OclFile.OclFile_index.get(" + ind + ")"; } 
+        if (data.equals("OclType"))
+        { return "OclType.getByPKOclType(" + ind + ")"; } 
+      
         return cont + ".get" + data + "ByPK(" + ind + ")"; 
       } 
       return data;  // But library classes may map to language-specific name
@@ -6377,7 +6404,7 @@ class BasicExpression extends Expression
       if (data.equals("Sequence{}"))
       { return "new ArrayList<Object>()"; } 
       if (data.equals("Map{}"))
-      { return "new HashMap<String,Object>()"; }
+      { return "new HashMap<Object,Object>()"; }
 	  
       if (data.equals("null")) 
       { return "null"; } 
@@ -6457,17 +6484,25 @@ class BasicExpression extends Expression
         }         
         return data + ".get(" + indopt + ")";
       } // unwrap it, also for primitive types
-      else if (parameters != null && variable != null && variable.getType().isFunctionType()) // application of a Function(S,T)
+      else if (parameters != null && variable != null)
       { String pars = ""; 
         for (int h = 0; h < parameters.size(); h++) 
         { Expression par = (Expression) parameters.get(h); 
           pars = pars + par.queryFormJava7(env,local); 
           if (h < parameters.size()-1) 
           { pars = pars + ","; } 
-        } 
-        return data + ".evaluate(" + pars + ")"; 
-      }
+        }
+		
+		if (variable.getType() != null && variable.getType().isFunctionType()) // application of a Function(S,T)
+        {  
+          return data + ".evaluate(" + pars + ")"; 
+        }
+        else 
+        { System.err.println("!! ERROR: function application " + this + " should be expressed as " + data + "->apply(" + pars + ")");
+          return "((Evaluation<Object,Object>) " + data + ").evaluate(" + pars + ")"; 
+        }
 
+      }
       else 
       { return data; }  
     } 
@@ -6475,6 +6510,11 @@ class BasicExpression extends Expression
     if (umlkind == CLASSID)
     { if (arrayIndex != null)
       { String ind = arrayIndex.queryFormJava7(env,local);
+        if ("OclFile".equals(data))
+        { return "OclFile.OclFile_index.get(" + ind + ")"; } 
+        if (data.equals("OclType"))
+        { return "OclType.getByPKOclType(" + ind + ")"; } 
+      
         return cont + ".get" + data + "ByPK(" + ind + ")"; 
       } 
       return data;  // But library classes may map to language-specific name
@@ -9960,8 +10000,8 @@ public Statement generateDesignSubtract(Expression rhs)
       return data + " = " + val2 + ";"; 
     }
 
-    String nme = entity.getName();
-    if (entity.isBidirectionalRole(data))
+    // String nme = entity.getName();
+    if (entity != null && entity.isBidirectionalRole(data))
     { local = false; } 
     
     if (objectRef == null)
@@ -10001,7 +10041,8 @@ public Statement generateDesignSubtract(Expression rhs)
         } 
 
         if (entity != null && entity.isClassScope(data))
-        { if (arrayIndex != null) 
+        { String nme = entity.getName();
+		  if (arrayIndex != null) 
           { String indopt = 
                arrayIndex.queryFormJava7(env,local); 
             // if ("String".equals(arrayIndex.type + "") || 
@@ -10056,8 +10097,9 @@ public Statement generateDesignSubtract(Expression rhs)
     else // objectRef != null
     { String pre = objectRef.queryFormJava7(env,local);
 
-      if (entity.isClassScope(data))
-      { if (arrayIndex != null) 
+      if (entity != null && entity.isClassScope(data))
+      { String nme = entity.getName();
+	    if (arrayIndex != null) 
         { String indopt = arrayIndex.queryFormJava7(env,local); 
           return nme + ".set" + data + "((" + indopt + " -1), " + val2 + ");"; 
         } 
@@ -10081,10 +10123,12 @@ public Statement generateDesignSubtract(Expression rhs)
         return cref + ".setAll" + data + "(" + cobjs + "," + val2 + ");"; 
       } 
 
-      if (objectRef.isMultiple()) 
-      { String cref = nme; 
+      if (entity != null && objectRef.isMultiple()) 
+      { String nme = entity.getName();
+	    String cref = nme; 
         if (entity.isInterface())
-        { cref = nme + "." + nme + "Ops"; } 
+        { cref = nme + "." + nme + "Ops"; }
+		 
         if (arrayIndex != null) 
         { String ind = arrayIndex.queryFormJava7(env,local); 
           if (isQualified())
@@ -12803,7 +12847,7 @@ public Statement generateDesignSubtract(Expression rhs)
       if (var == null)
       { var = e.searchForSuperclass(env); 
         if (var == null) 
-        { System.err.println("Error: no variable for " + nme); 
+        { System.err.println("!! Error: no variable for " + nme); 
           var = new BBasicExpression(nme.toLowerCase() + "x"); 
         } 
         else 
@@ -12836,7 +12880,7 @@ public Statement generateDesignSubtract(Expression rhs)
   { String feat = ""; 
     String op = ""; 
 
-    System.out.println("B UPDATE FORM OF " + this + " " + isEvent); 
+    System.out.println(">> B UPDATE FORM OF " + this + " " + isEvent); 
 
     if (isEvent) // an operation of entity -- not allowed if local
     { Vector oppars = new Vector(); 
@@ -12869,7 +12913,7 @@ public Statement generateDesignSubtract(Expression rhs)
         if (var == null)  // because nme is superclass of ent: dom(env)
         { var = entity.searchForSubclass(env); } 
         if (var == null) 
-        { System.err.println("Error: No variable of " + ename); 
+        { System.err.println("!! Error: No variable of " + ename); 
           var = new BBasicExpression(ename.toLowerCase() + "x"); 
           var.setKind(VARIABLE); 
         }        
@@ -12909,7 +12953,8 @@ public Statement generateDesignSubtract(Expression rhs)
         
         BStatement res;
         if (psimp.setValued() && op != null &&
-            op.equals("set") || op.equals("remove") || op.equals("add"))
+            op.equals("set") || op.equals("remove") || 
+            op.equals("add"))
         { res = new BOperationCall(op + "All" + feat,pars); }
         else 
         { res = new BOperationCall(data,pars); } 
@@ -12918,7 +12963,7 @@ public Statement generateDesignSubtract(Expression rhs)
       }
     }
     else
-    { System.out.println("No update form for " + this + " " + isEvent); 
+    { System.out.println("!! No update form for " + this + " " + isEvent); 
       return new BBasicStatement("skip"); 
     } // no sensible update form
   }
@@ -14016,7 +14061,7 @@ public Statement generateDesignSubtract(Expression rhs)
     }
     res = new BBasicExpression(data);
     res.setKind(umlkind); 
-    System.out.println("B INVARIANT FORM OF " + this + " IS " + res); 
+    System.out.println(">> B INVARIANT FORM OF " + this + " IS " + res); 
 
     return res;  // and setKind in all other cases, as well.
   }

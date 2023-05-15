@@ -54,6 +54,18 @@ public class Entity extends ModelElement implements Comparable
     realEntity = this; 
   }
 
+  public Object clone()
+  { Entity res = new Entity(name); 
+    res.attributes.addAll(attributes); 
+    res.associations.addAll(associations); 
+    res.operations.addAll(operations); 
+    res.superclass = superclass;
+    res.subclasses.addAll(subclasses); 
+    res.invariants.addAll(invariants); 
+    res.interfaces.addAll(interfaces);
+    return res; 
+  } 
+ 
   public static boolean validEntityName(String ename)
   { if (ename.length() == 0) 
     { return false; } 
@@ -1483,6 +1495,12 @@ public class Entity extends ModelElement implements Comparable
     operations.removeAll(removed); 
   } 
 
+  public void typeCheck(Vector types, Vector entities)
+  { typeCheckAttributes(types,entities); 
+    typeCheckOps(types,entities); 
+    typeCheckInvariants(types,entities); 
+  } 
+
   public void typeCheckAttributes(Vector types, Vector entities)
   { Vector localtypes = new Vector(); 
     localtypes.addAll(types); 
@@ -1828,6 +1846,20 @@ public class Entity extends ModelElement implements Comparable
       { anames.add(aname); } 
     } 
     return dups; 
+  } 
+
+  public void checkAttributeNames()
+  { Vector allatts = allAttributes(); 
+    for (int i = 0; i < allatts.size(); i++) 
+    { Attribute att = (Attribute) allatts.get(i); 
+      String aname = att.getName();
+      
+      if ("_".equals(aname))
+      { System.err.println("! Warning: underscore is not a valid name by itself"); } 
+
+      if (Compiler2.isAnyKeyword(aname))
+      { System.err.println("!! ERROR: keyword " + aname + " is not a valid feature name"); } 
+    } 
   } 
 
   public Vector checkOperationNames()
@@ -4609,7 +4641,15 @@ public class Entity extends ModelElement implements Comparable
 
     out.println("*** Number of " + nme + " attributes = " + atts); 
     out.println("*** Number of " + nme + " roles = " + assocs); 
+
+    if (atts + assocs >
+        TestParameters.numberOfDataFeaturesLimit) 
+    { out.println("!! Code smell (EPL): excessive number of data features " + (atts + assocs) + " in " + nme); } 
+
     out.println("*** Number of " + nme + " operations = " + ops); 
+
+    if (ops > TestParameters.numberOfOperationsLimit) 
+    { out.println("!! Code smell (ENO): excessive number of operations " + (ops) + " in " + nme); } 
 
     int totalComplexity = 0; 
 
@@ -4618,9 +4658,10 @@ public class Entity extends ModelElement implements Comparable
       
       int opcomplexity = op.displayMeasures(out);
 
-      if (opcomplexity > 100) 
+      if (opcomplexity > TestParameters.operationSizeLimit) 
       { highcount++; } 
-      else if (opcomplexity > 50)
+      else if (opcomplexity > 
+               TestParameters.operationSizeWarning)
       { lowcount++; } 
 
       totalComplexity = totalComplexity + opcomplexity;  
@@ -4631,7 +4672,9 @@ public class Entity extends ModelElement implements Comparable
       Vector newopuses = VectorUtil.union(vuses,opuses); 
   
       if (newopuses.size() > 0)
-      { out.println("*** Operations used in " + op.getName() + " are: " + newopuses); } 
+      { out.println("*** Operations used in " + op.getName() + " are: " + newopuses);
+        checkPlatformDependence(newopuses); 
+      } 
 
       op.findClones(clones);
       // System.out.println(">>> Clones in " + op.getName() + ": " + clones);  
@@ -4641,11 +4684,11 @@ public class Entity extends ModelElement implements Comparable
       out.println(); 
     } 
 
-    out.println("*** " + highcount + " operations of " + getName() + " are > 100 complexity"); 
-    out.println("*** " + lowcount + " other operations of " + getName() + " are > 50 complexity"); 
+    out.println("*** " + highcount + " operations of " + getName() + " are > " + TestParameters.operationSizeLimit + " complexity"); 
+    out.println("*** " + lowcount + " other operations of " + getName() + " are > " + TestParameters.operationSizeWarning + " complexity"); 
 
     out.println("*** Total complexity of " + getName() + " is: " + totalComplexity); 
-    if (totalComplexity > 1000)
+    if (totalComplexity > TestParameters.classSizeLimit)
     { System.err.println("!! Code Smell: Excessively large class: " + 
                 getName() + " has c = " + totalComplexity); 
     } 
@@ -4693,6 +4736,44 @@ public class Entity extends ModelElement implements Comparable
     }   
 
     return totalComplexity; 
+  } 
+
+  public void checkPlatformDependence(Vector calledops)
+  { String nme = getName(); 
+
+    Vector dependsOn = new Vector(); 
+    for (int i = 0; i < calledops.size(); i++) 
+    { String cop = (String) calledops.get(i); 
+      if (cop.startsWith("OclFile::"))
+      { dependsOn.add("OclFile"); } 
+      else if (cop.startsWith("OclDatasource::"))
+      { dependsOn.add("OclDatasource"); }
+      else if (cop.startsWith("SQLStatement::"))
+      { dependsOn.add("SQLStatement"); }
+      else if (cop.startsWith("OclProcess::"))
+      { dependsOn.add("OclProcess"); }
+      else if (cop.startsWith("Excel::"))
+      { dependsOn.add("Excel"); }
+    }
+
+    if (dependsOn.size() > 0)
+    { System.out.println("!! Warning: class " + nme + 
+        " depends on platform-specific facilities: " + 
+        dependsOn); 
+      stereotypes.add("platformSpecific"); 
+    }
+  }  
+
+  public Vector allOperationsUsedIn()
+  { Vector res = new Vector(); 
+    for (int i = 0; i < operations.size(); i++)
+    { BehaviouralFeature op = 
+        (BehaviouralFeature) operations.get(i);
+      
+      Vector opuses = op.operationsUsedIn(); 
+      res = VectorUtil.union(res,opuses); 
+    } 
+    return res; 
   } 
 
   public void extractOperations()
@@ -13333,7 +13414,7 @@ public class Entity extends ModelElement implements Comparable
 
     for (int i = 0; i < attributes.size(); i++)
     { Attribute att = (Attribute) attributes.get(i);
-      if (superclass.hasInheritedAttribute(att.getName()))
+      if (superclass != null && superclass.hasInheritedAttribute(att.getName()))
       { System.err.println("!! Error: attribute " + att +
           " defined in " + this + " and an " +
           " ancestor class");
@@ -13381,6 +13462,7 @@ public class Entity extends ModelElement implements Comparable
       if (sinterfaces.size() > 0)
       { return sinterfaces; } 
     }
+	
     for (int i = 0; i < interfaces.size(); i++) 
     { Entity intf = (Entity) interfaces.get(i); 
       Vector iinterfaces = intf.getAllInterfaces(new Vector()); 
@@ -13701,6 +13783,24 @@ public class Entity extends ModelElement implements Comparable
     } 
     return res; 
   } 
+
+  public Vector getSupplierClasses()
+  { Vector allAssociations = new Vector(); 
+    allAssociations.addAll(associations); 
+    allAssociations.addAll(allInheritedAssociations()); 
+
+    Vector res = new Vector(); 
+
+    for (int j = 0; j < allAssociations.size(); j++)
+    { Association ast = (Association) allAssociations.get(j);
+      Entity ent2 = ast.getEntity2(); 
+      if (res.contains(ent2)) { } 
+      else 
+      { res.add(ent2); } 
+    } 
+    return res; 
+  } // also from attributes. 
+
 
   public String getValueObject()
   { return getValueObject("beans"); } 
@@ -17757,12 +17857,14 @@ public BehaviouralFeature designAbstractKillOp()
   // { How many tests will be generated for this class }
 
 
-  public Vector testCases()
+  public Vector testCases(Vector instances)
   { Vector res = new Vector(); 
     String nme = getName(); 
     String x = nme.toLowerCase() + "$x"; 
-    res.add(x + " : " + nme); 
-	
+    // instances.add(x + " : " + nme);
+    // res.add(x + " : " + nme); 
+    res.add(""); 
+   
     defineLocalFeatures(); 
 
     Vector allattributes = localFeatures;
@@ -17798,6 +17900,7 @@ public BehaviouralFeature designAbstractKillOp()
       Vector testassignments = att.testCases(x,lowerBounds,
                                      upperBounds,javatests);
  
+      
       for (int j = 0; j < res.size(); j++) 
       { String tst = (String) res.get(j); 
         for (int k = 0; k < testassignments.size(); k++) 
@@ -17811,6 +17914,10 @@ public BehaviouralFeature designAbstractKillOp()
       res.clear(); 
       res.addAll(newres); 
     } 
+    // All combinations of test values for all attributes
+    // x : E\n x.att1 = v1\n x.att2 = v1
+    // x : E\n x.att1 = v2\n x.att2 = v1, etc
+    // But not identity attributes. 
 
     String y = nme.toLowerCase() + "x_"; 
 
@@ -17818,8 +17925,10 @@ public BehaviouralFeature designAbstractKillOp()
     for (int i = 0; i < res.size(); i++) 
     { String model = (String) res.get(i); 
       String yi = y + i; 
-      String mod1 = model.replace(x,yi);  // replaceAll(x,yi);  
-      // System.out.println(">---->> Replaced model= " + mod1);
+      String mod1 = model.replace(x,yi);  
+      // replaceAll(x,yi);  
+      // The above models specialised to yi
+      instances.add(yi + " : " + nme);
       newres.add(mod1);  
     } 
 	
@@ -17945,7 +18054,7 @@ public BehaviouralFeature designAbstractKillOp()
           bfmutanttest = bfmutanttest + "\n" + 
             "    for (int i = 0; i < _counts.length; i++)\n" + 
             "    { if (_totals[i] > 0)\n" + 
-            "      { System.out.println(\"Test \" + i + \" detects \" + (100.0*_counts[i])/_totals[i] + \"% " + bfname + " mutants\"); }\n" +
+            "      { summaryOut.println(\"Test \" + i + \" detects \" + (100.0*_counts[i])/_totals[i] + \"% " + bfname + " mutants\"); }\n" +
             "    }\n" +  
             "  }\n\n"; 
           // System.out.println(bfmutanttest);

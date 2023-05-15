@@ -167,9 +167,9 @@ public class BSystemTypes extends BComponent
 	  
       String test = pred.queryForm(newenv,false); 
       
-	  System.out.println(">>> Result =  " + test); 
+      System.out.println(">>> Result =  " + test); 
 	  
-	  String wvar = Expression.wrap(e,var); 
+      String wvar = Expression.wrap(e,var); 
       res = res + "      if (" + test + ")\n" + 
                   "      { _results_" + oldindex + ".add(" + wvar + "); }\n"; 
       res = res + "    }\n"; 
@@ -403,10 +403,11 @@ public class BSystemTypes extends BComponent
       for (int i = 0; i < pars.size(); i++) 
       { Attribute par = (Attribute) pars.get(i); 
         if (par.getType() == null) 
-        { System.err.println("ERROR: no type for " + par); } 
+        { System.err.println("!! ERROR: no type for " + par); } 
         else 
         { Type partype = par.getType(); 
-          String jType = partype.getJava7(partype.getElementType()); 
+          String jType = 
+            partype.getJava7(partype.getElementType()); 
           res1 = res1 + ", " + jType + " " + par.getName(); 
           res2 = res2 + ", " + jType + " " + par.getName();  
           res3 = res3 + ", " + jType + " " + par.getName();
@@ -927,7 +928,10 @@ public class BSystemTypes extends BComponent
     if (argtype == null) 
     { System.err.println("!! ERROR: No type for " + exp + " in collect"); } 
     else 
-    { exptype = Type.getJava7Type(argtype, exp.getElementType()); } 
+    { exptype = 
+        Type.getJava7Type(argtype, argtype.getKeyType(), 
+                          exp.getElementType()); 
+    } 
 
     String restype = "ArrayList<" + exptype + ">";  
 
@@ -951,7 +955,9 @@ public class BSystemTypes extends BComponent
       { Attribute par = (Attribute) pars.get(i);
         Type partype = par.getType(); 
         if (partype != null)  
-        { res = res + "," + partype.getJava7(partype.getElementType()) + " " + par.getName(); } 
+        { res = res + "," + 
+                partype.getJava7(partype.getElementType()) + 
+                                 " " + par.getName(); } 
       } 
       res = res + ")\n"; 
       res = res + "  { // Implements: " + left + "->collect( " + var + " | " + exp + " )\n" + 
@@ -1633,7 +1639,8 @@ public class BSystemTypes extends BComponent
       { Attribute par = (Attribute) pars.get(i); 
         Type partype = par.getType(); 
         if (partype != null) 
-        { String jType = partype.getJava7(partype.getElementType()); 
+        { String jType = 
+            partype.getJava7(partype.getElementType()); 
           res1 = res1 + ", " + jType + " " + par.getName(); 
           res2 = res2 + ", " + jType + " " + par.getName(); 
           res3 = res3 + ", " + jType + " " + par.getName(); 
@@ -2793,9 +2800,11 @@ public class BSystemTypes extends BComponent
       { Attribute par = (Attribute) pars.get(i); 
         Type partype = par.getType(); 
         if (partype == null) 
-        { System.err.println("ERROR: no type for " + par); } 
+        { System.err.println("!! ERROR: no type for " + par); } 
         else 
-        { res = res + ", " + partype.getJava7(partype.getElementType()) + " " + par.getName(); }  
+        { res = res + ", " + 
+            partype.getJava7(partype.getElementType()) + " " + par.getName(); 
+        }  
       } 
       res = res + ")\n"; 
 
@@ -3428,9 +3437,11 @@ public class BSystemTypes extends BComponent
       { Attribute par = (Attribute) pars.get(i); 
         Type partype = par.getType(); 
         if (partype == null) 
-        { System.err.println("ERROR: no type for " + par); } 
+        { System.err.println("!! ERROR: no type for " + par); } 
         else 
-        { res = res + "," + partype.getJava7(partype.getElementType()) + " " + par.getName(); } 
+        { res = res + "," + 
+            partype.getJava7(partype.getElementType()) + " " + par.getName(); 
+        } 
       } 
       res = res + ")\n"; 
 
@@ -4057,9 +4068,11 @@ public class BSystemTypes extends BComponent
       { Attribute par = (Attribute) pars.get(i); 
         Type partype = par.getType(); 
         if (partype == null) 
-        { System.err.println("ERROR: no type for parameter " + par); } 
+        { System.err.println("!! ERROR: no type for parameter " + par); } 
         else 
-        { res = res + "," + partype.getJava7(partype.getElementType()) + " " + par.getName(); }
+        { res = res + "," + 
+            partype.getJava7(partype.getElementType()) + " " + par.getName(); 
+        }
       } 
       res = res + ")\n"; 
 
@@ -5953,10 +5966,25 @@ public class BSystemTypes extends BComponent
   } // map
 
   public static String generateMaxOpJava7()  // for Java7
-  { String res = "  public static <T> T max(Collection<T> l)\n";
+  { /* String res = "  public static <T> T max(Collection<T> l)\n";
     res = res +  "  { return Collections.max(l); }\n";
     return res;
-  } // map
+    } */ 
+
+    String res = "  public static <T extends Comparable> T max(Collection<T> s)\n" +
+    "  { ArrayList<T> slist = new ArrayList<T>();\n" + 
+    "    slist.addAll(s); \n" +
+    "    T result = slist.get(0);\n" + 
+    "    for (int i = 1; i < slist.size(); i++)\n" + 
+    "    { T val = slist.get(i); \n" +
+    "      if (0 < val.compareTo(result))\n" + 
+    "      { result = val; } \n" +
+    "    } \n" +
+    "    return result;\n" + 
+    "  } \n"; 
+    return res; 
+  } 
+
 
   public static String generateMaxOpCSharp()  // for CSharp
   { String res = "  public static object max(ArrayList l)\n";
@@ -6007,10 +6035,22 @@ public class BSystemTypes extends BComponent
   } // map
 
   public static String generateMinOpJava7()  // for Java7 - not needed. 
-  { String res = "  public static <T> T min(Collection<T> l)\n";
-    res = res +  "  { return Collections.min(l); }\n";
-    return res;
-  } // map
+  { // String res = "  public static <T> T min(Collection<T> l)\n";
+    // res = res +  "  { return Collections.min(l); }\n";
+    // return res;
+    String res = "  public static <T extends Comparable> T min(Collection<T> s)\n" +
+    "  { ArrayList<T> slist = new ArrayList<T>();\n" + 
+    "    slist.addAll(s); \n" +
+    "    T result = slist.get(0);\n" + 
+    "    for (int i = 1; i < slist.size(); i++)\n" + 
+    "    { T val = slist.get(i); \n" +
+    "      if (val.compareTo(result) < 0)\n" + 
+    "      { result = val; } \n" +
+    "    } \n" +
+    "    return result;\n" + 
+    "  } \n"; 
+    return res; 
+  } // and for map
 
   public static String generateMinOpCSharp()
   { String res = "  public static object min(ArrayList l)\n";
@@ -9774,8 +9814,8 @@ public class BSystemTypes extends BComponent
 
   public static String generateAsSetOpJava7()
   { String res = 
-    "    public static <T> Set<T> asSet(Collection<T> c)\n" +
-    "    { Set<T> res = new HashSet<T>();\n" +
+    "    public static <T> HashSet<T> asSet(Collection<T> c)\n" +
+    "    { HashSet<T> res = new HashSet<T>();\n" +
     "      res.addAll(c);\n" +
     "      return res;\n" +
     "    }\n\n";

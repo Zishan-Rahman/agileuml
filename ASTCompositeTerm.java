@@ -10209,8 +10209,8 @@ public class ASTCompositeTerm extends ASTTerm
       vartypes.put(fname,bftype); 
       varelemtypes.put(fname,bf.getReturnType()); 
 
-      System.out.println("Variable types = " + vartypes); 
-      System.out.println("Variable element types = " + varelemtypes); 
+      System.out.println(">> Variable types = " + vartypes); 
+      System.out.println(">> Variable element types = " + varelemtypes); 
 
       res.add(bf); 
       return res;    
@@ -11066,7 +11066,7 @@ public class ASTCompositeTerm extends ASTTerm
                                 vartypes,varelemtypes,types,
                                 entities);
 
-      System.out.println("+++ Yield statement " + this); 
+      System.out.println("+++>> Yield statement " + this); 
 
       Expression ee = new BasicExpression("null"); 
       ee.setType(new Type("OclAny", null)); 
@@ -42855,17 +42855,18 @@ public class ASTCompositeTerm extends ASTTerm
         "Define".equals(terms.get(0) + "") && 
         terms.size() > 3)
     { // Define ID = expression or other item
-      ASTCompositeTerm expr = (ASTCompositeTerm) terms.get(3);
-      ASTTerm var = (ASTTerm) terms.get(1);
+      if (terms.get(3) instanceof ASTCompositeTerm)
+      { ASTCompositeTerm expr = (ASTCompositeTerm) terms.get(3);
+        ASTTerm var = (ASTTerm) terms.get(1);
 
-      if (expr.getTag().equals("expression"))
-      { ASTTerm.mathoclvars.put(var + "", expr); 
+        if (expr.getTag().equals("expression"))
+        { ASTTerm.mathoclvars.put(var + "", expr); 
         // JOptionPane.showMessageDialog(null, 
         //       ">> " + var + " = " + expr, 
         //       "", 
         //       JOptionPane.INFORMATION_MESSAGE);
-      }
-      else if (expr.getTag().equals("substituteIn"))
+        }
+     /* else if (expr.getTag().equals("substituteIn"))
       { ASTTerm def = 
           (ASTTerm) expr.getTerm(3); 
         ASTTerm subvar = 
@@ -42895,7 +42896,8 @@ public class ASTCompositeTerm extends ASTTerm
           res = res + 
             "  Define " + var + " = " + vt; 
         } 
-      }   
+      } */
+      }     
     } 
 
     /* if ("formula".equals(tag) && 
@@ -42960,7 +42962,10 @@ public class ASTCompositeTerm extends ASTTerm
           String quadformula2 = 
             AuxMath.quadraticFormula2(coefsq, coefvar, cnsts); 
           
-          return "  Simplify (" + vx0 + " = " + quadformula1 + ") or (" + vx0 + " = " + quadformula2 + ")"; 
+          return "  Define " + vx0 + "$1 = " + quadformula1 + "\n" + 
+                 "  Define " + vx0 + "$2 = " + quadformula2 + "\n" + 
+                 "  Define " + vx0 + "\n" + 
+                 "  Constraint on " + vx0 + " | (" + vx0 + " = " + vx0 + "$1) or (" + vx0 + " = " + vx0 + "$2)"; 
         } 
         else if (maxp == 1 && minp == -1 && maxdp == 0) 
         { // multiply by var

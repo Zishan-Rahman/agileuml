@@ -536,6 +536,35 @@ public class Compiler2
     return false; 
   } 
 
+  public static boolean isAnyKeyword(String str) 
+  { if (str.equals("class") || str.equals("if") || str.equals("while") ||
+        str.equals("error") || 
+        str.equals("catch") || 
+        str.equals("try") || 
+        str.equals("endtry") || 
+        str.equals("assert") || 
+        str.equals("return") || str.equals("break") || str.equals("continue") || 
+        str.equals("float") || str.equals("char") || str.equals("byte") || 
+        str.equals("boolean") || str.equals("int") || 
+        str.equals("long") || str.equals("double") ||  
+        str.equals("transient") || str.equals("volatile") || str.equals("short") ||
+        str.equals("native") || str.equals("enum") || str.equals("package") ||
+        str.equals("strictfp") || str.equals("wait") || str.equals("goto") || 
+        str.equals("const") || str.equals("notify") || str.equals("notifyAll") || 
+        str.equals("case") || str.equals("switch") || str.equals("this") || 
+        str.equals("null") ||
+        str.equals("new") || 
+        str.equals("try") || str.equals("catch") || str.equals("finally") ||
+        str.equals("synchronized") || str.equals("until") || str.equals("do") || 
+        str.equals("interface") || str.equals("extends") || str.equals("implements") ||
+        str.equals("for") || str.equals("instanceof") || str.equals("private") || 
+        str.equals("public") || str.equals("final") || str.equals("static") ||
+        str.equals("void") || str.equals("abstract") || str.equals("protected") ||
+        str.equals("else") || str.equals("throw") || str.equals("throws"))
+    { return true; }  // Java keywords. "super" is allowed. 
+    return false; 
+  } 
+
   public static boolean isSimpleIdentifier(String s)
   { boolean res = true; 
     if (Character.isLetter(s.charAt(0))) {}
@@ -1200,7 +1229,10 @@ public class Compiler2
     { Type tt = null; 
       if (st == en) 
       { System.err.println("!! Warning, map/function types must have type parameters"); 
-        return new Type(typ, null); 
+        tt = new Type(typ, null);
+        tt.setKeyType(new Type("OclAny", null)); 
+        tt.setElementType(new Type("OclAny", null)); 
+        return tt;  
       } 
 
       if (st+1 <= en-1) 
@@ -1971,21 +2003,24 @@ public class Compiler2
         expectStereo = false; 
       } 
       else if (se.equals("not"))
-      { cg.setNegative(); } 
+      { cg.setNegative();
+        expectVar = false; 
+        expectStereo = true;
+      } 
       else if (se.equals("/"))
-      { cg.setSubstitute(); } 
+      { cg.setSubstitute();
+        expectVar = false; 
+        expectStereo = true;
+      } 
       else if (se.equals("`") && 
-               i + 2 < lexs.size())
+               i + 1 < lexs.size())
       { String mt = "" + lexs.get(i+1); 
-        cg.setVariableMetafeature(mt);
+        if (expectStereo) // just seen a variable 
+        { cg.setVariableMetafeature(mt); } 
+        else if (expectVar) 
+        { cg.setStereotypeMetafeature(mt); }
         i++;
-      } // expectVar false, expectStereo true
-      else if (se.equals("`") && 
-               i + 2 == lexs.size())
-      { String mt = "" + lexs.get(i+1); 
-        cg.setStereotypeMetafeature(mt);
-        i++;
-      } // expectVar false, expectStereo false
+      } 
       else if (expectVar)
       { cg.setVariable(se); 
         expectVar = false; 
@@ -1996,11 +2031,13 @@ public class Compiler2
         expectVar = true; 
         expectStereo = false; 
       } 
+
+      System.out.println(se + " " + expectVar + " " + expectStereo + " " + cg); 
     }
 
     conds.add(cg); 
     return conds; 
-  } // Could be metafeatures: _i`mf value
+  } // Could be metafeatures on both variable, stereotype
 	
 	
   public Vector parseCGconditions(String str) 
@@ -5470,6 +5507,16 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
         return "f->apply(x)"; 
       } 
 
+      if ("->asSet".startsWith(st))
+      { mess[0] = "Converts collection to a set"; 
+        return "x->asSet()"; 
+      }
+
+      if ("->asSequence".startsWith(st))
+      { mess[0] = "Converts collection to sequence"; 
+        return "x->asSequence()"; 
+      }
+
       if ("->asBag".startsWith(st))
       { mess[0] = "Converts collection to Bag (a sorted sequence)"; 
         return "x->asBag()"; 
@@ -6450,7 +6497,15 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
     return res; 
  }
 
-
+  public Vector parseKM3()
+  { Vector ents = new Vector();
+    Vector typs = new Vector();
+    Vector gens = new Vector();
+    Vector pasts = new Vector();
+    Vector pnames = new Vector();
+    Vector items = parseKM3(ents,typs,gens,pasts,pnames);
+    return ents; 
+  }
 
   public Vector parseKM3(Vector entities, Vector types, Vector gens, Vector pasts, Vector pnames)
   { Vector res = new Vector(); 
@@ -6910,7 +6965,9 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
           else if ("invariant".equals(lxr))
           { Expression expr = parse_expression(0,reached+1,i-2,entities,types); 
             if (expr != null) 
-            { Constraint cons = Constraint.getConstraint(expr); 
+            { Constraint cons = 
+                 Constraint.getConstraint(expr); 
+              cons.setOwner(res); 
               res.addInvariant(cons);
             }
             else 

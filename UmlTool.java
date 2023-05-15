@@ -312,6 +312,8 @@ public void findPlugins()
     JMenuItem loadopRequirements = 
       new JMenuItem("Formalise operation requirements"); 
     loadopRequirements.addActionListener(this);
+    loadopRequirements.setToolTipText(
+      "Creates UML/OCL in output/mm.km3 from POS-tagged/parsed text in output/nlpout.txt. Needs output/background.txt thesaurus.");
     fileMenu.add(loadopRequirements);
 
     fileMenu.addSeparator(); 
@@ -761,6 +763,10 @@ public void findPlugins()
     JMenuItem measuresItem = new JMenuItem("Quality measures"); 
     measuresItem.addActionListener(this);
     analyseMenu.add(measuresItem);
+
+    JMenuItem carchItem = new JMenuItem("Clean architecture properties"); 
+    carchItem.addActionListener(this);
+    analyseMenu.add(carchItem);
 
     JMenuItem ddepsItem = new JMenuItem("Data dependencies"); 
     ddepsItem.addActionListener(this);
@@ -1268,7 +1274,7 @@ public void findPlugins()
     cgtlGenerator.addActionListener(this);
     buildMenu.add(cgtlGenerator); 
 
-    JMenuItem cstl4ast = new JMenuItem("Apply CSTL to AST"); 
+    JMenuItem cstl4ast = new JMenuItem("Apply CSTL/CGTL to AST"); 
     cstl4ast.addActionListener(this);
     buildMenu.add(cstl4ast); 
 
@@ -1961,7 +1967,7 @@ public void findPlugins()
       { ucdArea.applyCSTLSpecification(); } 
       else if (label.equals("Use CGTL specification"))
       { ucdArea.applyCGTL(); } 
-      else if (label.equals("Apply CSTL to AST"))
+      else if (label.equals("Apply CSTL/CGTL to AST"))
       { ucdArea.applyCSTLtoAST(); } 
       else if (label.equals("Generate Python"))
       { ucdArea.saveModelToFile("output/model.txt"); 
@@ -2027,7 +2033,7 @@ public void findPlugins()
           out.close();
         }
         catch (IOException ex)
-        { System.out.println("Error generating Web System"); }
+        { System.out.println("!! Error generating Web System"); }
 
         new TextDisplay("Web System code","output/servlets.txt");
       } 
@@ -2041,7 +2047,7 @@ public void findPlugins()
           out.close();
         }
         catch (IOException ex)
-        { System.out.println("Error generating Web System"); }
+        { System.out.println("!! Error generating Web System"); }
 
         new TextDisplay("Web System code","output/jsps.txt");
       } 
@@ -2055,7 +2061,7 @@ public void findPlugins()
           out.close();
         }
         catch (IOException ex)
-        { System.out.println("Error generating Android System"); }
+        { System.out.println("!! Error generating Android System"); }
 
         new TextDisplay("Android System code","output/app/AndroidManifest.xml");
       } 
@@ -2120,14 +2126,14 @@ public void findPlugins()
           egb.start(); igb.start();   
           int exitjavac = p.waitFor(); 
           if (exitjavac == 0) 
-          { System.out.println("Compilation successfull"); } 
+          { System.out.println(">>> Compilation successfull"); } 
           else 
-          { System.out.println("Compilation problem, exit code: " + exitjavac); 
+          { System.out.println("! Compilation problem, exit code: " + exitjavac); 
             return; 
           }  
         } 
         catch (Exception ee) 
-        { System.err.println("Unable to compile generated code: check the specification for errors"); } 
+        { System.err.println("!! Unable to compile generated code: check the specification for errors"); } 
 
         File manifest = new File("Manifest.txt");
         try
@@ -2138,7 +2144,7 @@ public void findPlugins()
           mout.close();
         }
         catch (IOException ex)
-        { System.out.println("Error generating Manifest.txt");
+        { System.out.println("! Error generating Manifest.txt");
           return; 
         }
 
@@ -2155,7 +2161,7 @@ public void findPlugins()
           }  */
           isg.start(); 
           int exitjar = p1.waitFor(); 
-          System.out.println("Jar exit code: " + exitjar); 
+          System.out.println(">>> Jar exit code: " + exitjar); 
           Process p2 = proc.exec("java -jar " + dir + "/" + dir + ".jar"); 
 
           InputStream sin2 = p2.getInputStream(); 
@@ -2168,13 +2174,13 @@ public void findPlugins()
             oline2 = ibr2.readLine(); 
           }  
           int exitjar2 = p2.waitFor(); 
-          System.out.println("Java exit code: " + exitjar2);
+          System.out.println(">>> Java exit code: " + exitjar2);
 
           Thread appthread = new Thread(new RunApp(dir)); 
           appthread.start(); 
         } 
         catch (Exception ee1) 
-        { System.err.println("Unable to run application"); }     
+        { System.err.println("! Unable to run application"); }     
       }
       else if (label.equals("Invariants"))
       { displayInvariants(ucdArea.displayInvariants()); 
@@ -2202,7 +2208,7 @@ public void findPlugins()
           out.close();
         }
         catch (IOException ex)
-        { System.out.println("Error generating operations"); }
+        { System.out.println("!! Error generating operations"); }
 
         new TextDisplay("Operations","output/tmp");
       }  
@@ -2236,6 +2242,8 @@ public void findPlugins()
 
         new TextDisplay("Measures","output/tmp.txt");
       }  
+      else if (label.equals("Clean architecture properties"))
+      { ucdArea.cleanArchitectureCheck(); }
       else if (label.equals("Data dependencies"))
       { ucdArea.displayDataDependencies(); }
       else if (label.equals("Compare models"))

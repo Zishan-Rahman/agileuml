@@ -2730,7 +2730,7 @@ public void findClones(java.util.Map clones,
     { BasicExpression be = (BasicExpression) callExp; 
       Vector readBEs = be.readBasicExpressionData(); 
       Vector readVars = be.readData(); 
-      String upd = be.updatedData(); 
+      String upd = be.getObjectRef() + ""; 
 
       if (upd != null) 
       { for (int i = 0; i < readVars.size(); i++) 
@@ -4295,9 +4295,12 @@ class WhileStatement extends Statement
         if (lret.isEntity())
         { lv.setEntity(lret.getEntity()); } 
       } 
-      // System.out.println(">>> Entity of loop variable " + lv + " is " + lv.getEntity());   
+
+      System.out.println(">>> Type of loop variable " + lv + " is " + lv.getType() + " entity: " + lv.getEntity());   
+
       env1.add(lv); 
     } 
+
     return body.typeCheck(types,entities,ctxs,env1); 
   }  
 
@@ -4341,11 +4344,18 @@ class WhileStatement extends Statement
 
   public Vector dataDependents(Vector allvars, Vector vars, Map mp, Map dlin)
   { Map bodymap = new Map(); 
-    Vector bodydeps = body.dataDependents(allvars,vars, bodymap, dlin);
+    Map bodydlin = new Map(); 
+
+    Vector bodydeps = body.dataDependents(allvars,vars, bodymap, bodydlin);
+
     Vector result = new Vector(); 
     result.addAll(bodydeps); 
+
     Vector updatedvariables = bodymap.range(); 
     mp.unionWith(bodymap); 
+
+    Vector modifiedvariables = bodydlin.range(); 
+    dlin.unionWith(bodydlin); 
 
     if (loopKind == FOR && loopVar != null && 
         loopRange != null)
@@ -4358,11 +4368,19 @@ class WhileStatement extends Statement
       for (int i = 0; i < rangevars.size(); i++) 
       { String rv = "" + rangevars.get(i); 
         mp.add_pair(rv, lv); 
-      } 
+        for (int j = 0; j < updatedvariables.size(); j++) 
+        { String vv = "" + updatedvariables.get(j); 
+          mp.add_pair(rv, vv); 
+        } 
+      }
 
       for (int i = 0; i < rangeBEs.size(); i++) 
       { String rv = "" + rangeBEs.get(i); 
         dlin.add_pair(rv, lv);
+        for (int k = 0; k < modifiedvariables.size(); k++) 
+        { String vv = "" + modifiedvariables.get(k); 
+          dlin.add_pair(rv, vv); 
+        } 
       } 
 
       if (vars.contains(lv)) 
@@ -4628,7 +4646,7 @@ class WhileStatement extends Statement
         Type et = loopRange.getElementType(); 
         String etr = "Object"; 
         if (et == null) 
-        { System.err.println("Error: null element type for " + loopRange);
+        { System.err.println("!! Error: null element type for " + loopRange);
           // JOptionPane.showMessageDialog(null, "ERROR: No element type for: " + loopRange,
           // "Type error", JOptionPane.ERROR_MESSAGE); 
           if (loopVar.getType() != null)
@@ -4658,9 +4676,9 @@ class WhileStatement extends Statement
         String wrappedElemType = Type.typeWrapperJava(et); 
 
         return "  ArrayList<" + wrappedElemType + "> " + rang + " = new ArrayList<" + wrappedElemType + ">();\n" +
-               "  " + rang + ".addAll(" + lr + ");\n" + 
-               "  for (int " + ind + " = 0; " + ind + " < " + rang + ".size(); " + ind + "++)\n" + 
-               "  { " + etr + " " + lv + " = " + extract + ";\n" +
+               "    " + rang + ".addAll(" + lr + ");\n" + 
+               "    for (int " + ind + " = 0; " + ind + " < " + rang + ".size(); " + ind + "++)\n" + 
+               "    { " + etr + " " + lv + " = " + extract + ";\n" +
                "    " + newbody + "\n" + 
                "  }"; 
       } 
@@ -4692,9 +4710,9 @@ class WhileStatement extends Statement
         String newbody = processPreTermsJava7(body, preterms, env1, local); 
 
         return "  ArrayList<" + etr + "> " + rang + " = new ArrayList<" + etr + ">();\n" +
-               "  " + rang + ".addAll(" + lr + ");\n" + 
-               "  for (int " + ind + " = 0; " + ind + " < " + rang + ".size(); " + ind + "++)\n" + 
-               "  { " + etr + " " + lv + " = (" + etr + ") " + rang + ".get(" + ind + ");\n" +
+               "    " + rang + ".addAll(" + lr + ");\n" + 
+               "    for (int " + ind + " = 0; " + ind + " < " + rang + ".size(); " + ind + "++)\n" + 
+               "    { " + etr + " " + lv + " = (" + etr + ") " + rang + ".get(" + ind + ");\n" +
                "    " + newbody + "\n" + 
                "  }"; 
       } 
@@ -5259,6 +5277,15 @@ class CreationStatement extends Statement
     variable = vbl.variable;  
   }
 
+  public static CreationStatement newCreationStatement(
+            String vbl, Type typ, Expression einit) 
+  { CreationStatement cs = 
+       new CreationStatement(typ.getName(), vbl); 
+    cs.setType(typ);
+    cs.setInitialisation(einit);   
+    return cs; 
+  } 
+
   public static CreationStatement newCreationStatement(String vbl, String typ) 
   { CreationStatement cs = new CreationStatement(typ, vbl); 
     Type t = Type.getTypeFor(typ);
@@ -5732,7 +5759,7 @@ class CreationStatement extends Statement
     else if (createsInstanceOf.startsWith("Map"))
     { return "  HashMap " + assignsTo + ";"; } 
     else if (createsInstanceOf.startsWith("Function"))
-    { return "  Evaluation<String,Object> " + assignsTo + ";"; } 
+    { return "  Function<String,Object> " + assignsTo + ";"; } 
     else if (createsInstanceOf.startsWith("Ref"))
     { return "  Object[] " + assignsTo + " = new Object[1];"; }
     else if (createsInstanceOf.equals("OclAny"))
@@ -5740,7 +5767,7 @@ class CreationStatement extends Statement
     else if (createsInstanceOf.equals("OclType"))
     { return "  Class " + assignsTo + ";"; }
     else if (createsInstanceOf.equals("OclDate"))
-    { return "  Date " + assignsTo + ";"; }
+    { return "  OclDate " + assignsTo + ";"; }
     else if (createsInstanceOf.equals("OclRandom"))
     { return "  OclRandom " + assignsTo + ";"; }
     else if (createsInstanceOf.equals("OclIterator"))
@@ -5999,9 +6026,11 @@ class CreationStatement extends Statement
 
   public boolean typeCheck(Vector types, Vector entities, Vector ctxs, Vector env)
   { Attribute att = 
-          new Attribute(assignsTo,instanceType,ModelElement.INTERNAL); 
+      new Attribute(assignsTo,instanceType,
+                    ModelElement.INTERNAL); 
 
-    Type typ = Type.getTypeFor(createsInstanceOf, types, entities); 
+    Type typ = Type.getTypeFor(createsInstanceOf, 
+                               types, entities); 
     if (instanceType == null && typ != null) 
     { instanceType = typ; } 
     if (elementType != null) 
@@ -6024,6 +6053,9 @@ class CreationStatement extends Statement
     if (initialExpression != null) 
     { initialExpression.typeCheck(types,entities,ctxs,env); }
 	
+    // if typ == null && instanceType == null use the 
+    // initialExpression type instead. 
+
     return true; 
   }  // createsInstanceOf must be a primitive type, String or entity, if Sequence, Set
      // there is not necessarily an element type. 
@@ -10983,9 +11015,9 @@ class AssignStatement extends Statement
   { Vector vbls = new Vector(); 
     vbls.addAll(vars); 
 
-    String updatedVar = lhs.updatedData(); 
+    String updatedVar = lhs + ""; 
 
-    if (updatedVar != null && vars.contains(updatedVar))
+    if (updatedVar != null) //  && vars.contains(updatedVar))
     { // remove this variable and add all vars of rhs to vars
       vbls.remove(updatedVar); 
       Vector es = rhs.allAttributesUsedIn(); 
@@ -11004,7 +11036,8 @@ class AssignStatement extends Statement
         { vbls.add(var); } 
       } 
 
-      // System.out.println(updatedVar + " --from--> " + rhsBEs); 
+      // System.out.println(updatedVar + " --from--> " + rhsBEs);
+ 
       for (int i = 0; i < rhsBEs.size(); i++) 
       { String rv = "" + rhsBEs.get(i); 
         dlin.add_pair(rv, updatedVar);

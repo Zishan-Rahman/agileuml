@@ -29,6 +29,7 @@ part
 
 formula
     :	'Define' ID '=' (expression | substituteIn | expandTo | cancelIn | factorBy | simplify ) 
+    | 'Define' ID '~' expression
     | 'Define' ID
     ; 
 
@@ -116,7 +117,6 @@ basicExpression
     | 'false'
     | basicExpression '.' ID 
     | basicExpression '(' expressionList? ')'  
-    | basicExpression '[' expression ']' 
     | identifier
     | 'g{' ID '}'  
     | INT  
@@ -148,8 +148,8 @@ logicalExpression
     | logicalExpression 'xor' logicalExpression  
     | logicalExpression '&' logicalExpression 
     | logicalExpression 'and' logicalExpression
-    | FORALL identifier CDOT logicalExpression
-    | EXISTS identifier CDOT logicalExpression  
+    | FORALL identifier ':' type CDOT logicalExpression
+    | EXISTS identifier ':' type CDOT logicalExpression  
     | 'not' logicalExpression  
     | equalityExpression
     ; 
@@ -157,7 +157,7 @@ logicalExpression
 equalityExpression 
     : additiveExpression 
         ('=' | '<' | '>' | '>=' | '<=' | '/=' | '<>' |
-         ':'| '/:' | '<:' | IN | NOTIN) additiveExpression 
+         '~' | ':'| '/:' | '<:' | IN | NOTIN) additiveExpression 
     | additiveExpression
     ; 
 
@@ -169,7 +169,8 @@ additiveExpression
     ; 
 
 factorExpression 
-    : 'C' '_{' expression '}' '^{' expression '}'
+    : 'C_{' expression '}' '^{' expression '}'
+    | 'E[' expression ']' 
     | factorExpression ('*' | '/' | 'mod' | 'div') 
                                    factorExpression
     | INTEGRAL '_{' expression '}' '^{' expression '}' expression ID 
@@ -218,11 +219,8 @@ factor2Expression
    ; 
 
 setExpression 
-    : 'OrderedSet{' expressionList? '}'  
-    | 'Bag{' expressionList? '}'  
-    | 'Set{' expressionList? '}' 
-    | 'Sequence{' expressionList? '}' 
-    | 'Map{' expressionList? '}'
+    : '{' ID ':' type '|' expression '}'
+    | '{' ID ':' type '|' expression CDOT expression '}'  
     ; 
 
 
