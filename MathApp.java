@@ -63,6 +63,8 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
    String newline = "\n";
    HashMap actions;
 
+   JEditorPane helpPane = null; 
+
    String systemName = "app"; 
    private JLabel thisLabel;
    String insertedText = ""; 
@@ -340,6 +342,7 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
         JMenu transMenu = createTranslationMenu();
         JMenu styleMenu = createStyleMenu();
         JMenu analysisMenu = createAnalysisMenu();
+        JMenu helpMenu = createHelpMenu(); 
         
         JMenuBar mb = new JMenuBar();
 
@@ -349,6 +352,7 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
         mb.add(styleMenu);
         mb.add(analysisMenu);
         mb.add(transMenu);
+        mb.add(helpMenu); 
         
         setJMenuBar(mb);
 
@@ -420,6 +424,8 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
 
       javax.swing.Action checkAction = new CheckAction(); 
         // checkAction.setMnemonic(KeyEvent.VK_K);
+      menu.setToolTipText(
+                      "Check & simplify the specification");
       menu.add(checkAction); 
 
       javax.swing.Action analyseAction = new AnalyseAction(); 
@@ -434,11 +440,14 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
 
       // Also, translate to OCL, translate to Matlab
 
-      javax.swing.Action matlabAction = new MatlabAction(); 
-      menu.add(matlabAction); 
+      menu.setToolTipText(
+              "Translate to Matlab, OCL, Mamba, code");
 
       javax.swing.Action km3Action = new KM3Action(); 
       menu.add(km3Action); 
+
+      javax.swing.Action matlabAction = new MatlabAction(); 
+      menu.add(matlabAction); 
 
       javax.swing.Action mambaAction = new MambaAction(); 
       menu.add(mambaAction); 
@@ -454,6 +463,18 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       javax.swing.Action toCPPAction = new Translate2CPPAction(); 
         // checkAction.setMnemonic(KeyEvent.VK_K);
       menu.add(toCPPAction); 
+
+      return menu; 
+   } 
+
+    protected JMenu createHelpMenu() 
+    { JMenu menu = new JMenu("Help");
+
+      javax.swing.Action helpNotationAction = new HelpNotationAction(); 
+      menu.add(helpNotationAction); 
+
+      javax.swing.Action helpProcessAction = new HelpProcessAction(); 
+      menu.add(helpProcessAction); 
 
       return menu; 
    } 
@@ -496,7 +517,7 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
           { inserting = true; 
             insertedText = insertedText + chr.charAt(0); 
             if ("Define".equals(insertedText))
-            { thisLabel.setText("Define variable: Define v, Define v = expr, Define v ~ distribution"); }
+            { thisLabel.setText("Define variable: Define v, Define v = expr, Define v = instruction, Define v ~ distribution"); }
             else if ("Solve".equals(insertedText))
             { thisLabel.setText("Solve single quadratic or differential equations, and multiple linear equations: Solve eqns for vars"); }
             else if ("Prove".equals(insertedText))
@@ -505,6 +526,12 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
             { thisLabel.setText("Constraint on a variable: Constraint on var | expr"); }
             else if ("Simplify".equals(insertedText))
             { thisLabel.setText("Simplify an expression: Simplify expr"); }
+            else if ("Factor".equals(insertedText))
+            { thisLabel.setText("Instruction to Factor: Factor expr by var"); }
+            else if ("Cancel".equals(insertedText))
+            { thisLabel.setText("Instruction to Cancel: Cancel var in expr"); }
+            else if ("Substitute".equals(insertedText))
+            { thisLabel.setText("Instruction to Substitute: Substitute var in expr"); }
           } 
           else  
           { thisLabel.setText(" "); 
@@ -614,7 +641,7 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       }
       catch(Exception _e) { _e.printStackTrace();
                             return; } 
-
+      thisLabel.setText("Specification saved in Test.xml, data.ser");
     } 
   } 
 
@@ -659,6 +686,8 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
         _e.printStackTrace();
         return; 
       }
+
+      thisLabel.setText("Specification loaded from Test.xml, data.ser");
     } 
   } 
 
@@ -713,7 +742,9 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
         } catch (Exception ex) { }  
       }  
       messageArea.setText(result);
-      internalModel = result; 
+      internalModel = result;
+  
+      thisLabel.setText("Specification translated to text format");
     }
   }
 
@@ -742,13 +773,17 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
 
         String asttext = antlr.getResultText(); 
         // messageArea.setText("" + asttext);
-        System.out.println(asttext); 
+        // System.out.println(asttext); 
  
         Compiler2 cc = new Compiler2(); 
         ASTTerm trm = cc.parseGeneralAST(asttext); 
-        if (trm != null)  
-        { String extracode = 
-            ((ASTCompositeTerm) trm).preprocessMathOCL(); 
+        if (trm != null && trm instanceof ASTCompositeTerm)  
+        { ASTCompositeTerm spec = (ASTCompositeTerm) trm;
+          ASTTerm.mathoclvars = new java.util.HashMap();  
+          spec.checkMathOCL(); 
+
+          // String extracode = 
+          //   spec.preprocessMathOCL(); 
 
           Vector ents = new Vector(); 
           Vector typs = new Vector(); 
@@ -760,18 +795,21 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
 
           String entcode = trm.cg(cgs);
 
-          System.out.println(entcode + "\n" + extracode);
+          System.out.println(entcode);
+
           // messageArea.append("\n"); 
           long t2 = (new java.util.Date()).getTime(); 
 
           System.out.println(">>> Processing took " + (t2 - t1)); 
 
-          messageArea.setText(entcode + "\n" + extracode);
-          internalModel = entcode + "\n" + extracode;   
+          messageArea.setText(entcode);
+          internalModel = entcode;   
         } 
       } 
       catch (Exception _expt) 
       { _expt.printStackTrace(); } 
+
+      thisLabel.setText("Specification analysed & simplified");
     }
   }
 
@@ -816,6 +854,7 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       } 
       catch (Exception _expt) 
       { _expt.printStackTrace(); } 
+      thisLabel.setText("Translated to Matlab");
     }
   }
 
@@ -872,6 +911,7 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       } 
       catch (Exception _expt) 
       { _expt.printStackTrace(); } 
+      thisLabel.setText("Translated to UML/OCL");
     }
   }
 
@@ -917,6 +957,7 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       } 
       catch (Exception _expt) 
       { _expt.printStackTrace(); } 
+      thisLabel.setText("Translated to Mamba");
     }
   }
 
@@ -941,6 +982,7 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       String res = sw.toString(); 
       // messageArea.setText(res);
       System.out.println(res); 
+      thisLabel.setText("Translated to Java");
     } 
   } 
 
@@ -968,6 +1010,7 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       String res = sw.toString();
       System.out.println(res);  
       // messageArea.setText(res);
+      thisLabel.setText("Translated to C#");
     } 
   }
 
@@ -997,8 +1040,120 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       String res1 = sw1.toString(); 
       // messageArea.setText(res + "\n\n" + res1);
       System.out.println(res + "\n\n" + res1);
+      thisLabel.setText("Translated to C++");
     } 
   }
+
+  class HelpNotationAction extends javax.swing.AbstractAction
+  { public HelpNotationAction()
+    { super("Notation help"); }
+
+    public void actionPerformed(ActionEvent e)
+    { if (helpPane != null) 
+      { helpPane.setVisible(true); }
+      else 
+      {  
+        helpPane = new JEditorPane();  
+        helpPane.setEditable(false); 
+        helpPane.setSize(300,400);
+        int w = getWidth(); 
+        int h = getHeight(); 
+ 
+        getContentPane().add(new JScrollPane(helpPane),  
+                             java.awt.BorderLayout.EAST); 
+        setSize(w + 300, h); 
+        helpPane.setVisible(true); 
+
+        java.awt.LayoutManager ll = getLayout(); 
+        if (ll != null)
+        { ll.layoutContainer(getContentPane()); }  
+
+        helpPane.repaint(); 
+        repaint(); 
+      } 
+ 
+      helpPane.setText("Specifications contain these elements: \n\n" + 
+        "1. Define clauses, with syntax one of\n" + 
+        "    Define var = expr\n" + 
+        "    Define var = instruction\n" + 
+        "    Define var ~ distribution\n\n" +
+        "2. Constraint clauses, with syntax\n" + 
+        "    Constraint on var | expr\n\n" + 
+        "3. Solve clauses, with syntax\n" + 
+        "    Solve eqn(s) for var(s)\n\n" + 
+        "4. Simplify clauses: \n" + 
+        "    Simplify expr\n\n" + 
+        "5. Prove clauses:\n" + 
+        "    Prove expr if expr\n\n" + 
+        "Instructions can be one of:\n" + 
+        "    Factor expr by expr\n" + 
+        "    Cancel expr in expr\n" + 
+        "    Substitute var in expr\n" + 
+        "    Expand expr to N terms\n\n" + 
+        "Distributions are:\n" + 
+        "    N(mu,sigma^2), Bernoulli(mu), Binom(n,p),\n" + 
+        "    U(), U(a,b), Poisson(mu)\n"); 
+
+        helpPane.repaint(); 
+        repaint();  
+      } 
+  } 
+
+  class HelpProcessAction extends javax.swing.AbstractAction
+  { public HelpProcessAction()
+    { super("Process help"); }
+
+    public void actionPerformed(ActionEvent e)
+    { if (helpPane != null) 
+      { helpPane.setVisible(true); }
+      else 
+      {  
+        helpPane = new JEditorPane();  
+        helpPane.setEditable(false); 
+        helpPane.setSize(300,400);
+        int w = getWidth(); 
+        int h = getHeight(); 
+ 
+        getContentPane().add(new JScrollPane(helpPane),  
+                             java.awt.BorderLayout.EAST); 
+        setSize(w + 300, h); 
+        helpPane.setVisible(true); 
+
+        java.awt.LayoutManager ll = getLayout(); 
+        if (ll != null)
+        { ll.layoutContainer(getContentPane()); }  
+
+        helpPane.repaint(); 
+        repaint(); 
+      } 
+ 
+      helpPane.setText("Specifications are processed by: \n\n" + 
+        "1. Check -- translates mathematical notation to\n" + 
+        "    ASCII in the lower pane\n\n" +
+        "2. Analyse -- executes MathOCL parser and\n" + 
+        "    simplify.cstl to simplify expressions, solve\n" + 
+        "    equations and attempt proofs.\n" + 
+        "    Individual quadratic & homogenous differential\n" +
+        "    equations can be solved, eg: \n" + 
+        "      Solve 2*(f" + '\u2032' + ") - f = 0 for f\n" + 
+        "    Also multiple linear equations.\n" + 
+        "    The re-written specification is put in the lower\n" + 
+        "    pane. Analyse can be applied repeatedly and\n" + 
+        "    instructions can be inserted in the text.\n\n" + 
+        "3. Translate -- to UML/OCL and then to a\n" + 
+        "    programming language, or to Mamba or Matlab.\n" +
+        "    Specification should contain only Define,\n" + 
+        "    Simplify and Constraint elements.\n" +  
+        "    Uses mathocl2ocl.cstl, mathocl2mamba.cstl,\n" + 
+        "    mathocl2matlab.cstl, and AgileUML code\n" + 
+        "    generators for Java, C#, C++\n"); 
+
+        helpPane.repaint(); 
+        repaint();  
+      } 
+  } 
+
+  /* Solve 2*(f?) - f = 0 for f */ 
 
   public static void main(String[] args) {
      MathApp window = new MathApp();

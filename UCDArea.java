@@ -2431,11 +2431,13 @@ public class UCDArea extends JPanel
 
   public void removeInheritance(Entity sub, Entity sup)
   { Vector removed = new Vector(); 
+
     for (int i = 0; i < generalisations.size(); i++)
     { Generalisation gen = (Generalisation) generalisations.get(i); 
       if (gen.getAncestor() == sup && gen.getDescendent() == sub)
       { removed.add(gen); } 
     } 
+
     for (int j = 0; j < removed.size(); j++) 
     { Generalisation gg = (Generalisation) removed.get(j); 
       removeGeneralisation(gg); 
@@ -2450,7 +2452,7 @@ public class UCDArea extends JPanel
     if (ans.isInterface())
     { dec.removeInterface(ans); } 
     else 
-    { dec.setSuperclass(null); 
+    { dec.removeSuperclass(ans); 
       removeFamily(gen); 
     }
     ans.removeSubclass(dec); 
@@ -2915,10 +2917,10 @@ public class UCDArea extends JPanel
       uc.setParameters(patts); 
     } 
 	
-	String stereo = ucDialog.getStereotype(); 
-	if (stereo == null || "none".equals(stereo)) { } 
-	else 
-	{ uc.addStereotype(stereo); }
+    String stereo = ucDialog.getStereotype(); 
+    if (stereo == null || "none".equals(stereo)) { } 
+    else 
+    { uc.addStereotype(stereo); }
 	    
     repaint(); 
   }
@@ -6667,6 +6669,42 @@ public class UCDArea extends JPanel
     System.out.println(">> Set activity for operation " + nme + " of entity " + ent); 
   }
 
+  public void replaceCallsByDefinitions(Entity ent)
+  { String nme = 
+      JOptionPane.showInputDialog("Name of operation to be replaced by its code:");
+    BehaviouralFeature bf = ent.getOperation(nme); 
+    if (bf == null) 
+    { System.err.println("!! ERROR: No such operation: " + nme); 
+      return; 
+    } 
+
+    String op = 
+      JOptionPane.showInputDialog("Name of operation where replacement is performed:");
+    BehaviouralFeature oper = ent.getOperation(op); 
+    if (oper == null) 
+    { System.err.println("!! ERROR: No such operation: " + op); 
+      return; 
+    }
+
+    Statement effect = ent.replaceCallsByDefinitions(op,nme); 
+
+    if (effect == null) 
+    { return; } 
+    
+    Vector contexts = new Vector(); 
+    contexts.add(ent); 
+    Vector pars = new Vector(); 
+
+    effect.setEntity(ent); 
+    pars.addAll(oper.getParameters()); 
+
+    effect.typeCheck(types,entities,contexts,pars); 
+    
+    oper.setActivity(effect); 
+    updateActivities(ent, oper, effect); 
+    System.out.println(">> Set activity for operation " + op + " of entity " + ent); 
+  }
+
   public void splitOperationActivity(Entity ent)
   { String nme = 
           JOptionPane.showInputDialog("Enter operation name:");
@@ -7164,7 +7202,8 @@ public class UCDArea extends JPanel
   { VisualData vd = getVisualOf(srcent); 
     if (vd == null) { return; } 
     RectData rd =
-      new RectData(xx + vd.getx(),vd.gety(),getForeground(),componentMode,
+      new RectData(xx + vd.getx(),vd.gety(),
+                   getForeground(),componentMode,
                    rectcount);
     rectcount++;
     String nme = trgent.getName(); 
@@ -7396,6 +7435,41 @@ public class UCDArea extends JPanel
 
    linecount++;
    visuals.add(line);
+  }
+
+  public void addInheritance(Entity sup, Entity sub)
+  { RectData supvisual = (RectData) getVisualOf(sup); 
+    if (supvisual == null) 
+    { System.err.println("!! No visual for: " + sup); 
+      return; 
+    }
+
+    RectData subvisual = (RectData) getVisualOf(sub); 
+    if (subvisual == null) 
+    { System.err.println("!! No visual for: " + sub); 
+      return; 
+    }
+
+    Generalisation gen = new Generalisation(sup, sub);
+
+    int lineKind = SOLID; 
+    if (sup.isInterface())
+    { lineKind = DASHED; 
+      gen.setRealization(true); 
+    } 
+ 
+    InheritLineData line =
+        new InheritLineData(subvisual.getx() + 5,
+                            subvisual.gety(),
+                            supvisual.getx() + 5,
+                            supvisual.gety() + supvisual.height - 10,
+                            linecount,lineKind);
+
+    line.setModelElement(gen);
+    generalisations.add(gen);
+    linecount++;
+    visuals.add(line);
+    formFamilies(gen);
   }
 
   public void addInheritances(Entity e, Entity[] ents)
@@ -27212,6 +27286,14 @@ public void produceCUI(PrintWriter out)
     long t2 = (new java.util.Date()).getTime(); 
 
     System.out.println(">> Time taken = " + (t2 - t1)); 
+
+    // set all classes concrete
+
+    for (int i = 0; i < entities.size(); i++) 
+    { Entity ent = (Entity) entities.get(i); 
+      ent.removeStereotype("abstract"); 
+      ent.setAbstract(false); 
+    } 
 
     repaint(); 
   }

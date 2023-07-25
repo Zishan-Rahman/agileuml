@@ -1612,6 +1612,19 @@ abstract class Expression
       { return false; } 
     } 
 
+    if (cleanValue.startsWith("0o"))
+    { cleanValue = cleanValue.substring(2); 
+      try 
+      { Integer bx = Integer.parseInt(cleanValue,8); 
+        if (bx == null) 
+        { return false; } 
+        int bn = bx.intValue(); 
+        return true; 
+      } 
+      catch (Exception e) 
+      { return false; } 
+    } 
+
     try
     { Integer intx = Integer.decode(cleanValue); 
       if (intx == null) 
@@ -1682,6 +1695,19 @@ abstract class Expression
     { cleanValue = cleanValue.substring(2); 
       try 
       { Integer bx = Integer.parseInt(cleanValue,2); 
+        if (bx == null) 
+        { return 0; } 
+        int bn = bx.intValue(); 
+        return bn; 
+      } 
+      catch (Exception e) 
+      { return 0; } 
+    } 
+
+    if (cleanValue.startsWith("0o"))
+    { cleanValue = cleanValue.substring(2); 
+      try 
+      { Integer bx = Integer.parseInt(cleanValue,8); 
         if (bx == null) 
         { return 0; } 
         int bn = bx.intValue(); 
@@ -2539,12 +2565,12 @@ abstract class Expression
     { return null; }  /* Should never happen */
     else 
     { if (e1.subformulaOf(e2))
-      { System.err.println("Two copies of formula " +
+      { System.err.println("!! Warning: Two copies of formula " +
                     e1.toString() + " being merged"); 
         return e2;  // e2 not e1, surely?  
       }
       else 
-      { System.err.println("Inconsistent formulae " +
+      { System.err.println("!! Inconsistent formulae " +
                     e1.toString() + " and " + 
                     e2.toString() + " being removed"); 
         return new BasicExpression(false); 

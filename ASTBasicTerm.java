@@ -10,6 +10,8 @@
 import java.util.Vector; 
 import java.io.*; 
 
+import javax.swing.*;
+
 
 public class ASTBasicTerm extends ASTTerm
 { String tag = ""; 
@@ -245,7 +247,10 @@ public class ASTBasicTerm extends ASTTerm
       if (!failed)
       { 
         for (int p = 0; p < eargs.size(); p++)
-        { String textp = ((ASTTerm) eargs.get(p)).literalForm(); 
+        { // String textp = ((ASTTerm) eargs.get(p)).literalForm();
+          ASTTerm term = (ASTTerm) eargs.get(p);  
+          String textp = term.cg(cgs); 
+             
           args.add(textp); 
         }
 
@@ -2781,5 +2786,45 @@ public class ASTBasicTerm extends ASTTerm
     System.out.println(ttx); 
   } 
 
+  public ASTTerm mathOCLSubstitute(String var, ASTTerm repl)
+  { // System.out.println(">>> MathOCL term " + this); 
+
+    if ("identifier".equals(tag))
+    { if (var.equals(value)) 
+      { return repl; } 
+      return new ASTBasicTerm(tag, value); 
+    }
+
+    return this; 
+  } 
+ 
+
+  public void checkMathOCL()
+  { // System.out.println(">>> MathOCL term " + this); 
+
+    if ("identifier".equals(tag))
+    { ASTTerm t1 = getTerm(0); 
+      String vv = t1.literalForm(); 
+      Object val = ASTTerm.mathoclvars.get(vv); 
+      if (val == null) 
+      { JOptionPane.showMessageDialog(null, 
+          "Warning!: variable " + vv + " does not have a definition",   "",
+          JOptionPane.WARNING_MESSAGE); 
+      } 
+    }
+  } 
+
+  public Vector mathOCLVariables()
+  { // System.out.println(">>> MathOCL term " + this); 
+    Vector res = new Vector(); 
+
+    if ("identifier".equals(tag))
+    { ASTTerm t1 = getTerm(0); 
+      String vv = t1.literalForm(); 
+      res.add(vv); 
+    }
+
+    return res; 
+  } 
 
 } 

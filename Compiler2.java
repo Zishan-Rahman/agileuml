@@ -5338,8 +5338,8 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
     }
  
     if ("pre".startsWith(st)) 
-    { mess[0] = "Operation precondition, eg: pre: true"; 
-      return "pre:"; 
+    { mess[0] = "Operation precondition, eg: pre: true\nOr usecase precondition, eg: precondition par > 0;\n"; 
+      return "pre: expr   or    precondition expr;"; 
     } 
  
 
@@ -5855,7 +5855,7 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
       }
  
       if ("extendedBy".startsWith(st))
-      { mess[0] = "Use case extension, eg., extendedBy errorCase;"; 
+      { mess[0] = "Use case extension, eg., extendedBy errorCase;\nDeclares errorCase as optional extra functionality of this use case\n"; 
         return "extendedBy"; 
       }
 
@@ -7055,7 +7055,8 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
       return null; 
     } 
 
-    // Parsing a class
+    // Parsing a class. 
+    // start is the index of element following the name.
 
     Entity res; 
     ModelElement melem = 
@@ -7098,7 +7099,9 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
         } 
       } 
     } 
-          
+     
+    // start points to the "{" or the token following 
+    // complete class name.      
 
     if ("extends".equals(lexicals.get(start) + "") || 
         "implements".equals(lexicals.get(start) + ""))
@@ -7108,44 +7111,47 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
       pregen.e1name = rname; 
       pregen.e2name = supr; 
       gens.add(pregen);   // to be linked in UCDArea. 
+      System.err.println(">>> " + rname + " specialises " + supr); 
 
       p++; 
       if ((lexicals.get(p) + "").equals("{"))
-      { start = p+1; }
+      { start = p; }
       else if ((lexicals.get(p) + "").equals("<"))
-      { start = p+1; 
+      { // start = p+1; 
         while (!(lexicals.get(p) + "").equals("{"))
-        { supr = lexicals.get(p+1) + ""; 
+        { supr = lexicals.get(p) + ""; 
           if (">".equals(supr))
           { Vector args = 
-              parse_type_sequence(start,p,entities,types); 
+              parse_type_sequence(start,p-1,entities,types); 
             pregen.setParameters(args); 
           } 
           p = p+1; 
         } 
-        start = p + 1;
+        start = p;
       }    
       else 
       { while (!(lexicals.get(p) + "").equals("{"))
-        { supr = lexicals.get(p+1) + ""; 
-          if (",".equals(supr)) { } 
+        { supr = lexicals.get(p) + ""; 
+          if (",".equals(supr)) 
+          { } 
           else 
-          { PreGeneralisation pregen2 = new PreGeneralisation(); 
+          { PreGeneralisation pregen2 = 
+              new PreGeneralisation(); 
             pregen2.e1name = rname; 
             pregen2.e2name = supr; 
             System.err.println(">>> " + rname + " specialises " + supr); 
             gens.add(pregen2);   // to be linked in UCDArea.
-          } 
+          } // it could also have type parameters 
           p = p+1; 
         }  
-        start = p + 1;
+        start = p;
       }  
     } 
-    else 
-    { start = start + 1; } 
+    // else 
+    // { start = start + 1; } 
 
+    // start points to the "{"
     
-
     if (abstr) 
     { res.setAbstract(true); } 
     if (interf) 
@@ -7156,7 +7162,9 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
 
     int reached = start; // start of the next element to be parsed. reached <= i
 
-    for (int i = start + 3; i < en; i++) 
+    System.out.println(">>> starting: " + lexicals.get(reached)); 
+
+    for (int i = start + 1; i < en; i++) 
     { String lx2 = lexicals.get(i) + ""; 
       if ("attribute".equals(lx2) || 
           "reference".equals(lx2) || 
@@ -7447,15 +7455,15 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
       { String stereo = lexicals.get(j+1) + ""; 
         for (int k = j+2; k <= en; k++)
         { // System.out.println(lexicals.get(k) + ""); 
-		   String lx = lexicals.get(k) + ""; 
-	       if (";".equals(lx))
-	       { uc.addStereotype(stereo);
-		     j = k; 
-		     k = en; // end the loop
-	       }
-		   else 
-		   { stereo = stereo + lx; } 
-		 } 
+          String lx = lexicals.get(k) + ""; 
+          if (";".equals(lx))
+          { uc.addStereotype(stereo);
+            j = k; 
+            k = en; // end the loop
+	     }
+          else 
+          { stereo = stereo + lx; } 
+        } 
          // uc.addStereotype(stereo);
          // j = j + 3; 
 		 j++;  
@@ -7478,25 +7486,25 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
         } 
         j++;  
       }
-	  else if ("attribute".equals(jx))
-	  { String p = lexicals.get(j+1) + ""; 
-	    for (int k = j+2; k <= en; k++)
-		{ // System.out.println(lexicals.get(k) + ""); 
+      else if ("attribute".equals(jx))
+      { String p = lexicals.get(j+1) + ""; 
+        for (int k = j+2; k <= en; k++)
+        { // System.out.println(lexicals.get(k) + ""); 
 		
-		  if (";".equals(lexicals.get(k) + ""))
-		  { Type ptype = parseType(j+3,k-1,entities,types); 
-		    if (ptype != null) 
-			{ uc.addAttribute(p,ptype); // it is automatically static 
-			  j = k; 
-			  k = en; 
-		    }
-			else 
-			{ System.err.println("!! Invalid attribute type: " + showLexicals(j+3,k-1)); }
-		  } 
-		} 
-		j++;  
+          if (";".equals(lexicals.get(k) + ""))
+          { Type ptype = parseType(j+3,k-1,entities,types); 
+            if (ptype != null) 
+            { uc.addAttribute(p,ptype); // it is automatically static 
+              j = k; 
+              k = en; 
+            }
+            else 
+            { System.err.println("!! Invalid attribute type: " + showLexicals(j+3,k-1)); }
+          } 
+        } 
+        j++;  
       }
-      else if ("query".equals(jx))  // Only static query operations are permitted in use cases.  
+      else if ("query".equals(jx))   
       { for (int k = j+1; k <= en; k++)
         { // System.out.println(lexicals.get(k) + ""); 
 		
@@ -7517,29 +7525,29 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
             }
           }
         } 
-		j++;   
+        j++;   
       } 
       else if ("precondition".equals(jx))
       { for (int k = j+1; k <= en; k++)
-        { System.out.println(lexicals.get(k) + ""); 
+        { // System.out.println(lexicals.get(k) + ""); 
 		
           if (";".equals(lexicals.get(k) + ""))
           { Expression expr = parse_expression(0,j+1,k-1,entities,types); 
-             if (expr != null) 
-             { Constraint cons = Constraint.getConstraint(expr); 
-			  uc.addPrecondition(cons);
-			  j = k; 
-			  k = en; 
-		    }
-			else 
-			{ System.err.println("!! Invalid precondition expression: " + showLexicals(j+1,k-1)); }
-		  } 
+            if (expr != null) 
+            { Constraint cons = Constraint.getConstraint(expr); 
+              uc.addPrecondition(cons);
+              j = k; 
+              k = en; 
+            }
+            else 
+            { System.err.println("!! Invalid precondition expression: " + showLexicals(j+1,k-1)); }
 		} 
-		j++;  
-      }
-	  else 
-	  { j++; }   			
-	}
+         } 
+         j++;  
+       }
+       else 
+       { j++; }   		
+    }
   } 
 
   public Entity parseEntityName(int st, int en, 
