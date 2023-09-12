@@ -28,6 +28,8 @@ public class Attribute extends ModelElement
   private Entity entity = null; // owner
   private boolean sorted = false;  // for collection-valued attributes 
 
+  private boolean isParameter = false; 
+
   private Vector navigation = new Vector();  // for attributes derived as composition
   private int lower = 1;  
   private int upper = 1; // 0 represents * 
@@ -314,11 +316,20 @@ public class Attribute extends ModelElement
   public Vector getParameters()
   { return parameters; } 
 
+  public void setKind(int k)
+  { kind = k; } 
+
   public boolean isArray()
   { return isArray; } 
 
   public void setArray(boolean b)
   { isArray = b; } 
+
+  public boolean isParameter()
+  { return isParameter; } 
+
+  public void setIsParameter(boolean b)
+  { isParameter = b; } 
 
   public void setWidth(int w)
   { width = w; } 
@@ -1509,6 +1520,16 @@ public class Attribute extends ModelElement
     return "null"; 
   } 
 
+  public Expression convertStringToNumber(Expression expr)
+  { if (isInt())
+    { return new UnaryExpression("->toInteger", expr); } 
+    if (isLong())
+    { return new UnaryExpression("->toLong", expr); } 
+    if (isDouble()) 
+    { return new UnaryExpression("->toReal", expr); } 
+    return expr; 
+  } 
+
   public int syntacticComplexity()
   { // att : T = init
     int result = 3; 
@@ -1573,6 +1594,8 @@ public class Attribute extends ModelElement
     { return "(OclAttribute attribute " + getName() + " identity : " + getType().toAST() + " )"; }
     else if (isDerived())
     { return "(OclAttribute attribute " + getName() + " derived : " + getType().toAST() + " )"; }
+    else if (isParameter())
+    { return toASTParameter(); } 
     else  
     { return "(OclAttribute attribute " + getName() + " : " + getType().toAST() + " )"; } 
   } 
@@ -2777,7 +2800,8 @@ public class Attribute extends ModelElement
     String code = ""; 
     String sync = ""; 
 
-    if (entity.isSequential()) { sync = " synchronized"; } 
+    if (entity.isSequential()) 
+    { sync = " synchronized"; } 
     
     if (instanceScope && 
         ent != entity && !entity.isInterface()) 

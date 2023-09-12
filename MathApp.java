@@ -141,16 +141,19 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       JButton bsum = new JButton("" + mSigma); 
       bsum.addActionListener(this); 
       bsum.setToolTipText(
-        "Sum of expressions: " + mSigma + '\u2092' + '\u207F' + " expr");
+        "Sum of expressions: " + mSigma + '\u2096' + '\u208C' + '\u2092' + '\u207F' + " expr");
       JButton bprd = new JButton("" + mPi); 
       bprd.addActionListener(this); 
       bprd.setToolTipText(
-        "Product of expressions: " + mPi + '\u2092' + '\u207F' + " expr");
+        "Product of expressions: " + mPi + '\u2096' + '\u208C' + '\u2092' + '\u207F' + " expr");
       JButton bsqrt = new JButton("" + mSqrt); 
+      bsqrt.setToolTipText("Square root"); 
       bsqrt.addActionListener(this); 
       JButton binfty = new JButton("" + mInfinity); 
+      binfty.setToolTipText("Positive infinity: Math_PINFINITY"); 
       binfty.addActionListener(this); 
       JButton bintegral = new JButton("" + mIntegral); 
+      bintegral.setToolTipText("Integral, definite & indefinite: " + mIntegral + "expr dx"); 
       bintegral.addActionListener(this); 
       
       JButton bdiff = new JButton("" + mDifferential); 
@@ -175,8 +178,13 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       
       JButton bin = new JButton("" + mIn); 
       bin.addActionListener(this); 
+      bin.setToolTipText(
+        "Set membership: x " + mIn + " s");
+
       JButton bnotin = new JButton("" + mNotIn); 
       bnotin.addActionListener(this); 
+      bnotin.setToolTipText(
+        "Set exclusion: x " + mNotIn + " s");
 
       JButton bempty = new JButton("" + emptySet); 
       bempty.addActionListener(this); 
@@ -205,11 +213,14 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
 
       JButton bsim = new JButton("\u2248"); // ~
       bsim.addActionListener(this); 
-      JButton btends = new JButton("\u2192"); 
+      JButton btends = new JButton("\u2192"); // » 
       btends.addActionListener(this);
+      btends.setToolTipText(
+        "Used for lim_{x " + '\u2192' + " v} expr");
 
       charMap.put('\u2219', '•'); // such that 
       charMap.put('\u2248', '~'); // almost equal
+      charMap.put('\u2192', '»'); // tends to
       
       buttonsPanel.add(bexists);
       buttonsPanel.add(bforall);
@@ -267,14 +278,14 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       omega.addActionListener(this); 
 
       charMap.put('\u03B1', "g{a}"); 
-      charMap.put('\u03B2', "g{b}"); 
+      charMap.put('\u03B2', "g{b}"); // ß
       charMap.put('\u03B3', "g{g}"); 
       charMap.put('\u03B4', "g{d}"); 
       charMap.put('\u03B5', "g{e}"); 
       charMap.put('\u03B6', "g{z}"); 
       charMap.put('\u03B8', "g{f}"); 
       charMap.put('\u03BB', "g{l}"); 
-      charMap.put('\u03BC', "g{m}"); 
+      charMap.put('\u03BC', "g{m}"); // µ
       charMap.put('\u03BD', "g{n}"); 
       charMap.put('\u03C0', "g{p}"); 
       charMap.put('\u03C1', "g{r}");      
@@ -535,6 +546,26 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
             { thisLabel.setText("Instruction to Cancel: Cancel var in expr"); }
             else if ("Substitute".equals(insertedText))
             { thisLabel.setText("Instruction to Substitute: Substitute var in expr"); }
+            else if ("Group".equals(insertedText))
+            { thisLabel.setText("Group expr by var: group together terms with same var power"); }
+            else if ("Theorem".equals(insertedText))
+            { thisLabel.setText("Theorem expr1 when expr2: assert that expr1 follows from expr2"); }
+            else if ("Rewrite".equals(insertedText))
+            { thisLabel.setText("Rewrite expr1 to expr2: assert that expr1 can be replaced by expr2"); }
+            else if ("Bernoulli".equals(insertedText))
+            { thisLabel.setText("Bernoulli distribution Bernoulli(p) for probability p of success"); }
+            else if ("Binom".equals(insertedText))
+            { thisLabel.setText("Binomial distribution Binom(n,p) for n trials, probability p of success"); }
+            else if ("Poisson".equals(insertedText))
+            { thisLabel.setText("Poisson distribution Poisson(p)"); }
+            else if ("LogNorm".equals(insertedText))
+            { thisLabel.setText("Log-normal distribution LogNorm(mu,var) based on N(mu,var)"); }
+            else if ("N(".equals(insertedText))
+            { thisLabel.setText("Normal distribution N(mu,var)"); }
+            else if ("U(".equals(insertedText))
+            { thisLabel.setText("Uniform distribution U() or U(lower,upper)"); }
+            else if ("lim".equals(insertedText))
+            { thisLabel.setText("Limit: lim_{x » v} expr"); }
           } 
           else  
           { thisLabel.setText(" "); 
@@ -746,7 +777,9 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
       }  
       messageArea.setText(result);
       internalModel = result;
-  
+      ASTTerm.mathocltheorems = new Vector();  
+      ASTTerm.mathoclrewrites = new Vector();  
+          
       thisLabel.setText("Specification translated to text format");
     }
   }
@@ -783,6 +816,7 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
         if (trm != null && trm instanceof ASTCompositeTerm)  
         { ASTCompositeTerm spec = (ASTCompositeTerm) trm;
           ASTTerm.mathoclvars = new java.util.HashMap();  
+          ASTTerm.mathoclrewrites = new Vector();  
           spec.checkMathOCL(); 
 
           // String extracode = 
@@ -1088,14 +1122,18 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
         "    Simplify expr\n\n" + 
         "5. Prove clauses:\n" + 
         "    Prove expr if expr\n\n" + 
+        "6. Theorem/rewrite rule clauses:\n" + 
+        "    Theorem expr when expr\n" + 
+        "    Rewrite expr to expr\n\n" + 
         "Instructions can be one of:\n" + 
         "    Factor expr by expr\n" + 
         "    Cancel expr in expr\n" + 
         "    Substitute var in expr\n" + 
+        "    Group expr by var\n" + 
         "    Expand expr to N terms\n\n" + 
         "Distributions are:\n" + 
         "    N(mu,sigma^2), Bernoulli(mu), Binom(n,p),\n" + 
-        "    U(), U(a,b), Poisson(mu)\n"); 
+        "    U(), U(a,b), Poisson(mu), LogNorm(mu,sigma^2)\n"); 
 
         helpPane.repaint(); 
         repaint();  
@@ -1200,9 +1238,9 @@ public class MathApp extends JFrame implements DocumentListener, ActionListener
         "   Powers and exponents are written with superscripts.\n\n" +
         "   Boolean values are true, false, with operators\n" + 
         "   &, or, =>, not\n" + 
-        "   " + '\u018E' + " x : s " + '\u2219' + " expr is \n" + 
+        "   " + '\u018E' + " x : s " + '\u2219' + " expr expresses \n" + 
         "   s->exists( x | expr )\n" + 
-        "   " + '\u2200' + " x : s " + '\u2219' + " expr is \n" + 
+        "   " + '\u2200' + " x : s " + '\u2219' + " expr expresses \n" + 
         "   s->forAll( x | expr )\n\n"
         ); 
 

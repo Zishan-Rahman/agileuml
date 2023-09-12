@@ -67,7 +67,7 @@ public class ASTBasicTerm extends ASTTerm
   public ASTTerm replaceCobolIdentifiers()
   { if ("FILLER".equals(value))
     { ASTTerm.cobolFillerCount++; 
-      return new ASTBasicTerm(tag, "FILLER$" + ASTTerm.cobolFillerCount); 
+      return new ASTBasicTerm(tag, "FILLER_" + ASTTerm.cobolFillerCount); 
     } 
     
     if (tag.equals("cobolWord"))
@@ -290,6 +290,55 @@ public class ASTBasicTerm extends ASTTerm
     return toString(); 
   }
 
+  public java.util.Set allMathMetavariables() 
+  { java.util.Set res = new java.util.HashSet(); 
+    
+    if (CSTL.isMathMetavariable(value))
+    { res.add(value); } 
+   
+    return res; 
+  } 
+
+  public java.util.HashMap hasMatch(ASTTerm rterm, 
+                                    java.util.HashMap res) 
+  { return fullMatch(rterm,res); } 
+
+  public java.util.HashMap fullMatch(ASTTerm rterm, 
+                                     java.util.HashMap res) 
+  { // This term matches to a schematic term rterm
+
+    String rlit = rterm.literalForm(); 
+    if (value.equals(rlit))
+    { return res; } 
+
+    // if (CSTL.isCSTLVariable(rlit))
+    if (CSTL.isMathMetavariable(rlit))
+    { ASTTerm oldterm = (ASTTerm) res.get(rlit); 
+      if (oldterm == null)
+      { res.put(rlit, this); 
+        return res; 
+      } 
+      else if (value.equals(oldterm.literalForm()))
+      { } 
+      else 
+      { return null; } 
+    }
+
+    return null; 
+  }  
+
+  public ASTTerm instantiate(java.util.HashMap res) 
+  { // replace _i by res.get(_i)
+
+    // if (CSTL.isCSTLVariable(value))
+    if (CSTL.isMathMetavariable(value))
+    { ASTTerm oldterm = (ASTTerm) res.get(value); 
+      if (oldterm != null)
+      { return oldterm; } 
+    }
+
+    return new ASTBasicTerm(tag,value); 
+  }  
 
   public String getLabel()
   { return null; } 

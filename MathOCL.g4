@@ -19,7 +19,8 @@ specification
 part
     : formula
     | constraint
-    | reexpression
+    | theorem
+    | rewrite
     | expanding
     | simplify
     | substituting
@@ -38,19 +39,23 @@ instruction
     | expandTo 
     | cancelIn 
     | factorBy 
-    | simplify
+    | groupBy
     ; 
 
 constraint
     :	'Constraint' 'on' expression '|' logicalExpression
     ; 
 
-reexpression
-    : 'Express' expression 'as' expression
+theorem
+    :	'Theorem' logicalExpression 'when' logicalExpression
+    ; 
+
+rewrite
+    : 'Rewrite' expression 'to' expression
     ; 
 
 simplify 
-    : 'Simplify' expression
+    : 'Simplify' (instruction | expression)
     ; 
 
 substituting
@@ -70,7 +75,7 @@ expanding
     ; 
 
 substituteIn
-    : 'Substitute' ID 'in' (expression | expandTo)
+    : 'Substitute' ID 'in' expression
     ; 
 
 expandTo
@@ -85,6 +90,9 @@ cancelIn
     : 'Cancel' expression 'in' expression
     ; 
 
+groupBy
+    : 'Group' expression 'by' expression
+    ; 
 
 idList
      : (ID ',')* ID
@@ -180,6 +188,7 @@ additiveExpression
 factorExpression 
     : 'C_{' expression '}' '^{' expression '}'
     | 'E[' expression ']' 
+    | 'lim_{' identifier ARROW expression '}' expression
     | factorExpression ('*' | '/' | 'mod' | 'div') 
                                    factorExpression
     | INTEGRAL '_{' expression '}' '^{' expression '}' expression ID 
@@ -277,6 +286,7 @@ FORALL : '¡';
 EXISTS : '£'; 
 EMPTYSET : 'Ø';
 SQUAREROOT : '†';
+ARROW : '»';
 
 NATURAL : 'Ñ'; 
 INTEGER : '';
@@ -286,5 +296,6 @@ CDOT : '•';
 
 NEWLINE : [\r\n]+ -> skip ;
 INT     : [0-9]+ ;
-ID  :   [a-zA-Z]+[a-zA-Z0-9$]* ;      // match identifiers
+ID  :   [_a-zA-Z]+[a-zA-Z0-9$]* ;      // match identifiers
 WS  :   [ \t\n\r]+ -> skip ;
+

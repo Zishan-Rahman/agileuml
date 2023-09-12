@@ -75,13 +75,25 @@ public class MathOCLBaseListener implements MathOCLListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterReexpression(MathOCLParser.ReexpressionContext ctx) { }
+	@Override public void enterTheorem(MathOCLParser.TheoremContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitReexpression(MathOCLParser.ReexpressionContext ctx) { }
+	@Override public void exitTheorem(MathOCLParser.TheoremContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterRewrite(MathOCLParser.RewriteContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitRewrite(MathOCLParser.RewriteContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -190,6 +202,18 @@ public class MathOCLBaseListener implements MathOCLListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitCancelIn(MathOCLParser.CancelInContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterGroupBy(MathOCLParser.GroupByContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitGroupBy(MathOCLParser.GroupByContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

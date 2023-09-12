@@ -57,15 +57,25 @@ public interface MathOCLListener extends ParseTreeListener {
 	 */
 	void exitConstraint(MathOCLParser.ConstraintContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link MathOCLParser#reexpression}.
+	 * Enter a parse tree produced by {@link MathOCLParser#theorem}.
 	 * @param ctx the parse tree
 	 */
-	void enterReexpression(MathOCLParser.ReexpressionContext ctx);
+	void enterTheorem(MathOCLParser.TheoremContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link MathOCLParser#reexpression}.
+	 * Exit a parse tree produced by {@link MathOCLParser#theorem}.
 	 * @param ctx the parse tree
 	 */
-	void exitReexpression(MathOCLParser.ReexpressionContext ctx);
+	void exitTheorem(MathOCLParser.TheoremContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link MathOCLParser#rewrite}.
+	 * @param ctx the parse tree
+	 */
+	void enterRewrite(MathOCLParser.RewriteContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link MathOCLParser#rewrite}.
+	 * @param ctx the parse tree
+	 */
+	void exitRewrite(MathOCLParser.RewriteContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link MathOCLParser#simplify}.
 	 * @param ctx the parse tree
@@ -156,6 +166,16 @@ public interface MathOCLListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitCancelIn(MathOCLParser.CancelInContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link MathOCLParser#groupBy}.
+	 * @param ctx the parse tree
+	 */
+	void enterGroupBy(MathOCLParser.GroupByContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link MathOCLParser#groupBy}.
+	 * @param ctx the parse tree
+	 */
+	void exitGroupBy(MathOCLParser.GroupByContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link MathOCLParser#idList}.
 	 * @param ctx the parse tree
