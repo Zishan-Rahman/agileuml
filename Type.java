@@ -176,7 +176,8 @@ public class Type extends ModelElement
     if (exceptions2java.get(tname) != null) 
     { return true; } 
     return false; 
-  } // MathLib, StringLib and OclComparator are static
+  } // MathLib, Excel, OclRegex, 
+    // StringLib and OclComparator are static
 
   public static boolean isDefinedType(Type t) 
   { if (t == null) 
@@ -186,6 +187,33 @@ public class Type extends ModelElement
     if ("void".equals(t.getName()))
     { return false; } 
     return true; 
+  } 
+
+  public static boolean isVacuousType(Type t) 
+  { if (t == null) 
+    { return true; } 
+    if ("OclAny".equals(t.getName()))
+    { return true; } 
+    if ("void".equals(t.getName()))
+    { return true; } 
+    return false; 
+  } 
+
+  public static boolean hasVacuousType(Expression expr) 
+  { Type t = expr.getType(); 
+    return Type.isVacuousType(t); 
+  } 
+
+  public static boolean isSummableType(Type t) 
+  { if (t == null) 
+    { return false; } 
+    String tname = t.getName(); 
+    if ("int".equals(tname) || "long".equals(tname) || 
+        "double".equals(tname))
+    { return true; } 
+    if ("String".equals(tname))
+    { return true; } 
+    return false; 
   } 
 
   public boolean isEnumeratedType() 
@@ -2840,6 +2868,21 @@ public class Type extends ModelElement
     return res; 
   } 
 
+  public static Expression nullInitialValueExpression(Type t)
+  { if (t == null) 
+    { return new BasicExpression("null"); } 
+    String tname = t.getName(); 
+    if (tname.equals("double"))
+    { return new BasicExpression("Math_NaN"); } 
+    return new BasicExpression("null"); 
+  } 
+
+  public static Expression defaultInitialValueExpression(Type t)
+  { if (t == null) 
+    { return new BasicExpression("null"); } 
+    return t.getDefaultValueExpression(); 
+  } 
+
   public Expression getDefaultValueExpression()
   { return getDefaultValueExpression(elementType); } 
 
@@ -3218,7 +3261,7 @@ public class Type extends ModelElement
     { return alias.getCSharp(); } 
  
     if (nme.equals("OclDate"))
-    { return "DateTime"; } 
+    { return "OclDate"; } 
     if (nme.equals("OclAny"))
     { return "object"; } 
     if (nme.equals("OclType"))
@@ -3807,6 +3850,95 @@ public class Type extends ModelElement
       { return "HashMap<Object, " + elementType.typeWrapperJava7() + ">"; } 
       else 
       { return "HashMap"; } 
+    
+      // if (sorted) 
+      // { tname = "TreeMap"; } 
+    } 
+
+    if (nme.equals("Function"))
+    { if (keyType != null && elementType != null) 
+      { return "Evaluation<" + keyType.typeWrapperJava7() + ", " + elementType.typeWrapperJava7() + ">"; } 
+      else if (elementType != null) 
+      { return "Evaluation<Object, " + elementType.typeWrapperJava7() + ">"; } 
+      else 
+      { return "Evaluation<Object,Object>"; } 
+    } 
+
+    if (nme.equals("Ref"))
+    { String restype = "Object"; 
+      if (elementType != null) 
+      { restype = elementType.getJava7();
+        // if (isBasicType(elementType) ||
+        //     elementType.isStructEntityType() ||  
+        //     "Ref".equals(elementType.getName()) || 
+        //     "void".equals(elementType.getName()))
+        { return restype + "[]"; } 
+        // else 
+        // { return restype; }
+      }  
+      else 
+      { return restype + "[]"; } 
+    } 
+
+    if (alias != null)    // For datatypes
+    { return alias.getJava7(); } 
+
+    if (nme.equals("OclAny"))
+    { return "Object"; } 
+
+    if (nme.equals("OclType"))
+    { return "Class"; } 
+
+    if (nme.equals("OclDate"))
+    { return "Date"; } 
+
+    String jex = (String) exceptions2java.get(nme); 
+    if (jex != null) 
+    { return jex; } 
+
+    if (entity != null) 
+    { return entity.getCompleteName(); } 
+
+    if (values == null)
+    { return nme; }
+
+    // if (nme.equals("long")) { return "long"; } 
+    return "int"; 
+  }
+
+  public String getParJava7()
+  { String nme = getName();
+    // String et = ""; 
+    // if (elementType != null && elementType != this) 
+    // { et = elementType.getJava7(); } 
+    // else 
+    // { et = "Object"; } 
+
+    if (nme.equals("Set"))
+    { String tname = "HashSet"; 
+      if (sorted) 
+      { tname = "TreeSet"; } 
+
+      if (elementType != null) 
+      { return tname + "<" + elementType.typeWrapperJava7() + ">"; } 
+      else 
+      { return tname; } 
+    } 
+
+    if (nme.equals("Sequence"))
+    { if (elementType != null) 
+      { return "List<" + elementType.typeWrapperJava7() + ">"; } 
+      else 
+      { return "List"; } 
+    } 
+
+    if (nme.equals("Map"))
+    { if (keyType != null && elementType != null) 
+      { return "Map<" + keyType.typeWrapperJava7() + ", " + elementType.typeWrapperJava7() + ">"; } 
+      else if (elementType != null) 
+      { return "Map<Object, " + elementType.typeWrapperJava7() + ">"; } 
+      else 
+      { return "Map"; } 
     
       // if (sorted) 
       // { tname = "TreeMap"; } 
@@ -4804,18 +4936,24 @@ public class Type extends ModelElement
     
     String tn1 = oldType.getName();
     String tn2 = t.getName();
+
+    if ("OclAny".equals(tn1) && 
+        !("OclAny".equals(tn2)))
+    { return t; } 
         
-    if (tn1.equals("double") && (tn2.equals("int") || tn2.equals("long")))
+    if (tn1.equals("double") && 
+        (tn2.equals("int") || tn2.equals("long")))
     { return oldType; }
 
     if (tn1.equals("long") && tn2.equals("int"))
     { return oldType; }
 
-    if (tn2.equals("double") && (tn1.equals("int") || tn1.equals("long")))
+    if (tn2.equals("double") && 
+        (tn1.equals("int") || tn1.equals("long")))
     { return oldType; }
     
     if (tn2.equals("long") && tn1.equals("int"))
-    { return t; }
+    { return t; } // oldType
 
     if (tn1.equals(tn2))
     { return oldType; } 
@@ -4865,7 +5003,9 @@ public class Type extends ModelElement
 
     if (t1.values != null) { return t1; } 
     if (t2.values != null) { return t2; } 
-    if (t1name.equals("int") && t2name.equals("double")) { return t1; } 
+    if (t1name.equals("int") && 
+        t2name.equals("double")) 
+    { return t1; } 
     if (t2name.equals("int") && t1name.equals("double")) { return t2; } 
     if (t1name.equals("int") && t2name.equals("long")) { return t1; } 
     if (t2name.equals("int") && t1name.equals("long")) { return t2; }
@@ -4947,8 +5087,8 @@ public class Type extends ModelElement
     if ("Set".equals(nme) || "Sequence".equals(nme) || 
         "Ref".equals(nme))
     { if (elementType == null)
-	  { return nme; }
-	  else if (elementType == this)
+      { return nme; }
+      else if (elementType == this)
       { return nme; }
       else   
       { return nme + "(" + elementType + ")"; } 

@@ -204,6 +204,9 @@ public class ASTSymbolTerm extends ASTTerm
   public String literalFormSpaces()
   { return symbol; } 
 
+  public String evaluationLiteralForm()
+  { return symbol; } 
+
   public int arity()
   { return 0; } 
 
@@ -589,6 +592,14 @@ public class ASTSymbolTerm extends ASTTerm
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence"; 
     }
+
+    if ("Multiset".equals(symbol) || 
+        "MultiSet".equals(symbol))
+    { modelElement = new Type("Sequence", null); 
+      expression = new BasicExpression((Type) modelElement); 
+      return "Sequence"; 
+    } 
+
  
     if ("Set".equals(symbol) || "HashSet".equals(symbol) ||
         "EnumSet".equals(symbol)) 
@@ -612,14 +623,29 @@ public class ASTSymbolTerm extends ASTTerm
       return "Sequence(boolean)"; 
     } 
 
-    if ("ByteBuffer".equals(symbol))
+    if ("ByteBuffer".equals(symbol) || 
+        "IntBuffer".equals(symbol) ||
+        "ShortBuffer".equals(symbol) || 
+        "CharBuffer".equals(symbol) || 
+        "LongBuffer".equals(symbol) 
+       )
     { modelElement = new Type("Sequence", null);
       ((Type) modelElement).setElementType(new Type("int", null));  
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence(int)";
     } 
 
+    if ("FloatBuffer".equals(symbol) || 
+        "DoubleBuffer".equals(symbol)
+       )
+    { modelElement = new Type("Sequence", null);
+      ((Type) modelElement).setElementType(new Type("double", null));  
+      expression = new BasicExpression((Type) modelElement); 
+      return "Sequence(double)";
+    } 
+
     if ("HashMap".equals(symbol) || 
+        "LinkedHashMap".equals(symbol) || 
         "EnumMap".equals(symbol) || 
         "Hashtable".equals(symbol) || 
         "Map".equals(symbol)) 
@@ -828,12 +854,20 @@ public class ASTSymbolTerm extends ASTTerm
     if ("RandomAccessFile".equals(symbol))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclFile"; } 
-    if ("BufferedReader".equals(symbol))
+      return "OclFile"; 
+    }
+ 
+    if ("BufferedReader".equals(symbol) ||        
+        "LittleEndianInput".equals(symbol) ||
+        "BigEndianInput".equals(symbol))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclFile"; } 
-    if ("BufferedWriter".equals(symbol))
+      return "OclFile"; 
+    }
+ 
+    if ("BufferedWriter".equals(symbol) ||               
+        "LittleEndianOutput".equals(symbol) ||
+        "BigEndianOutput".equals(symbol))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "OclFile"; } 
@@ -931,6 +965,9 @@ public class ASTSymbolTerm extends ASTTerm
 
   public boolean updatesObject(ASTTerm t)
   { return false; } 
+
+  public ASTTerm updatedObject()
+  { return this; } 
 
   public boolean callSideEffect()
   { return false; }

@@ -1,5 +1,5 @@
 
-    class OclFile
+    public class OclFile
     {
         private string name = ""; // internal
         private int port = 0; // internal
@@ -769,11 +769,15 @@
         public bool mkdir()
         {
             bool result = false;
-            DirectoryInfo inf = Directory.CreateDirectory(name);
+            DirectoryInfo inf = 
+               Directory.CreateDirectory(name);
             if (inf != null)
             { return true; }
             return result;
         }
+
+        public bool mkdirs()
+        { return mkdir(); } 
 
         public static string convertConversionFormat(string cstyle)
         {

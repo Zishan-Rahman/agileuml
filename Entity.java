@@ -202,6 +202,9 @@ public class Entity extends ModelElement implements Comparable
     }
   }      
 
+  public void setIsParameter(boolean gen)
+  { genericParameter = gen; } 
+
   public boolean isEmpty()
   { if (attributes.size() == 0 && associations.size() == 0 && operations.size() == 0)
     { return true; }
@@ -528,7 +531,12 @@ public class Entity extends ModelElement implements Comparable
   } 
 
   public void setTypeParameters(Vector tpars)
-  { typeParameters = tpars; }
+  { typeParameters = new Vector(); 
+    for (int i = 0; i < tpars.size(); i++)
+    { ModelElement x = (ModelElement) tpars.get(i);
+      addTypeParameter(x);
+    }
+  } 
 
   public boolean hasTypeParameters(Vector tpars) 
   { boolean res = true; 
@@ -1113,6 +1121,25 @@ public class Entity extends ModelElement implements Comparable
     { typeParameters.add(t); } 
   } 
 
+  public void addTypeParameter(Entity e)
+  { if (e != null) 
+    { e.genericParameter = true; 
+      Type t = new Type(e); 
+      this.addTypeParameter(t); 
+    } 
+  } 
+
+  public void addTypeParameter(ModelElement x)
+  { if (x instanceof Entity) 
+    { Entity e = (Entity) x;
+      e.genericParameter = true;  
+      Type t = new Type(e); 
+      this.addTypeParameter(t); 
+    } 
+    else if (x instanceof Type)
+    { this.addTypeParameter((Type) x); } 
+  } 
+
   public Vector getTypeParameters()
   { return typeParameters; }
 
@@ -1571,6 +1598,13 @@ public class Entity extends ModelElement implements Comparable
     operations.removeAll(removed); 
   } 
 
+  public void typeInference(Vector types, Vector entities, 
+                            java.util.Map vartypes)
+  { typeInferenceAttributes(types,entities,vartypes); 
+    typeInferenceOps(types,entities,vartypes); 
+    // typeCheckInvariants(types,entities); 
+  } 
+
   public void typeCheck(Vector types, Vector entities)
   { typeCheckAttributes(types,entities); 
     typeCheckOps(types,entities); 
@@ -1588,6 +1622,18 @@ public class Entity extends ModelElement implements Comparable
     } 
   } 
 
+  public void typeInferenceAttributes(Vector types, Vector entities, java.util.Map vartypes)
+  { Vector localtypes = new Vector(); 
+    localtypes.addAll(types); 
+    localtypes.addAll(typeParameters); 
+    for (int i = 0; i < attributes.size(); i++) 
+    { Attribute att = (Attribute) attributes.get(i); 
+      // System.out.println(">> Type-checking " + att + " with " + localtypes + " " + entities); 
+      att.typeInference(localtypes,entities,vartypes);
+      vartypes.put(att.getName(), att.getType());  
+    } 
+  } 
+
   public void typeCheckOps(Vector types, Vector entities)
   { Vector localtypes = new Vector(); 
     localtypes.addAll(types); 
@@ -1595,6 +1641,17 @@ public class Entity extends ModelElement implements Comparable
     for (int i = 0; i < operations.size(); i++) 
     { BehaviouralFeature bf = (BehaviouralFeature) operations.get(i); 
       bf.typeCheck(localtypes,entities); 
+    } 
+  } 
+
+  public void typeInferenceOps(Vector types, Vector entities, 
+                               java.util.Map vartypes)
+  { Vector localtypes = new Vector(); 
+    localtypes.addAll(types); 
+    localtypes.addAll(typeParameters); 
+    for (int i = 0; i < operations.size(); i++) 
+    { BehaviouralFeature bf = (BehaviouralFeature) operations.get(i); 
+      bf.typeInference(localtypes,entities,vartypes); 
     } 
   } 
 
@@ -7091,8 +7148,9 @@ public class Entity extends ModelElement implements Comparable
   { BehaviouralFeature res = null; 
     for (int i = 0; i < operations.size(); i++) 
     { res = (BehaviouralFeature) operations.get(i); 
-      if (nme.equals(res.getName()) && res.parametersMatch(parameters))
-      { return res; } 
+      if (nme.equals(res.getName()) && 
+          res.parametersMatch(parameters))
+      { return res; }
     }  
 
     return getOperation(nme); 
@@ -7128,16 +7186,27 @@ public class Entity extends ModelElement implements Comparable
     return null; 
   } 
 
-  public BehaviouralFeature getDefinedOperation(String nme, Vector parameters)
+  public BehaviouralFeature getDefinedOperation(String nme, 
+                                         Vector parameters)
   { BehaviouralFeature res = null; 
     for (int i = 0; i < operations.size(); i++) 
     { res = (BehaviouralFeature) operations.get(i); 
-      if (nme.equals(res.getName()) && res.parametersMatch(parameters))
+      if (nme.equals(res.getName()) && 
+          res.parametersMatch(parameters))
       { return res; } 
     }  
 
+    for (int i = 0; i < operations.size(); i++) 
+    { res = (BehaviouralFeature) operations.get(i); 
+      if (nme.equals(res.getName()) && 
+          res.parametersSupset(parameters))
+      { System.out.println("!! There is no operation " + nme + " in class " + name + " with " + parameters.size() + " parameters,\n   but there is an operation with " + res.getParameters().size() + " parameters -- the call needs to be extended."); 
+      }   
+    } 
+
     if (superclass != null) 
     { return superclass.getDefinedOperation(nme,parameters); } 
+
 
     return null; 
   } 
@@ -11286,10 +11355,11 @@ public class Entity extends ModelElement implements Comparable
   public String getCompleteName()
   { String nme = getName();
 
-    if (typeParameters.size() > 0)
+    if (typeParameters != null && typeParameters.size() > 0)
     { String tp = ""; 
       for (int i = 0; i < typeParameters.size(); i++) 
-      { tp = tp + ((ModelElement) typeParameters.get(i)).getName();
+      { tp = tp + ((ModelElement) 
+                      typeParameters.get(i)).getName();
         if (i < typeParameters.size()-1)
         { tp = tp + ","; } 
       } 

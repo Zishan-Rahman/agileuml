@@ -193,6 +193,55 @@ abstract class Statement implements Cloneable
     return res;
   } // Other cases, for all other forms of statement. 
 
+  public static boolean endsWithReturn(Statement st)
+  { if (st == null) 
+    { return false; }
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+      Vector stats = sq.getStatements(); 
+      Statement stat = (Statement) stats.get(stats.size()-1); 
+      return Statement.endsWithReturn(stat);
+    } 
+    
+    if (st instanceof ReturnStatement)
+    { return true; } 
+
+    if (st instanceof ConditionalStatement) 
+    { ConditionalStatement cs = (ConditionalStatement) st; 
+      if (Statement.endsWithReturn(cs.ifPart()))
+      { return Statement.endsWithReturn(cs.elsePart()); } 
+      return false; 
+    } 
+
+    if (st instanceof WhileStatement) 
+    { return false; } 
+
+    if (st instanceof TryStatement) 
+    { TryStatement ts = (TryStatement) st; 
+
+      if (Statement.endsWithReturn(ts.getBody())) 
+      { Vector stats = ts.getClauses(); 
+        for (int i = 0; i < stats.size(); i++) 
+        { if (stats.get(i) instanceof Statement)
+          { Statement stat = (Statement) stats.get(i); 
+            if (Statement.endsWithReturn(stat)) { } 
+            else 
+            { return false; } 
+          }
+          else 
+          { return false; } 
+        }  
+      }
+      else 
+      { return false; }  
+      if (ts.getEndStatement() == null) { return false; } 
+      return Statement.endsWithReturn(ts.getEndStatement()); 
+    } 
+
+    return false;
+  } // Other cases, for all other forms of statement. 
+
   public static Statement replaceReturnBySkip(Statement st)
   { if (st == null) 
     { return st; }
@@ -269,6 +318,149 @@ abstract class Statement implements Cloneable
     return st;
   } // Other cases, for all other forms of statement. 
 
+  public static Statement replaceElseBySequence(Statement st)
+  { if (st == null) 
+    { return st; }
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+      Vector newstats = new Vector(); 
+      Vector stats = sq.getStatements(); 
+      for (int i = 0; i < stats.size(); i++) 
+      { if (stats.get(i) instanceof Statement)
+        { Statement stat = (Statement) stats.get(i); 
+          Statement newstat = 
+            Statement.replaceElseBySequence(stat);
+          newstats.add(newstat); 
+        }  
+      } 
+
+      SequenceStatement newsq = 
+            new SequenceStatement(newstats);
+      newsq.setBrackets(sq.hasBrackets());  
+      return newsq; 
+    } 
+    
+    if (st instanceof ReturnStatement)
+    { return st; } 
+
+    if (st instanceof ConditionalStatement) 
+    { ConditionalStatement cs = (ConditionalStatement) st; 
+      Statement newif = 
+         Statement.replaceElseBySequence(cs.ifPart()); 
+      Statement newelse = 
+         Statement.replaceElseBySequence(cs.elsePart());
+      if (Statement.endsWithReturn(newif))
+      { ConditionalStatement res = 
+          new ConditionalStatement(cs.getTest(), 
+                newif, 
+                new InvocationStatement("skip"));
+        SequenceStatement ss = new SequenceStatement(); 
+        ss.addStatement(res); 
+        ss.addStatement(newelse); 
+        return ss; 
+      } 
+      else 
+      { ConditionalStatement res = 
+          new ConditionalStatement(cs.getTest(), 
+                newif, 
+                newelse);
+  
+        return res;
+      } 
+    } 
+
+    if (st instanceof WhileStatement) 
+    { WhileStatement ws = (WhileStatement) st; 
+      Statement newbody = 
+         Statement.replaceElseBySequence(ws.getLoopBody());
+      WhileStatement wsnew = 
+        new WhileStatement(ws.getTest(), newbody); 
+      wsnew.loopKind = ws.loopKind;  
+      wsnew.loopVar = ws.loopVar;
+      wsnew.loopRange = ws.loopRange;
+  
+      return wsnew; 
+    } 
+
+    if (st instanceof TryStatement) 
+    { TryStatement ts = (TryStatement) st; 
+      Statement newbody = 
+         Statement.replaceElseBySequence(ts.getBody());
+      Vector newclauses = new Vector();  
+      Vector stats = ts.getClauses(); 
+      for (int i = 0; i < stats.size(); i++) 
+      { if (stats.get(i) instanceof Statement)
+        { Statement stat = (Statement) stats.get(i); 
+          Statement newstat = 
+             Statement.replaceElseBySequence(stat);
+          newclauses.add(newstat); 
+        }  
+      } 
+      
+      Statement newend = 
+         Statement.replaceElseBySequence(
+                             ts.getEndStatement()); 
+      TryStatement newtry = 
+         new TryStatement(newbody, newclauses, newend); 
+      return newtry; 
+    } 
+
+    return st;
+  } // Other cases, for all other forms of statement. 
+
+  public static Vector getLocalDeclarations(Statement st)
+  { // Local declarations that are not within a loop 
+
+    Vector res = new Vector(); 
+    if (st == null) 
+    { return res; }
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+      Vector stats = sq.getStatements(); 
+      for (int i = 0; i < stats.size(); i++) 
+      { if (stats.get(i) instanceof Statement)
+        { Statement stat = (Statement) stats.get(i); 
+          res.addAll(Statement.getLocalDeclarations(stat));
+        }  
+      } 
+      return res;
+    } 
+    
+    if (st instanceof CreationStatement)
+    { res.add(st); 
+      return res; 
+    } 
+
+    if (st instanceof ConditionalStatement) 
+    { ConditionalStatement cs = (ConditionalStatement) st; 
+      res.addAll(getLocalDeclarations(cs.ifPart())); 
+      res.addAll(getLocalDeclarations(cs.elsePart())); 
+      return res; 
+    } 
+
+    if (st instanceof WhileStatement) 
+    { WhileStatement ws = (WhileStatement) st; 
+      // res.addAll(getLocalDeclarations(ws.getLoopBody())); 
+      return res; 
+    } 
+
+    if (st instanceof TryStatement) 
+    { TryStatement ts = (TryStatement) st; 
+      res.addAll(getLocalDeclarations(ts.getBody())); 
+      Vector stats = ts.getClauses(); 
+      for (int i = 0; i < stats.size(); i++) 
+      { if (stats.get(i) instanceof Statement)
+        { Statement stat = (Statement) stats.get(i); 
+          res.addAll(getLocalDeclarations(stat));
+        }  
+      } 
+      res.addAll(getLocalDeclarations(ts.getEndStatement())); 
+    } 
+
+    return res;
+  } // Other cases, for all other forms of statement. 
 
   public static Vector getBreaksContinues(Statement st)
   { Vector res = new Vector(); 
@@ -770,6 +962,82 @@ abstract class Statement implements Cloneable
     return st;
   } // Other cases, for all other forms of statement. 
 
+  public static Statement replaceLocalDeclarations(Statement st, Vector vars)
+  { // replace each var v : T := e statement in st by v := e
+    // if v : vars
+
+    if (st == null) 
+    { return st; }
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+      Vector stats = sq.getStatements(); 
+
+      Vector res = new Vector(); 
+      for (int i = 0; i < stats.size(); i++) 
+      { if (stats.get(i) instanceof Statement)
+        { Statement stat = (Statement) stats.get(i); 
+          res.add(
+            Statement.replaceLocalDeclarations(stat,vars));
+        }  
+      } 
+      return new SequenceStatement(res);
+    } 
+    
+    if (st instanceof CreationStatement)
+    { CreationStatement cs = (CreationStatement) st; 
+      String lhs = cs.assignsTo;
+      if (vars.contains(lhs) && 
+          cs.initialExpression != null)
+      { Expression lhsexpr = new BasicExpression(lhs); 
+        lhsexpr.type = cs.getType(); 
+        lhsexpr.elementType = cs.getElementType();  
+        AssignStatement newst = 
+          new AssignStatement(lhsexpr,
+                              cs.initialExpression); 
+        return newst; 
+      } 
+      return st; 
+    } 
+
+    if (st instanceof ConditionalStatement) 
+    { ConditionalStatement cs = (ConditionalStatement) st;
+      Statement newif = 
+        Statement.replaceLocalDeclarations(cs.ifPart(), vars);  
+      Statement newelse = 
+        Statement.replaceLocalDeclarations(cs.elsePart(), vars);
+      ConditionalStatement res = 
+        new ConditionalStatement(cs.test, newif, newelse);  
+      return res; 
+    } 
+
+    /* if (st instanceof WhileStatement) 
+    { WhileStatement ws = (WhileStatement) st; 
+      Statement newbody = 
+        Statement.replaceLocalDeclarations(
+                                     ws.getLoopBody(),vars); 
+      WhileStatement res = 
+             new WhileStatement(ws.getLoopTest(),newbody);
+      res.loopKind = ws.loopKind; 
+      return res;  
+    } 
+
+    if (st instanceof TryStatement) 
+    { TryStatement ts = (TryStatement) st; 
+      res.addAll(getLocalDeclarations(ts.getBody())); 
+      Vector stats = ts.getClauses(); 
+      for (int i = 0; i < stats.size(); i++) 
+      { if (stats.get(i) instanceof Statement)
+        { Statement stat = (Statement) stats.get(i); 
+          res.addAll(getLocalDeclarations(stat));
+        }  
+      } 
+      res.addAll(getLocalDeclarations(ts.getEndStatement())); 
+    } */ 
+
+    return st;
+  } // Other cases, for all other forms of statement. 
+
   public static Statement unfoldCall(
            Statement stat, String nme, Statement defn)
   { // self.nme() replaced by defn in stat.
@@ -1077,6 +1345,8 @@ abstract class Statement implements Cloneable
 
   abstract boolean typeCheck(Vector types, Vector entities, 
                              Vector contexts, Vector env); 
+
+  abstract boolean typeInference(Vector types, Vector entities, Vector ctxs, Vector env, java.util.Map vartypes); 
 
   boolean typeCheck(Vector types, Vector entities, Vector env)
   { Vector contexts = new Vector(); 
@@ -1665,6 +1935,13 @@ class ReturnStatement extends Statement
     return value.typeCheck(types,entities,ctxs,env); 
   }  
 
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { if (value == null) { return true; } 
+    value.typeInference(types,entities,cs,env,vartypes);
+    vartypes.put("result", value.getType()); 
+    return true;  
+  } 
+
   public void displayImp(String var, PrintWriter out) 
   { } 
  
@@ -1934,6 +2211,9 @@ class BreakStatement extends Statement
   public boolean typeCheck(Vector types, Vector entities, Vector cs, Vector env)
   { return true; }  
  
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { return true; } 
+
   public Expression wpc(Expression post)
   { return post; }  
 
@@ -2109,6 +2389,9 @@ class ContinueStatement extends Statement
   } 
 
   public boolean typeCheck(Vector types, Vector entities, Vector cs, Vector env)
+  { return true; }  
+
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
   { return true; }  
  
   public Expression wpc(Expression post)
@@ -2694,6 +2977,12 @@ public void findClones(java.util.Map clones,
     { callExp.typeCheck(types,entities,ctxs,env); } 
     return true;
   }  
+
+  public boolean typeInference(Vector types, Vector entities, Vector ctxs, Vector env, java.util.Map vartypes)
+  { if (callExp != null)
+    { callExp.typeInference(types,entities,ctxs,env,vartypes); } 
+    return true;
+  } // infer the callee type from the operation called on it 
 
   public Expression wpc(Expression post)
   { return post; }
@@ -3331,6 +3620,12 @@ class ImplicitInvocationStatement extends Statement
   public boolean typeCheck(Vector types, Vector entities, Vector ctxs, Vector env)
   { if (callExp != null)
     { callExp.typeCheck(types,entities,ctxs,env); } 
+    return true;
+  }  
+
+  public boolean typeInference(Vector types, Vector entities, Vector ctxs, Vector env, java.util.Map vartypes)
+  { if (callExp != null)
+    { callExp.typeInference(types,entities,ctxs,env,vartypes); } 
     return true;
   }  
 
@@ -4304,6 +4599,52 @@ class WhileStatement extends Statement
     return body.typeCheck(types,entities,ctxs,env1); 
   }  
 
+  public boolean typeInference(Vector types, Vector entities, Vector ctxs, Vector env, java.util.Map vartypes)
+  { Vector env1 = new Vector(); 
+    env1.addAll(env);
+    /* A copy should be made of env, 
+       but lots of bad things happen if this is done. We 
+       don't know why. */
+
+    System.out.println(">>> Type-checking " + this + " " + loopRange); 
+ 
+    boolean res = loopTest.typeInference(
+                     types,entities,ctxs,env1,vartypes);
+  
+    if (loopRange != null) 
+    { res = loopRange.typeInference(types,entities,
+                                    ctxs,env1,vartypes);
+      Type lrt = loopRange.getType(); 
+      Type lret = loopRange.getElementType(); 
+
+      // JOptionPane.showMessageDialog(null, 
+      //    ">>> Type of loop range " + loopRange + " is " + lrt + "(" + lret + ")",
+      //    "Type error", JOptionPane.ERROR_MESSAGE); 
+      System.out.println(">>> Type of loop range " + loopRange + " is " + lrt + "(" + lret + ")");
+      System.out.println(); 
+      if (lret == null)
+      { if (loopVar.type != null) 
+        { lret = loopVar.type; } 
+        else 
+        { lret = new Type("OclAny", null); } 
+      } 
+   
+      Attribute lv = new Attribute(loopVar + "", lret, ModelElement.INTERNAL); 
+
+      if (lret != null) 
+      { lv.setElementType(lret.getElementType()); 
+        if (lret.isEntity())
+        { lv.setEntity(lret.getEntity()); } 
+      } 
+
+      System.out.println(">>> Type of loop variable " + lv + " is " + lv.getType() + " entity: " + lv.getEntity());   
+
+      env1.add(lv); 
+    } 
+
+    return body.typeInference(types,entities,ctxs,env1,vartypes); 
+  }  
+
   public Expression wpc(Expression post)
   { return loopTest; } // actually the invariant
 
@@ -5194,6 +5535,19 @@ class CreationStatement extends Statement
   boolean isFrozen = false;  // true when a constant is declared. 
   Attribute variable = null; // for the LHS
 
+  public Object clone()
+  { CreationStatement cs = 
+       new CreationStatement(createsInstanceOf,assignsTo); 
+    cs.instanceType = instanceType; 
+    cs.elementType = elementType; 
+    cs.declarationOnly = declarationOnly; 
+    cs.initialValue = initialValue; 
+    cs.initialExpression = (Expression) initialExpression.clone(); 
+    cs.isFrozen = isFrozen; 
+    cs.variable = variable; 
+    return cs; 
+  } 
+
   public Type getType()
   { return instanceType; } 
 
@@ -5249,6 +5603,15 @@ class CreationStatement extends Statement
     { elementType = new Type("String", null); }  
     assignsTo = vbl + ""; 
   }
+
+  public CreationStatement defaultVersion()
+  { CreationStatement res = (CreationStatement) clone(); 
+    Expression defaultInit = 
+      Type.defaultInitialValueExpression(instanceType);
+    res.initialExpression = defaultInit; 
+    res.initialValue = defaultInit + ""; 
+    return res; 
+  } 
 
 
   /* public CreationStatement(Attribute vbl, Type typ)
@@ -5377,9 +5740,6 @@ class CreationStatement extends Statement
     if (instanceType != null) 
     { instanceType.setElementType(t); }  
   } 
-
-  public Object clone()
-  { return this; } 
 
   public Statement dereference(BasicExpression var)
   { return this; } 
@@ -5832,7 +6192,7 @@ class CreationStatement extends Statement
         if (ent.genericParameter)
         { return "  " + ename + " " + assignsTo + ";\n"; } 
 
-        String gpars = ent.typeParameterTextCSharp(); 
+        String gpars = ""; // ent.typeParameterTextCSharp(); 
        
 
         if (ent.hasStereotype("external"))
@@ -6066,6 +6426,61 @@ class CreationStatement extends Statement
      // there is not necessarily an element type. 
      // The element type needs be set when the statement is 
      // parsed or analysed. 
+
+  public boolean typeInference(Vector types, Vector entities, 
+    Vector ctxs, Vector env, java.util.Map vartypes)
+  { Attribute att = 
+      new Attribute(assignsTo,instanceType,
+                    ModelElement.INTERNAL); 
+
+    Type typ = Type.getTypeFor(createsInstanceOf, 
+                               types, entities); 
+    if (instanceType == null && typ != null) 
+    { instanceType = typ; } 
+    if (elementType != null) 
+    { instanceType.setElementType(elementType); } 
+    else if (typ != null) 
+    { elementType = typ.elementType; 
+      if ("String".equals(typ.getName()))
+      { elementType = new Type("String", null); } 
+    }
+ 
+    if (instanceType == null) 
+    { att.setType(typ); } 
+    
+    if (elementType != null) 
+    { att.setElementType(elementType); } 
+ 
+	
+    if (initialExpression != null) 
+    { initialExpression.typeInference(types,entities,
+                                      ctxs,env,vartypes); 
+      System.out.println(">>> Inferred type " + 
+        initialExpression.getType() + "(" + 
+        initialExpression.getElementType() + 
+        ") for variable " + att); 
+
+      Type initType = initialExpression.getType(); 
+      Type initElemType = initialExpression.getElementType(); 
+
+      if (!Type.isVacuousType(initType))
+      { instanceType = initType;  
+        att.setType(instanceType);
+      } 
+ 
+      if (!Type.isVacuousType(initElemType))
+      { elementType = initElemType;
+        instanceType.setElementType(initElemType);  
+        att.setElementType(initElemType); 
+      } 
+    } 
+
+    variable = att; 
+    env.add(att); 
+    vartypes.put(assignsTo, att.getType()); 
+
+    return true; 
+  }  
 
   public Expression wpc(Expression post)
   { return post; }
@@ -7030,6 +7445,28 @@ class SequenceStatement extends Statement
     return res; 
   }  
 
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { boolean res = true; 
+
+    for (int i = 0; i < statements.size(); i++) 
+    { Statement s = (Statement) statements.get(i); 
+      Vector context = new Vector(); 
+      Entity ee = s.entity; 
+      if (ee != null) 
+      { if (cs.size() > 0 && 
+            (ee + "").equals(cs.get(0) + "")) 
+        { } 
+        else 
+        { context.add(ee); }
+      } 
+      context.addAll(cs); 
+      res = s.typeInference(types,entities,context,env,vartypes);
+    } 
+
+    return res; 
+  }  
+
+
   public Expression wpc(Expression post)
   { Expression e1 = (Expression) post.clone();
     for (int i = statements.size()-1; i >= 0; i--)
@@ -7737,6 +8174,9 @@ class CaseStatement extends Statement
   public boolean typeCheck(Vector types, Vector entities, Vector cs, Vector env)
   { return true; }   // type check each case dest? 
 
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { return true; }   // type check each case dest? 
+
   public Expression wpc(Expression post)
   { return post; }  // Will not occur in a transition action. 
 
@@ -8004,6 +8444,14 @@ class ErrorStatement extends Statement
   public boolean typeCheck(Vector types, Vector entities, Vector cs, Vector env)
   { if (thrownObject != null) 
     { thrownObject.typeCheck(types,entities,cs,env); } 
+    return true;
+  } 
+
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { if (thrownObject != null) 
+    { thrownObject.typeInference(types,entities,
+                                 cs,env,vartypes); 
+    } 
     return true;
   } 
   
@@ -8351,6 +8799,13 @@ class AssertStatement extends Statement
   { condition.typeCheck(types,entities,cs,env); 
     if (message != null) 
     { message.typeCheck(types,entities,cs,env); } 
+    return true;
+  } 
+
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { condition.typeInference(types,entities,cs,env,vartypes); 
+    if (message != null) 
+    { message.typeInference(types,entities,cs,env,vartypes); } 
     return true;
   } 
   
@@ -8724,6 +9179,18 @@ class CatchStatement extends Statement
 
     caughtObject.typeCheck(types,entities,cs,localEnv);
     action.typeCheck(types,entities,cs,localEnv);  
+    return true;
+  } 
+
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { Vector localEnv = new Vector(); 
+    localEnv.addAll(env); 
+
+    // The caught exception variable is added to the localEnv
+
+    caughtObject.typeInference(types,entities,
+                               cs,localEnv,vartypes);
+    action.typeInference(types,entities,cs,localEnv,vartypes);  
     return true;
   } 
   
@@ -9295,6 +9762,23 @@ class TryStatement extends Statement
 
     if (endStatement != null) 
     { endStatement.typeCheck(types,entities,cs,env); } 
+    return true; 
+  }  
+
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { if (body != null) 
+    { body.typeInference(types,entities,cs,env,vartypes); } 
+ 
+    for (int i = 0; i < catchClauses.size(); i++) 
+    { Statement cc = (Statement) catchClauses.get(i); 
+      cc.typeInference(types,entities,cs,env,vartypes);
+    } 
+
+    if (endStatement != null) 
+    { endStatement.typeInference(types,entities,
+                                 cs,env,vartypes); 
+    }
+ 
     return true; 
   }  
   
@@ -10162,6 +10646,15 @@ class IfStatement extends Statement
     return res;
   }
 
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { boolean res = true;
+    for (int i = 0; i < cases.size(); i++) 
+    { IfCase ic = (IfCase) cases.get(i); 
+      res = ic.typeInference(types,entities,cs,env,vartypes) && res; 
+    }
+    return res;
+  }
+
   public Expression wpc(Expression post)
   { Expression res = null;
     for (int i = 0; i < cases.size(); i++)
@@ -10982,6 +11475,48 @@ class AssignStatement extends Statement
     return res; 
   }
 
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { // Also recognise the type as an entity or enumeration if it exists
+
+    boolean res = lhs.typeCheck(types,entities,cs,env);
+    res = rhs.typeCheck(types,entities,cs,env);
+    Type rhsType = rhs.getType();  
+    res = rhs.typeInference(types,entities,cs,env,vartypes);
+
+    if (Type.isVacuousType(lhs.type) && 
+        !Type.isVacuousType(rhsType)) 
+    { lhs.type = rhsType; } 
+
+    if (rhs.elementType != null && lhs.elementType == null) 
+    { lhs.elementType = rhs.elementType; } 
+    else if (lhs.elementType != null && rhs.elementType == null) 
+    { rhs.elementType = lhs.elementType; } 
+
+    if (BasicExpression.hasVariable(lhs))
+    { BasicExpression.updateVariableType(lhs,rhs); } 
+    else if (BasicExpression.isMapAccess(lhs))
+    { // update key and element types appropriately
+      BasicExpression.updateMapType(lhs,rhs); 
+    } 
+
+    if (type != null)  // declare it
+    { Attribute att = new Attribute(lhs + "", rhs.type, ModelElement.INTERNAL); 
+      att.setElementType(lhs.elementType);
+      System.out.println(">>> local variable " + lhs + " has type " + att.getType());  
+      env.add(att); 
+    } 
+
+    Type declaredType = (Type) vartypes.get(lhs + ""); 
+    if (!Type.isVacuousType(declaredType) && 
+        Type.isVacuousType(lhs.type))
+    { lhs.type = declaredType;
+      System.out.println(">>> " + lhs + " actual type is " + declaredType);  
+    } // does not allow for changing the type 
+
+    return res; 
+  }
+
+
   public Expression wpc(Expression post)
   { return post.substituteEq(lhs.toString(),rhs); }
   // But more complex than this if the lhs is an array index
@@ -11543,6 +12078,16 @@ class IfCase
     return res1 && res2; 
   }
 
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { boolean res1 = test.typeInference(types,entities,
+                                      cs,env,vartypes);
+    // Must be boolean
+
+    boolean res2 = ifPart.typeInference(types,entities,
+                                        cs,env,vartypes);
+    return res1 && res2; 
+  }
+
 
   public void displayJava(String t, PrintWriter out)
   { out.print("if (" + test.toJava() + 
@@ -12066,6 +12611,17 @@ class ConditionalStatement extends Statement
     return res; 
   }
 
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { boolean res = test.typeInference(types,entities,
+                                     cs,env,vartypes); 
+    res = ifPart.typeInference(types,entities,cs,env,vartypes);
+    if (elsePart != null) 
+    { res = elsePart.typeInference(types, entities, 
+                               cs, env,vartypes); 
+    } 
+    return res; 
+  }
+
   public Expression wpc(Expression post)
   { BinaryExpression ifimpl = new BinaryExpression("=>", test, ifPart.wpc(post));
     if (elsePart != null) 
@@ -12516,6 +13072,12 @@ class FinalStatement extends Statement
 
   public boolean typeCheck(Vector types, Vector entities, Vector cs, Vector env)
   { boolean res = body.typeCheck(types,entities,cs,env);
+    return res; 
+  }
+
+  public boolean typeInference(Vector types, Vector entities, Vector cs, Vector env, java.util.Map vartypes)
+  { boolean res = body.typeInference(types,entities,
+                                     cs,env,vartypes);
     return res; 
   }
 

@@ -490,6 +490,7 @@ public class BehaviouralFeature extends ModelElement
   { BehaviouralFeature bf = new BehaviouralFeature("new" + ename); 
     bf.setParameters(pars); 
     Entity e = new Entity(ename); 
+ 
     Type etype = new Type(e); 
     bf.setType(etype); 
     bf.setPostcondition(new BasicExpression(true)); 
@@ -500,7 +501,95 @@ public class BehaviouralFeature extends ModelElement
                           "res", etype); 
  
     CreationStatement cs = 
-        new CreationStatement("res", etype); 
+        new CreationStatement("res", etype);
+    // cs.setInstanceType(etype);  
+    code.addStatement(cs); 
+
+    BasicExpression createCall = 
+        new BasicExpression("create" + ename); 
+    createCall.setUmlKind(Expression.UPDATEOP); 
+    createCall.setParameters(new Vector()); 
+    createCall.setIsEvent(); 
+    createCall.setType(etype); 
+    createCall.setStatic(true); 
+    // createCall.entity = e; 
+
+    AssignStatement assgn = new AssignStatement(res,createCall); 
+    code.addStatement(assgn); 
+
+    BasicExpression initialiseCall = 
+       new BasicExpression("initialise"); 
+    initialiseCall.setUmlKind(Expression.UPDATEOP);
+    initialiseCall.setIsEvent(); 
+    Vector parNames = bf.getParameterExpressions(); 
+    // System.out.println(">>=== " + pars + " " + parNames); 
+ 
+    initialiseCall.setParameters(parNames); 
+    initialiseCall.setObjectRef(res); 
+    InvocationStatement callInit = 
+        new InvocationStatement(initialiseCall);
+    callInit.setParameters(parNames);  
+    code.addStatement(callInit); 
+
+    // Add each instance _initialiseInstance() operation
+    // res._initialiseInstance()
+	if (ent != null) 
+    { Vector allops = ent.getOperations(); 
+      for (int i = 0; i < allops.size(); i++) 
+      { BehaviouralFeature op = (BehaviouralFeature) allops.get(i); 
+        String opname = op.getName(); 
+        if (opname.startsWith("_initialiseInstance"))
+        { BasicExpression initialiseInstanceCall = 
+                             new BasicExpression(opname); 
+          initialiseInstanceCall.setUmlKind(Expression.UPDATEOP);
+          initialiseInstanceCall.setIsEvent(); 
+          initialiseInstanceCall.setParameters(new Vector()); 
+          initialiseInstanceCall.setObjectRef(res); 
+          InvocationStatement callInstInit = 
+            new InvocationStatement(initialiseInstanceCall);
+          callInstInit.setParameters(new Vector());  
+          code.addStatement(callInstInit); 
+        } 
+      } 
+    }
+	
+    ReturnStatement rs = new ReturnStatement(res); 
+    code.addStatement(rs); 
+
+    code.setBrackets(true); 
+
+    bf.setActivity(code); 
+    bf.setStatic(true); 
+
+    return bf; 
+  } 
+
+  public static BehaviouralFeature newConstructor(String ename, 
+                                       Entity ent, Vector pars,
+                                       Vector gpars)
+  { BehaviouralFeature bf = new BehaviouralFeature("new" + ename); 
+    bf.setParameters(pars); 
+    Entity e = new Entity(ename); 
+    if (gpars != null) 
+    { e.setTypeParameters(gpars); }
+ 
+    Type etype = new Type(e); 
+    bf.setType(etype); 
+
+    System.out.println(">> Generic parameters of " + bf + " are " + gpars); 
+
+    System.out.println(">> Return type of " + bf + " is " + e.getCompleteName()); 
+
+    bf.setPostcondition(new BasicExpression(true)); 
+    SequenceStatement code = new SequenceStatement();
+
+    BasicExpression res = 
+      BasicExpression.newVariableBasicExpression(
+                          "res", etype); 
+ 
+    CreationStatement cs = 
+        new CreationStatement("res", etype);
+    cs.setInstanceType(etype);  
     code.addStatement(cs); 
 
     BasicExpression createCall = 
@@ -2954,20 +3043,39 @@ public class BehaviouralFeature extends ModelElement
   } 
 
   public boolean parametersMatch(Vector pars)
-  { if (pars == null || parameters == null) { return false; } 
+  { if (pars == null || parameters == null) 
+    { return false; } 
+
+    System.out.println(">>> For operation " + name + " actual parameters are " + pars + " formal parameters are " + parameters); 
+
     if (pars.size() == parameters.size()) 
     { return true; } 
+
+    return false; 
+  } // and check the types
+
+  public boolean parametersSupset(Vector pars)
+  { if (pars == null || parameters == null) 
+    { return false; } 
+
+    if (pars.size() < parameters.size()) 
+    { return true; } 
+
     return false; 
   } // and check the types
 
   public boolean parameterMatch(Vector pars)
-  { if (pars == null || parameters == null) { return false; } 
+  { if (pars == null || parameters == null) 
+    { return false; } 
     if (pars.size() != parameters.size()) 
     { return false; } 
     for (int i = 0; i < parameters.size(); i++) 
     { Attribute par = (Attribute) parameters.get(i); 
       Expression arg = (Expression) pars.get(i); 
-      if (Type.isSubType(arg.getType(), par.getType())) { }  // = or a subtype
+      if (par.getType() == null ||
+          Type.isVacuousType(par.getType())) { } 
+      else if (par.getType().equals(arg.getType())) { } 
+      else if (Type.isSubType(arg.getType(), par.getType())) { }  // = or a subtype
       else 
       { return false; } 
     } 
@@ -2976,12 +3084,28 @@ public class BehaviouralFeature extends ModelElement
   } // and check the types
 
   public void setFormalParameters(Vector pars)
-  { if (pars == null || parameters == null) { return; } 
-    for (int i = 0; i < parameters.size() && i < pars.size(); i++) 
+  { if (pars == null || parameters == null) 
+    { return; }
+ 
+    Vector extrapars = new Vector(); 
+
+    for (int i = 0; i < parameters.size(); i++) 
     { Attribute par = (Attribute) parameters.get(i); 
-      Expression arg = (Expression) pars.get(i); 
-      arg.formalParameter = par; 
+      Type pt = par.getType(); 
+
+      if (i < pars.size())
+      { Expression arg = (Expression) pars.get(i); 
+        arg.formalParameter = par;
+      } 
+      else 
+      { Expression nullInit = 
+          Type.nullInitialValueExpression(pt); 
+        nullInit.formalParameter = par; 
+        extrapars.add(nullInit); 
+      } 
     } 
+
+    pars.addAll(extrapars); 
   } // Used in code generation, eg., for Swift. 
 
   public Expression substituteParameters(Expression e, Vector arguments) 
@@ -3315,7 +3439,7 @@ public class BehaviouralFeature extends ModelElement
   } 
 
   public boolean typeCheck(Vector types, Vector entities)
-  { // System.err.println("ERRROR -- calling wrong type-check for " + name); 
+  { // System.err.println("ERROR -- calling wrong type-check for " + name); 
 
     Vector localEntities = allTypeParameterEntities(); 
      
@@ -3358,6 +3482,75 @@ public class BehaviouralFeature extends ModelElement
     return res;  
   } // and the activity? 
   // could deduce type and element type of result. 
+
+  public boolean typeInference(Vector types, Vector entities, 
+                               java.util.Map vartypes)
+  { java.util.Map localvartypes = new java.util.HashMap(); 
+    localvartypes.putAll(vartypes); 
+
+    Vector localEntities = allTypeParameterEntities(); 
+     
+    localEntities.addAll(entities); 
+
+    Vector contexts = new Vector(); 
+    if (entity != null && instanceScope) 
+    { contexts.add(entity); }
+    else if (entity != null && !instanceScope)
+    { localEntities.add(0,entity); } 
+ 
+    Vector env = new Vector();
+    typeCheckParameters(parameters,types,localEntities);  
+    env.addAll(parameters);
+
+    for (int i = 0; i < parameters.size(); i++) 
+    { Attribute par = (Attribute) parameters.get(i); 
+      localvartypes.put(par.getName(), par.getType()); 
+    } 
+
+    if (resultType != null && !("void".equals(resultType + "")))
+    { Attribute resultVar = getResultParameter(); 
+      if (resultVar != null) 
+      { env.add(resultVar); 
+        localvartypes.put("result", resultType); 
+      }  
+    } 
+ 
+    if (pre != null) 
+    { pre.typeCheck(types,localEntities,contexts,env); } 
+
+    boolean res = false; 
+
+    if (post != null) 
+    { res = post.typeCheck(
+              types,localEntities,contexts,env); 
+    }
+ 
+    if (activity != null) 
+    { System.out.println(">>> Type inference for activity " + activity); 
+      res = activity.typeInference(
+              types,localEntities,contexts,env,localvartypes);
+    } 
+
+    System.out.println(">>> Typed variables = " + 
+                       localvartypes); 
+
+    Type rtype = (Type) localvartypes.get("result"); 
+    if ((resultType == null || 
+         "OclAny".equals(resultType + "")) && 
+        rtype != null) 
+    { resultType = rtype; } 
+
+    for (int i = 0; i < parameters.size(); i++) 
+    { Attribute par = (Attribute) parameters.get(i); 
+      Type newpartype = 
+         (Type) localvartypes.get(par.getName());
+      if (Type.isVacuousType(par.getType()) && 
+          newpartype != null)
+      { par.setType(newpartype); } 
+    } 
+
+    return res;  
+  } 
 
   public boolean typeCheck(Vector types, Vector entities, Vector contexts, Vector env)
   { Vector contexts1 = new Vector(); 
@@ -10942,6 +11135,73 @@ public class BehaviouralFeature extends ModelElement
     } 
 
     return act;  
+  } 
+
+  public void hoistLocalDeclarations()
+  { // Find all the local declarations. 
+    // Give warnings if 
+    //   (i) multiple declarations with same variable name
+    //   (ii) declaration with same name as a parameter
+    // Apart from case (ii) replace declarations by assigns
+    // in the code and put all declarations at the start 
+
+    if (activity == null) 
+    { return; } 
+
+    Vector localdecs = 
+      Statement.getLocalDeclarations(activity); 
+    
+    Vector initialDecs = new Vector(); 
+    Vector varnames = new Vector(); 
+    
+    for (int i = 0; i < localdecs.size(); i++) 
+    { CreationStatement cs = (CreationStatement) localdecs.get(i); 
+      String vname = cs.assignsTo;
+
+      ModelElement par = 
+          ModelElement.lookupByName(vname, parameters); 
+
+      if (par != null) 
+      { System.err.println("!! Code Smell (MDV): " + vname + " is both a parameter and a local variable!"); 
+        continue; 
+      }
+  
+      if (varnames.contains(vname))
+      { System.err.println("!! Code Smell (MDV): multiple declarations in same scope for variable " + vname); 
+        continue;
+      } 
+
+      varnames.add(vname); 
+      initialDecs.add(cs.defaultVersion()); 
+    } 
+
+    if (varnames.size() == 0) 
+    { return; } 
+
+    Statement newactivity = 
+      Statement.replaceLocalDeclarations(activity,varnames); 
+    SequenceStatement ss = new SequenceStatement(initialDecs);
+    ss.addStatement(newactivity); 
+   
+    System.out.println(">>> New activity: " + ss); 
+    activity = ss; 
+  } 
+
+  public void reduceCodeNesting()
+  { // Replace each conditional  
+    // if cond then stats1 else stats2 
+    // by 
+    // if cond then stats1 else skip; stats2
+    // where all code paths in stats1 end with a return. 
+
+    if (activity == null) 
+    { return; } 
+
+    Statement newactivity = 
+      Statement.replaceElseBySequence(activity); 
+       
+    System.out.println(">>> New activity: " + newactivity); 
+    activity = newactivity; 
   } 
 }
 

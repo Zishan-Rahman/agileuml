@@ -258,6 +258,46 @@ abstract class Expression
 
   public abstract String toAST(); 
 
+  public static String formattedString(String f)
+  { /* s written with {v:fmt} to format v element */ 
+
+    String res = "";
+    boolean inElement = false;
+    boolean inFormat = false;
+    String var = "";   
+    String fmt = "";   
+    for (int i = 0; i < f.length(); i++) 
+    { char c = f.charAt(i); 
+      if (inElement) 
+      { if (':' == c) 
+        { fmt = ""; 
+          inFormat = true; 
+        } 
+        else if ('}' == c)
+        { if ("".equals(fmt))
+          { fmt = "s"; } 
+          res = res + "\" + String.format(\"%" + fmt + "\", " + var + ") + \""; 
+          inElement = false;
+          inFormat = false;  
+          var = ""; 
+          fmt = ""; 
+        } 
+        else if (inFormat) 
+        { fmt = fmt + c; } // skip the format
+        else 
+        { var = var + c; } // var name character
+      } 
+      else if ('{' == c) 
+      { inElement = true; } 
+      else 
+      { res = res + c; } // literal character
+    }  
+
+    return res + ""; 
+  } 
+
+
+
   public Vector mutants()
   { Vector res = new Vector(); 
     res.add(this); 
@@ -1347,7 +1387,11 @@ abstract class Expression
           tname.equals("Function") || 
           tname.equals("OclType") ||
           tname.equals("OclDate") || 
+          tname.equals("OclFile") || 
           tname.equals("OclIterator") || 
+          tname.equals("OclRandom") || 
+          tname.equals("OclDatasource") || 
+          tname.equals("OclProcess") || 
           tname.equals("OclAny"))
       { return qf; }
       if (tname.equals("boolean"))
@@ -1376,7 +1420,11 @@ abstract class Expression
           tname.equals("Function") || 
           tname.equals("OclType") ||
           tname.equals("OclDate") || 
+          tname.equals("OclFile") || 
           tname.equals("OclIterator") || 
+          tname.equals("OclRandom") || 
+          tname.equals("OclDatasource") || 
+          tname.equals("OclProcess") || 
           tname.equals("OclAny"))
       { return qf; }
       if (tname.equals("boolean"))
@@ -1403,9 +1451,14 @@ abstract class Expression
       String tname = t.getName();
       if (tname.equals("Set") || tname.equals("Sequence") || 
           tname.equals("String") || tname.equals("Map") ||
+          tname.equals("Function") || 
           tname.equals("OclType") || 
+          tname.equals("OclFile") || 
           tname.equals("OclIterator") || 
-          tname.equals("OclDate") || 
+          tname.equals("OclDate") ||
+          tname.equals("OclRandom") || 
+          tname.equals("OclDatasource") || 
+          tname.equals("OclProcess") || 
           tname.equals("OclAny"))
       { return qf; }
       if (tname.equals("boolean"))
@@ -1529,6 +1582,11 @@ abstract class Expression
   public abstract boolean typeCheck(final Vector typs, final Vector ents,
                                     final Vector contexts, final Vector env); 
 
+  public abstract boolean typeInference(final Vector typs, 
+                                        final Vector ents,
+                   final Vector contexts, final Vector env, 
+                   java.util.Map vartypes); 
+
   public abstract int maxModality();
 
   public abstract int minModality(); 
@@ -1547,6 +1605,13 @@ abstract class Expression
     { return type.getName().equals("int") || 
         type.getName().equals("long"); 
     } 
+    return false; 
+  }  
+
+  public boolean isInt()
+  { if (type != null) 
+    { return type.getName().equals("int"); }
+ 
     return false; 
   }  
 

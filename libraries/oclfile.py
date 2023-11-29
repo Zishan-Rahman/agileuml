@@ -239,6 +239,13 @@ class OclFile:
       return False
     return True
 
+  def mkdirs(self) : 
+    try: 
+      os.makedirs(self.name)
+    except OSError as error: 
+      return False
+    return True
+
   def print(self, s) :
     if self.name == "System.out" or self.name == "System.err" : 
       print(str(s), end="")
@@ -607,3 +614,8 @@ System_out = OclFile.newOclFile("System.out")
 System_err = OclFile.newOclFile("System.err")
 
 
+# d = OclFile.newOclFile(".")
+# dirfiles = d.listFiles()
+# for f in dirfiles : 
+#   f.openRead()
+#   print(f.getName() + " " + str(f.lineCount()))

@@ -340,10 +340,11 @@ public class BSystemTypes extends BComponent
     } 
   } 
 
-  public static String getSelectDefinitionJava7(Expression left, String lqf,
-                                           Expression pred, String selectvar, 
-                                           java.util.Map env,
-                                           Vector pars)
+  public static String getSelectDefinitionJava7(
+                   Expression left, String lqf,
+                   Expression pred, String selectvar, 
+                   java.util.Map env,
+                   Vector pars)
   { String signature = Attribute.parList(pars); 
 
     if (Expression.isSimpleEntity(left)) 
@@ -365,12 +366,16 @@ public class BSystemTypes extends BComponent
     if (ename.equals("Set"))
     { tname = "Set"; } // element type? 
     else if (ename.equals("Sequence"))
-    { tname = "ArrayList"; } 
+    { tname = "ArrayList"; 
+      if (e != null)
+      { tname = e.getJava7(); }
+    }  
     else if (ename.equals("int"))
     { tname = "Integer"; } 
     else if (e != null) 
     { tname = e.typeWrapperJava7(); } 
 
+    String partype1 = "List<" + tname + ">"; 
     String restype1 = "ArrayList<" + tname + ">"; 
     String restype2 = "HashSet<" + tname + ">"; 
     String restype3 = "TreeSet<" + tname + ">"; 
@@ -391,7 +396,7 @@ public class BSystemTypes extends BComponent
       { var = selectvar; } 
       else 
       { var = ename.toLowerCase() + "_" + oldindex + "_xx"; }
-      String res1 = "  public static " + restype1 + " select_" + oldindex + "(" + restype1 + " _l"; 
+      String res1 = "  public static " + restype1 + " select_" + oldindex + "(" + partype1 + " _l"; 
       String res2 = "  public static " + restype2 + " select_" + oldindex + "(" + restype2 + " _l"; 
       String res3 = "  public static " + restype3 + " select_" + oldindex + "(" + restype3 + " _l"; 
       String res4 = "  public static " + restype2 + " select_" + oldindex + "(" + restype4 + " _l"; 
@@ -897,10 +902,11 @@ public class BSystemTypes extends BComponent
     } 
   } 
 
-  public static String getCollectDefinitionJava7(Expression left, String lqf,
-                                           Expression exp, boolean rprim,
-                                           String collectvar, java.util.Map env,
-                                           Vector pars)
+  public static String getCollectDefinitionJava7(
+           Expression left, String lqf,
+           Expression exp, boolean rprim,
+           String collectvar, java.util.Map env,
+           Vector pars)
   { String signature = Attribute.parList(pars); 
 
     if (Expression.isSimpleEntity(left))  
@@ -957,7 +963,8 @@ public class BSystemTypes extends BComponent
         if (partype != null)  
         { res = res + "," + 
                 partype.getJava7(partype.getElementType()) + 
-                                 " " + par.getName(); } 
+                                 " " + par.getName(); 
+        } 
       } 
       res = res + ")\n"; 
       res = res + "  { // Implements: " + left + "->collect( " + var + " | " + exp + " )\n" + 
@@ -1575,10 +1582,11 @@ public class BSystemTypes extends BComponent
     } 
   } 
 
-  public static String getRejectDefinitionJava7(Expression left, String lqf,
-                                           Expression pred, String selectvar,
-                                           java.util.Map env,
-                                           Vector pars)
+  public static String getRejectDefinitionJava7(
+            Expression left, String lqf,
+            Expression pred, String selectvar,
+            java.util.Map env,
+            Vector pars)
   { String signature = Attribute.parList(pars); 
 
     if (Expression.isSimpleEntity(left)) 
@@ -1599,12 +1607,16 @@ public class BSystemTypes extends BComponent
     if (ename.equals("Set"))
     { tname = "Set"; } 
     else if (ename.equals("Sequence"))
-    { tname = "ArrayList"; } 
+    { tname = "ArrayList"; 
+      if (e != null)
+      { tname = e.getJava7(); }
+    } 
     else if (ename.equals("int"))
     { tname = "Integer"; } 
     else if (e != null) 
     { tname = e.typeWrapperJava7(); } 
 
+    String partype1 = "List<" + tname + ">"; 
     String restype1 = "ArrayList<" + tname + ">"; 
     String restype2 = "HashSet<" + tname + ">"; 
     String restype3 = "TreeSet<" + tname + ">"; 
@@ -1630,7 +1642,7 @@ public class BSystemTypes extends BComponent
       if (selectvar == null && e != null && e.isEntity())
       { newenv.put(ename,var); } 
 
-      String res1 = "  public static " + restype1 + " reject_" + oldindex + "(" + restype1 + " _l"; 
+      String res1 = "  public static " + restype1 + " reject_" + oldindex + "(" + partype1 + " _l"; 
       String res2 = "  public static " + restype2 + " reject_" + oldindex + "(" + restype2 + " _l"; 
       String res3 = "  public static " + restype3 + " reject_" + oldindex + "(" + restype3 + " _l"; 
       String res4 = "  public static " + restype2 + " reject_" + oldindex + "(" + restype4 + " _l"; 
@@ -2234,8 +2246,8 @@ public class BSystemTypes extends BComponent
     if (e == null || "OclAny".equals(e.getName())) 
     { ename = "Object"; } 
     else if ("Set".equals(e.getName()))
-	{ ename = "HashSet"; } 
-	else if ("Sequence".equals(e.getName()))
+    { ename = "HashSet"; } 
+    else if ("Sequence".equals(e.getName()))
     { ename = "ArrayList"; } 
     else 
     { ename = e.getName(); }
@@ -4940,7 +4952,9 @@ public class BSystemTypes extends BComponent
                  "  }\n\n";
 
      res = res + "  public static List subrange(List l, int i, int j)\n";
-     res = res + "  { List tmp = new Vector(); \n" + 
+     res = res + "  { List tmp = new Vector(); \n" +
+                 "    if (i < 0) { i = l.size() + i; }\n" + 
+                 "    if (j < 0) { j = l.size() + j; }\n" + 
                  "    for (int k = i-1; k < j; k++)\n" + 
                  "    { tmp.add(l.get(k)); } \n" + 
                  "    return tmp; \n" + 
@@ -4968,6 +4982,8 @@ public class BSystemTypes extends BComponent
 
      res = res + "  public static ArrayList subrange(ArrayList l, int i, int j)\n";
      res = res + "  { ArrayList tmp = new ArrayList(); \n" + 
+                 "    if (i < 0) { i = l.size() + i; }\n" + 
+                 "    if (j < 0) { j = l.size() + j; }\n" + 
                  "    for (int k = i-1; k < j; k++)\n" + 
                  "    { tmp.add(l.get(k)); } \n" + 
                  "    return tmp; \n" + 
@@ -4995,6 +5011,8 @@ public class BSystemTypes extends BComponent
 
     res = res + "  public static <T> ArrayList<T> subrange(ArrayList<T> l, int i, int j)\n";
     res = res + "  { ArrayList<T> tmp = new ArrayList<T>(); \n" + 
+                "    if (i < 0) { i = l.size() + i; }\n" + 
+                "    if (j < 0) { j = l.size() + j; }\n" + 
                 "    for (int k = i-1; k < j; k++)\n" + 
                 "    { tmp.add(l.get(k)); } \n" + 
                 "    return tmp; \n" + 
@@ -5022,6 +5040,8 @@ public class BSystemTypes extends BComponent
 
     res = res + "  public static ArrayList subrange(ArrayList l, int i, int j)\n";
     res = res + "  { ArrayList tmp = new ArrayList(); \n" + 
+                "    if (i < 0) { i = l.Count + i; }\n" + 
+                "    if (j < 0) { j = l.Count + j; }\n" + 
                 "    if (i < 1) { i = 1; }\n" + 
                 "    for (int k = i-1; k < j; k++)\n" + 
                 "    { tmp.Add(l[k]); } \n" + 
@@ -7682,8 +7702,8 @@ public class BSystemTypes extends BComponent
       "  }\n\n"; 
 
     res = res + 
-      "  public static List mapAsSequence(Map m)\n" +
-      "  { List range = new Vector();\n" +
+      "  public static Vector mapAsSequence(Map m)\n" +
+      "  { Vector range = new Vector();\n" +
       "    java.util.Set ss = m.entrySet();\n" + 
       "    for (Object x : ss)\n" +
       "    { Map.Entry ee = (Map.Entry) x;\n" + 
@@ -7695,8 +7715,8 @@ public class BSystemTypes extends BComponent
       "  }\n\n"; 
 
     res = res + 
-      "  public static List mapAsSet(Map m)\n" +
-      "  { List range = mapAsSequence(m); \n" +
+      "  public static Vector mapAsSet(Map m)\n" +
+      "  { Vector range = mapAsSequence(m); \n" +
       "    return asSet(range); \n" +
       "  }\n\n"; 
  
@@ -7739,8 +7759,20 @@ public class BSystemTypes extends BComponent
       "    return res;\n" +
       "  }\n\n";   
 
+    res = res + 
+      "  public static ArrayList asSequence(Hashtable m)\n" +
+      "  { ArrayList res = new ArrayList();\n" +
+      "    foreach (DictionaryEntry pair in m)\n" +
+      "    { object key = pair.Key;\n" +
+      "      Hashtable maplet = new Hashtable();\n" +
+      "      maplet[key] = pair.Value;\n" + 
+      "      res.Add(maplet);\n" +
+      "    }\n" +
+      "    return res;\n" + 
+      "  }\n\n"; 
+
     return res;
-  } // and map
+  } // and map as a set
 
   public static String refOps() 
   { String res = ""; 
@@ -9085,6 +9117,30 @@ public class BSystemTypes extends BComponent
     return res; 
   } 
 
+  public static String generateInsertIntoOp()  
+  { String res = 
+      "  public static List insertInto(List l, int ind, List ob)\n" + 
+      "  { List res = new Vector();\n" + 
+      "    for (int i = 0; i < ind-1 && i < l.size(); i++)\n" +  
+      "    { res.add(l.get(i)); }\n" + 
+      "    for (int j = 0; j < ob.size(); j++)\n" + 
+      "    { res.add(ob.get(j)); }\n" + 
+      "    for (int i = ind-1; i < l.size(); i++)\n" +  
+      "    { res.add(l.get(i)); }\n" + 
+      "    return res;\n" + 
+      "  }\n"; 
+    res = res + "  public static String insertInto(String l, int ind, Object ob)\n" + 
+      "  { String res = \"\";\n" + 
+      "    for (int i = 0; i < ind-1 && i < l.length(); i++)\n" +  
+      "    { res = res + l.charAt(i); }\n" + 
+      "    res = res + ob; \n" + 
+      "    for (int i = ind-1; i < l.length(); i++)\n" +  
+      "    { res = res + l.charAt(i); }\n" + 
+      "    return res;\n" + 
+      "  }\n"; 
+    return res; 
+  } 
+
   public static String generateRemoveSetAtOps()
   { String res = 
       "  public static List removeAt(List l, int ind)\n" + 
@@ -9153,6 +9209,31 @@ public class BSystemTypes extends BComponent
       "  }\n"; 
     return res; 
   } 
+
+  public static String generateInsertIntoOpJava6()  
+  { String res = 
+      "  public static ArrayList insertInto(ArrayList l, int ind, ArrayList ob)\n" + 
+      "  { ArrayList res = new ArrayList();\n" + 
+      "    for (int i = 0; i < ind-1 && i < l.size(); i++)\n" +  
+      "    { res.add(l.get(i)); }\n" + 
+      "    for (int j = 0; j < ob.size(); j++)\n" + 
+      "    { res.add(ob.get(j)); }\n" + 
+      "    for (int i = ind-1; i < l.size(); i++)\n" +  
+      "    { res.add(l.get(i)); }\n" + 
+      "    return res;\n" + 
+      "  }\n"; 
+    res = res + "  public static String insertInto(String l, int ind, Object ob)\n" + 
+      "  { String res = \"\";\n" + 
+      "    for (int i = 0; i < ind-1 && i < l.length(); i++)\n" +  
+      "    { res = res + l.charAt(i); }\n" + 
+      "    res = res + ob;\n" + 
+      "    for (int i = ind-1; i < l.length(); i++)\n" +  
+      "    { res = res + l.charAt(i); }\n" + 
+      "    return res;\n" + 
+      "  }\n"; 
+    return res; 
+  } 
+
 
   public static String generateRemoveSetAtOpsJava6()
   { String res = 
@@ -9224,6 +9305,31 @@ public class BSystemTypes extends BComponent
     return res; 
   } 
 
+  public static String generateInsertIntoOpJava7()  
+  { String res = 
+      "  public static <T> ArrayList<T> insertInto(List<T> l, int ind, List<T> ob)\n" + 
+      "  { ArrayList<T> res = new ArrayList<T>();\n" + 
+      "    for (int i = 0; i < ind-1 && i < l.size(); i++)\n" +  
+      "    { res.add(l.get(i)); }\n" + 
+      "    for (int j = 0; j < ob.size(); j++)\n" + 
+      "    { res.add(ob.get(j)); }\n" + 
+      "    for (int i = ind-1; i < l.size(); i++)\n" +  
+      "    { res.add(l.get(i)); }\n" + 
+      "    return res;\n" + 
+      "  }\n"; 
+    res = res + "  public static String insertInto(String l, int ind, Object ob)\n" + 
+      "  { String res = \"\";\n" + 
+      "    for (int i = 0; i < ind-1 && i < l.length(); i++)\n" +  
+      "    { res = res + l.charAt(i); }\n" + 
+      "    res = res + ob;\n" + 
+      "    for (int i = ind-1; i < l.length(); i++)\n" +  
+      "    { res = res + l.charAt(i); }\n" + 
+      "    return res;\n" + 
+      "  }\n"; 
+    return res; 
+  } 
+
+
   public static String generateRemoveSetAtOpsJava7()
   { String res = 
       "  public static <T> ArrayList<T> removeAt(List<T> l, int ind)\n" + 
@@ -9287,6 +9393,30 @@ public class BSystemTypes extends BComponent
       "    for (int i = 0; i < ind-1 && i < l.Length; i++)\n" +  
       "    { res = res + l[i]; }\n" + 
       "    if (ind <= l.Length + 1) { res = res + ob; }\n" + 
+      "    for (int i = ind-1; i < l.Length; i++)\n" +  
+      "    { res = res + l[i]; }\n" + 
+      "    return res;\n" + 
+      "  }\n"; 
+    return res; 
+  } 
+
+  public static String generateInsertIntoOpCSharp()  
+  { String res = 
+      "  public static ArrayList insertInto(ArrayList l, int ind, ArrayList ob)\n" + 
+      "  { ArrayList res = new ArrayList();\n" + 
+      "    for (int i = 0; i < ind-1 && i < l.Count; i++)\n" +  
+      "    { res.Add(l[i]); }\n" + 
+      "    for (int j = 0; j < ob.Count; j++) \n" + 
+      "    { res.Add(ob[j]); }\n" + 
+      "    for (int i = ind-1; i < l.Count; i++)\n" +  
+      "    { res.Add(l[i]); }\n" + 
+      "    return res;\n" + 
+      "  }\n"; 
+    res = res + "  public static string insertInto(string l, int ind, object ob)\n" + 
+      "  { string res = \"\";\n" + 
+      "    for (int i = 0; i < ind-1 && i < l.Length; i++)\n" +  
+      "    { res = res + l[i]; }\n" + 
+      "    res = res + ob; \n" + 
       "    for (int i = ind-1; i < l.Length; i++)\n" +  
       "    { res = res + l[i]; }\n" + 
       "    return res;\n" + 
@@ -9816,6 +9946,25 @@ public class BSystemTypes extends BComponent
     "      return res; \n" + 
     "    }\n\n"; 
 
+    res = res + 
+      "  public static ArrayList mapAsSequence(Map m)\n" +
+      "  { ArrayList range = new ArrayList();\n" +
+      "    java.util.Set ss = m.entrySet();\n" + 
+      "    for (Object x : ss)\n" +
+      "    { Map.Entry ee = (Map.Entry) x;\n" + 
+      "      HashMap mx = new HashMap(); \n" +
+      "      mx.put(ee.getKey(), ee.getValue());\n" + 
+      "      range.add(mx); \n" +
+      "    } \n" +
+      "    return range;\n" + 
+      "  }\n\n"; 
+
+    res = res + 
+      "  public static HashSet mapAsSet(Map m)\n" +
+      "  { ArrayList range = mapAsSequence(m); \n" +
+      "    return asSet(range); \n" +
+      "  }\n\n"; 
+
     return res;
   }
 
@@ -9827,6 +9976,11 @@ public class BSystemTypes extends BComponent
     "      return res;\n" +
     "    }\n\n";
 
+    res = res + "    public static <S,T> HashSet<HashMap<S,T>> asSet(Map<S,T> m)\n" +
+    "    { ArrayList<HashMap<S,T>> res = Ocl.asSequence(m);\n" +
+    "      return Ocl.asSet(res);\n" +
+    "    }\n\n";
+
     res = res + "    public static <T> ArrayList<T> asOrderedSet(Collection<T> c)\n" + 
     "    { ArrayList<T> res = new ArrayList<T>();\n" +  
     "      for (T x : c)\n" + 
@@ -9836,6 +9990,17 @@ public class BSystemTypes extends BComponent
     "      } \n" + 
     "      return res;\n" +  
     "    }\n\n"; 
+
+    res = res + "    public static <S,T> ArrayList<HashMap<S,T>> asSequence(Map<S,T> m)\n" + 
+    "    { Set<Map.Entry<S,T>> ss = m.entrySet();\n" + 
+    "      ArrayList<HashMap<S,T>> res = new ArrayList<HashMap<S,T>>();\n" + 
+    "      for (Map.Entry<S,T> item : ss)\n" + 
+    "      { HashMap<S,T> maplet = new HashMap<S,T>();\n" +  
+    "        maplet.put(item.getKey(), item.getValue()); \n" + 
+    "        res.add(maplet); \n" + 
+    "      }  \n" + 
+    "      return res;\n" +  
+    "    }\n"; 
 
     return res;
   }

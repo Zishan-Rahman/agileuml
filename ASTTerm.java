@@ -71,6 +71,8 @@ public abstract class ASTTerm
   { mathoclrewrites = new Vector(); }  
      // pairs [lhs,rhs]
 
+  static int mathoclfunctionIndex; 
+
   static String cobolHyphenReplacement; 
   static 
   { cobolHyphenReplacement = "_"; } // or "$" for Java
@@ -167,6 +169,8 @@ public abstract class ASTTerm
   public abstract String literalForm();
 
   public abstract String literalFormSpaces();
+
+  public abstract String evaluationLiteralForm();
 
   public static Vector getLiteralForms(Vector trms) 
   { Vector res = new Vector(); 
@@ -620,6 +624,13 @@ public abstract class ASTTerm
       return ASTTerm.symbolicLeq(e1,e2); 
     } 
 
+    if ("expressAsPolynomial".equals(opname) && 
+        eargs.size() == 2)
+    { ASTTerm e1 = (ASTTerm) eargs.get(0); 
+      ASTTerm e2 = (ASTTerm) eargs.get(1); 
+      return ASTTerm.expressAsPolynomial(e1,e2); 
+    } 
+
     // Also Eq and Neq
 
     if ("equationSolution".equals(opname) && 
@@ -813,6 +824,8 @@ public abstract class ASTTerm
 
   // Only for programming languages. 
   public abstract boolean updatesObject(ASTTerm t); 
+
+  public abstract ASTTerm updatedObject();
 
   public abstract boolean callSideEffect(); 
 
@@ -4145,6 +4158,326 @@ public abstract class ASTTerm
 
   public abstract Type cobolDataType(); 
 
+  public static String coefficientOfPower(ASTTerm var, int n, 
+                                          ASTTerm expr)
+  { // coefficient of n-th power of v in expr, n > 0
+
+    String v = var.literalForm(); 
+
+    boolean isIn = ASTTerm.isSubterm(var,expr); 
+    if (!isIn)
+    { return "0"; }
+
+    if (n == 1)
+    { return coefficientOf(var,expr); }  
+    
+    if (n == 2) 
+    { return coefficientOfSquare(var,expr); } 
+
+    // Vector powers = ASTTerm.powersOf(var,expr);
+    // if (VectorUtil.containsEqualString("" + n, powers) ||
+    //     VectorUtil.containsEqualString(n + ".0", powers))
+    // { } 
+    // else 
+    // { return "0"; } 
+
+    String thisLiteral = expr.literalForm(); 
+
+    if (v.equals(thisLiteral) && n == 1) 
+    { return "1"; } 
+
+    if (expr instanceof ASTCompositeTerm)
+    { // (factorExpression _1 * _2), etc
+      
+      ASTCompositeTerm ct = (ASTCompositeTerm) expr;
+      Vector subterms = ct.getTerms(); 
+ 
+      if (subterms.size() == 1) 
+      { return ASTTerm.coefficientOfPower(var, n, 
+                                (ASTTerm) subterms.get(0)); 
+      } 
+
+      if ("basicExpression".equals(ct.tag))
+      { if (subterms.size() == 3 && 
+            "(".equals(subterms.get(0) + "") && 
+            ")".equals(subterms.get(2) + ""))
+        { ASTTerm tt = (ASTTerm) subterms.get(1); 
+          return ASTTerm.coefficientOfPower(var, n, tt); 
+        } 
+      } 
+
+      if ("logicalExpression".equals(ct.tag) || 
+          "equalityExpression".equals(ct.tag))
+      { if (subterms.size() == 3)
+        { String opr = subterms.get(1) + ""; 
+          if ("=".equals(opr))
+          { ASTTerm t1 = (ASTTerm) subterms.get(0);  
+            ASTTerm t2 = (ASTTerm) subterms.get(2);  
+            String coef1 = 
+                ASTTerm.coefficientOfPower(var, n, t1); 
+            String coef2 = 
+                ASTTerm.coefficientOfPower(var, n, t2);
+ 
+            if ("0".equals(coef2))
+            { return coef1; }
+            if ("0".equals(coef1))
+            { return "-(" + coef2 + ")"; } 
+             
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 =
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(coef2);
+              return "" + (val1 - val2);  
+            } 
+              
+            return coef1 + " - (" + coef2 + ")"; 
+          }
+        } 
+
+        return "0"; 
+      }  
+
+      if ("additiveExpression".equals(ct.tag))
+      { if (subterms.size() == 3)
+        { String opr = subterms.get(1) + ""; 
+          if ("+".equals(opr) || "-".equals(opr))
+          { ASTTerm t1 = (ASTTerm) subterms.get(0);  
+            ASTTerm t2 = (ASTTerm) subterms.get(2); 
+            String coef1 = 
+                ASTTerm.coefficientOfPower(var, n, t1); 
+            String coef2 = 
+                ASTTerm.coefficientOfPower(var, n, t2); 
+            if ("0".equals(coef2) || "0.0".equals(coef2))
+            { return coef1; }
+            if ("0".equals(coef1) && "-".equals(opr))
+            { return "-(" + coef2 + ")"; } 
+            if ("0".equals(coef1) && "+".equals(opr))
+            { return coef2; } 
+
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 = 
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(coef2);
+              if ("+".equals(opr))
+              { return "" + (val1 + val2); } 
+              else 
+              { return "" + (val1 - val2); } 
+            } 
+              
+            if ("-".equals(opr))
+            { return coef1 + " - (" + coef2 + ")"; } 
+            else 
+            { return coef1 + " + " + coef2; } 
+          } 
+        } 
+
+        return "0"; 
+      }  
+
+
+      if ("factorExpression".equals(ct.tag))
+      { if (subterms.size() == 2)
+        { String opr = subterms.get(0) + ""; 
+
+          if ("-".equals(opr))
+          { ASTTerm tt = (ASTTerm) subterms.get(1); 
+
+            if (v.equals(tt.literalForm()) && n == 1)
+            { return "-1"; } 
+  
+            String coef1 = 
+               ASTTerm.coefficientOfPower(var, n, tt); 
+            if (coef1.equals("0") || coef1.equals("0.0"))
+            { return coef1; } 
+            return "-(" + coef1 + ")"; 
+          } 
+
+
+          if ("+".equals(opr))
+          { ASTTerm tt = (ASTTerm) subterms.get(1); 
+
+            String coef1 = 
+               ASTTerm.coefficientOfPower(var, n, tt); 
+            return coef1; 
+          } 
+        }
+
+        if (subterms.size() == 3)
+        { String opr = subterms.get(1) + ""; 
+
+          if ("*".equals(opr))
+          { ASTTerm t1 = (ASTTerm) subterms.get(0);  
+            ASTTerm t2 = (ASTTerm) subterms.get(2); 
+
+            Vector vv = new Vector(); 
+            vv.add(var); 
+
+            String cnst1 = ASTTerm.constantTerms(vv,t1); 
+            String cnst2 = ASTTerm.constantTerms(vv,t2); 
+
+            String coef1n = 
+              ASTTerm.coefficientOfPower(var, n, t1); 
+            String coef2n =                  
+              ASTTerm.coefficientOfPower(var, n, t2); 
+
+            String coef1 = t1.literalForm(); 
+            String coef2 = t2.literalForm(); 
+
+            // System.out.println(v + " in " + coef1 + " " + isIn1); 
+            // System.out.println(v + " in " + coef2 + " " + isIn2); 
+
+            String sumcoefs = "0"; 
+
+            if ("0".equals(cnst1) || "0.0".equals(cnst1) ||
+                "(0)".equals(cnst1))
+            { }
+            else if ("0".equals(coef2n) || 
+                     "0.0".equals(coef2n) ||
+                     "(0)".equals(coef2n))
+            { } 
+            else if (AuxMath.isGeneralNumeric(cnst1) &&
+                AuxMath.isGeneralNumeric(coef2n))
+            { double val1 = 
+                    AuxMath.generalNumericValue(cnst1); 
+              double val2 = 
+                    AuxMath.generalNumericValue(coef2n);
+              sumcoefs = sumcoefs + " + " + (val1 * val2);  
+            } 
+            else 
+            { sumcoefs = 
+                     sumcoefs + " + " + 
+                     "(" + cnst1 + ")*(" + coef2n + ")";
+            } 
+
+            if ("0".equals(cnst2) || "0.0".equals(cnst2) ||
+                "(0)".equals(cnst2))
+            { }
+            else if ("0".equals(coef1n) || 
+                     "0.0".equals(coef1n) ||
+                     "(0)".equals(coef1n))
+            { } 
+            else if (AuxMath.isGeneralNumeric(cnst2) &&
+                AuxMath.isGeneralNumeric(coef1n))
+            { double val1 = 
+                    AuxMath.generalNumericValue(cnst2); 
+              double val2 = 
+                    AuxMath.generalNumericValue(coef1n);
+              sumcoefs = sumcoefs + " + " + (val1 * val2);  
+            } 
+            else 
+            { sumcoefs = 
+                     sumcoefs + " + " + 
+                     "(" + cnst2 + ")*(" + coef1n + ")";
+            } 
+
+            for (int i = 1; i < n; i++) 
+            { coef1 = ASTTerm.coefficientOfPower(var, i, t1);
+              coef2 = ASTTerm.coefficientOfPower(var, n-i, t2);
+
+                // System.out.println(v + "->pow(" + i + ") coef= " + coef1); 
+                // System.out.println(v + "->pow(" + (n-i) + ") coef= " + coef2); 
+
+              if (AuxMath.isGeneralNumeric(coef1))
+              { coef1 = 
+                  "" + AuxMath.generalNumericValue(coef1); 
+              } 
+
+              if (AuxMath.isGeneralNumeric(coef2))
+              { coef2 = 
+                  "" + AuxMath.generalNumericValue(coef2); 
+              } 
+
+              if ("0".equals(coef1) || "0.0".equals(coef1) ||
+                  "(0)".equals(coef1))
+              { }
+              else if ("0".equals(coef2) || 
+                       "0.0".equals(coef2) ||
+                       "(0)".equals(coef2))
+              { } 
+              else if (AuxMath.isGeneralNumeric(coef1) &&
+                  AuxMath.isGeneralNumeric(coef2))
+              { double val1 = 
+                    AuxMath.generalNumericValue(coef1); 
+                double val2 = 
+                    AuxMath.generalNumericValue(coef2);
+                sumcoefs = sumcoefs + " + " + (val1 * val2);  
+              } 
+              else 
+              { sumcoefs = 
+                     sumcoefs + " + " + 
+                     "(" + coef1 + ")*(" + coef2 + ")";
+              } 
+            }  
+
+            return sumcoefs;  
+          } 
+          else if ("/".equals(opr))
+          { ASTTerm t1 = (ASTTerm) subterms.get(0);  
+            ASTTerm t2 = (ASTTerm) subterms.get(2); 
+
+            boolean isIn1 = ASTTerm.isSubterm(var,t1); 
+            boolean isIn2 = ASTTerm.isSubterm(var,t2); 
+
+            String coef1 = t1.literalForm(); 
+            if (isIn1)
+            { coef1 = 
+                ASTTerm.coefficientOfPower(var, n, t1); 
+            }
+            String coef2 = t2.literalForm();
+ 
+            if (isIn2)
+            { JOptionPane.showMessageDialog(null, 
+                 "!! Cannot determine coefficients for " + thisLiteral + ". It needs to be put in polynomial form",   "",
+                 JOptionPane.INFORMATION_MESSAGE); 
+            }
+
+            if ("0".equals(coef1) || "0.0".equals(coef1))
+            { return "0"; }  
+
+            if (coef1.equals("1") || coef1.equals("1.0"))
+            { return "1/(" + coef2 + ")"; } 
+
+            if (coef2.equals("1") || coef2.equals("1.0"))
+            { return coef1; } 
+
+            return "(" + coef1 + ")/(" + coef2 + ")"; 
+          } 
+          else if ("=".equals(opr))
+          { ASTTerm t1 = (ASTTerm) subterms.get(0);  
+            ASTTerm t2 = (ASTTerm) subterms.get(2);  
+            String coef1 = 
+              ASTTerm.coefficientOfPower(var, n, t1); 
+            String coef2 = 
+              ASTTerm.coefficientOfPower(var, n, t2);
+ 
+            if ("0".equals(coef2) || "0.0".equals(coef2))
+            { return coef1; }
+            if ("0".equals(coef1) || "0.0".equals(coef1))
+            { return "-(" + coef2 + ")"; } 
+             
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 =
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(coef2);
+              return "" + (val1 - val2);  
+            } 
+              
+            return coef1 + " - (" + coef2 + ")"; 
+          } 
+        } 
+      }
+    } 
+   
+    return "0"; 
+  }  
+
+
   public static String coefficientOf(
                             ASTTerm var, ASTTerm expr)
   { // expr is coef*var where coef does not involve var
@@ -4216,10 +4549,12 @@ public abstract class ASTTerm
             if ("0".equals(coef1))
             { return "-(" + coef2 + ")"; } 
              
-            if (AuxMath.isNumeric(coef1) &&
-                AuxMath.isNumeric(coef2))
-            { double val1 = Double.parseDouble(coef1); 
-              double val2 = Double.parseDouble(coef2);
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 = 
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(coef2);
               return "" + (val1 - val2);  
             } 
               
@@ -4245,10 +4580,12 @@ public abstract class ASTTerm
             if ("0".equals(coef1) && "+".equals(opr))
             { return coef2; } 
 
-            if (AuxMath.isNumeric(coef1) &&
-                AuxMath.isNumeric(coef2))
-            { double val1 = Double.parseDouble(coef1); 
-              double val2 = Double.parseDouble(coef2);
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 = 
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(coef2);
               if ("+".equals(opr))
               { return "" + (val1 + val2); } 
               else 
@@ -4301,37 +4638,46 @@ public abstract class ASTTerm
           { ASTTerm t1 = (ASTTerm) subterms.get(0);  
             ASTTerm t2 = (ASTTerm) subterms.get(2); 
 
+            Vector vv = new Vector(); 
+            vv.add(var); 
+
+            String cnst1 = ASTTerm.constantTerms(vv,t1); 
+            String cnst2 = ASTTerm.constantTerms(vv,t2); 
+
             if (v.equals(t1.literalForm()))
-            { return t2.literalForm(); } 
+            { return cnst2; } 
 
             if (v.equals(t2.literalForm()))
-            { return t1.literalForm(); }
+            { return cnst1; }
 
-            boolean isIn1 = ASTTerm.isSubterm(var,t1); 
-            boolean isIn2 = ASTTerm.isSubterm(var,t2); 
+            String coef1 = ASTTerm.coefficientOf(var, t1);
+            String coef2 = ASTTerm.coefficientOf(var, t2); 
+            
+            String total = "0"; 
 
-            String coef1 = t1.literalForm(); 
-            if (isIn1)
-            { coef1 = ASTTerm.coefficientOf(var, t1); }
-            String coef2 = t2.literalForm(); 
-            if (isIn2)
-            { coef2 = ASTTerm.coefficientOf(var, t2); }
-            if (coef1.equals("0") || coef2.equals("0"))
-            { return "0"; } 
-
-            if (coef1.equals("1") || coef1.equals("1.0"))
-            { return coef2; } 
-
-            if (coef2.equals("1") || coef2.equals("1.0"))
-            { return coef1; } 
-
-            if (AuxMath.isNumeric(coef1) &&
-                AuxMath.isNumeric(coef2))
-            { double val1 = Double.parseDouble(coef1); 
-              double val2 = Double.parseDouble(coef2);
-              return "" + (val1 * val2);  
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(cnst2))
+            { double val1 = 
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(cnst2);
+              total = "" + (val1 * val2);  
             } 
-            return "(" + coef1 + ")*(" + coef2 + ")"; 
+            else 
+            { total = "(" + coef1 + ")*(" + cnst2 + ")"; } 
+
+            if (AuxMath.isGeneralNumeric(coef2) &&
+                AuxMath.isGeneralNumeric(cnst1))
+            { double val1 = 
+                AuxMath.generalNumericValue(coef2); 
+              double val2 = 
+                AuxMath.generalNumericValue(cnst1);
+              total = total + " + " + (val1 * val2);  
+            } 
+            else 
+            { total = total + " + (" + coef2 + ")*(" + cnst1 + ")"; } 
+
+            return total; 
           } 
           else if ("/".equals(opr))
           { ASTTerm t1 = (ASTTerm) subterms.get(0);  
@@ -4374,10 +4720,12 @@ public abstract class ASTTerm
             if ("0".equals(coef1) || "0.0".equals(coef1))
             { return "-(" + coef2 + ")"; } 
              
-            if (AuxMath.isNumeric(coef1) &&
-                AuxMath.isNumeric(coef2))
-            { double val1 = Double.parseDouble(coef1); 
-              double val2 = Double.parseDouble(coef2);
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 =
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(coef2);
               return "" + (val1 - val2);  
             } 
               
@@ -4414,20 +4762,21 @@ public abstract class ASTTerm
     { // (factorExpression _1 * _2), etc
       
       ASTCompositeTerm ct = (ASTCompositeTerm) expr;
-      Vector subterms = ct.getTerms(); 
+      Vector subterms = ct.getTerms();
+      String tg = ct.getTag();  
  
       if (subterms.size() == 1) 
       { return ASTTerm.powersOf(var, 
                                 (ASTTerm) subterms.get(0)); 
       } 
 
-      if ("factorExpression".equals(ct.getTag()) && 
+      if ("factorExpression".equals(tg) && 
           "†".equals(ct.getTerm(0) + ""))
       { Vector sqrtpowers = powersOf(var, ct.getTerm(1));
         return VectorUtil.vectorDivide(sqrtpowers,2);  
       }  
 
-      if ("basicExpression".equals(ct.tag))
+      if ("basicExpression".equals(tg))
       { if (subterms.size() == 3 && 
             "(".equals(subterms.get(0) + "") && 
             ")".equals(subterms.get(2) + ""))
@@ -4436,8 +4785,8 @@ public abstract class ASTTerm
         } 
       } 
 
-      if ("logicalExpression".equals(ct.tag) || 
-          "equalityExpression".equals(ct.tag))
+      if ("logicalExpression".equals(tg) || 
+          "equalityExpression".equals(tg))
       { if (subterms.size() == 3)
         { String opr = subterms.get(1) + ""; 
           if ("=".equals(opr))
@@ -4453,7 +4802,7 @@ public abstract class ASTTerm
         return res; 
       }  
 
-      if ("additiveExpression".equals(ct.tag))
+      if ("additiveExpression".equals(tg))
       { if (subterms.size() == 3)
         { String opr = subterms.get(1) + ""; 
           if ("+".equals(opr) || "-".equals(opr))
@@ -4471,7 +4820,7 @@ public abstract class ASTTerm
         return res; 
       }  
 
-      if ("factor2Expression".equals(ct.tag))
+      if ("factor2Expression".equals(tg))
       { if (subterms.size() == 5 && 
             "^".equals(subterms.get(1) + "") && 
             "{".equals(subterms.get(2) + "") && 
@@ -4499,7 +4848,7 @@ public abstract class ASTTerm
       }  
 
 
-      if ("factorExpression".equals(ct.tag))
+      if ("factorExpression".equals(tg))
       { if (subterms.size() == 2)
         { String opr = subterms.get(0) + ""; 
 
@@ -4530,44 +4879,52 @@ public abstract class ASTTerm
         if (subterms.size() == 3)
         { String opr = subterms.get(1) + ""; 
 
+          Vector mres = new Vector(); 
+
           if ("*".equals(opr))
           { ASTTerm t1 = (ASTTerm) subterms.get(0);  
             ASTTerm t2 = (ASTTerm) subterms.get(2); 
 
             if (v.equals(t1.literalForm()) && 
                 v.equals(t2.literalForm()))
-            { res.add(2);
-              return res;
+            { mres.add(2);
+              return mres;
             } 
             else if (v.equals(t1.literalForm()))
-            { res.add(1);
+            { mres.add(1);
               Vector powerst2 = ASTTerm.powersOf(var, t2);
-              return VectorUtil.vectorSummation(res,powerst2);
+              if (powerst2.size() == 0) 
+              { return mres; } 
+              return 
+                VectorUtil.vectorSummation(mres,powerst2);
             } 
             else if (v.equals(t2.literalForm()))
-            { res.add(1);
+            { mres.add(1);
               Vector powerst1 = ASTTerm.powersOf(var, t1);
-              return VectorUtil.vectorSummation(res,powerst1);
+              if (powerst1.size() == 0) 
+              { return mres; } 
+              return 
+                VectorUtil.vectorSummation(mres,powerst1);
             }
 
             boolean isIn1 = ASTTerm.isSubterm(var,t1); 
             boolean isIn2 = ASTTerm.isSubterm(var,t2); 
 
-            Vector powers1 = new Vector(); 
-            Vector powers2 = new Vector(); 
+            Vector powers1 = ASTTerm.powersOf(var, t1);
+            Vector powers2 = ASTTerm.powersOf(var, t2);
+
+            /* System.out.println(">>> IS IN: " + isIn1 + " " + isIn2 + " powers " + powers1 + " " + powers2); */ 
 
             if (isIn1 && isIn2)
-            { powers1 = ASTTerm.powersOf(var, t1); 
-              powers2 = ASTTerm.powersOf(var, t2);
- 
+            { 
               // result is x + y for x : powers1, y : powers2
               return VectorUtil.vectorSummation(
                                       powers1,powers2); 
             }
             else if (isIn1)
-            { return ASTTerm.powersOf(var, t1); }
+            { return powers1; }
             else 
-            { return ASTTerm.powersOf(var, t2); } 
+            { return powers2; } 
           } 
           else if ("/".equals(opr))
           { ASTTerm t1 = (ASTTerm) subterms.get(0);  
@@ -4808,7 +5165,8 @@ public abstract class ASTTerm
 
     Vector powers = ASTTerm.powersOf(var, expr);
 
-    /* JOptionPane.showMessageDialog(null, 
+    /* 
+    JOptionPane.showMessageDialog(null, 
            ">>> Powers of : " + var + " in " + expr +  
            " are " + powers, 
            "", 
@@ -4835,7 +5193,10 @@ public abstract class ASTTerm
         vpow2.equals(elit))
     { return "1"; } 
 
-    if (vsqrb.equals(elit) || vpowb.equals(elit) || 
+    if (vsqrb.equals(elit) || 
+        elit.equals("(" + vpow + ")") || 
+        vpowb.equals(elit) || 
+        elit.equals("(" + vpow2 + ")") ||
         vpow2b.equals(elit))
     { return "1"; } 
 
@@ -4868,10 +5229,12 @@ public abstract class ASTTerm
             ASTTerm t2 = (ASTTerm) subterms.get(2);  
             String coef1 = ASTTerm.coefficientOfSquare(var, t1); 
             String coef2 = ASTTerm.coefficientOfSquare(var, t2);
-            if (AuxMath.isNumeric(coef1) &&
-                AuxMath.isNumeric(coef2))
-            { double val1 = Double.parseDouble(coef1); 
-              double val2 = Double.parseDouble(coef2);
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 =
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(coef2);
               return "" + (val1 - val2); 
             } 
 
@@ -4891,17 +5254,21 @@ public abstract class ASTTerm
             String coef1 = ASTTerm.coefficientOfSquare(var, t1); 
             String coef2 = ASTTerm.coefficientOfSquare(var, t2); 
             
-            if ("0".equals(coef2))
+            if ("0".equals(coef2) || "0.0".equals(coef2))
             { return coef1; }
-            if ("0".equals(coef1) && "-".equals(opr))
+            if (("0".equals(coef1) || "0.0".equals(coef1))
+                && "-".equals(opr))
             { return "-(" + coef2 + ")"; } 
-            if ("0".equals(coef1) && "+".equals(opr))
+            if (("0".equals(coef1) || "0.0".equals(coef1))
+                && "+".equals(opr))
             { return coef2; } 
 
-            if (AuxMath.isNumeric(coef1) &&
-                AuxMath.isNumeric(coef2))
-            { double val1 = Double.parseDouble(coef1); 
-              double val2 = Double.parseDouble(coef2);
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 =
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(coef2);
               if ("+".equals(opr))
               { return "" + (val1 + val2); } 
               else 
@@ -4916,12 +5283,11 @@ public abstract class ASTTerm
       }  
 
       if ("factor2Expression".equals(ct.tag))
-      { if (subterms.size() == 5 && 
-            "^".equals(subterms.get(1) + "") && 
-            "{".equals(subterms.get(2) + "") && 
-            "}".equals(subterms.get(4) + ""))
+      { if (subterms.size() == 4 && 
+            "^{".equals(subterms.get(1) + "") &&  
+            "}".equals(subterms.get(3) + ""))
         { ASTTerm arg = (ASTTerm) subterms.get(0); 
-          ASTTerm pow = (ASTTerm) subterms.get(3); 
+          ASTTerm pow = (ASTTerm) subterms.get(2); 
           String arglit = arg.literalForm(); 
           String powlit = pow.literalForm(); 
           
@@ -4930,6 +5296,13 @@ public abstract class ASTTerm
                "2.0".equals(powlit))
              )
           { return "1"; } 
+
+          String c = coefficientOf(var,arg); 
+          if (c.equals("0") || c.equals("0.0"))
+          { return "0"; } 
+          else if ("2".equals(powlit) ||
+                   "2.0".equals(powlit))
+          { return c + "*" + c; } 
         } 
 
         return "0"; 
@@ -4943,7 +5316,7 @@ public abstract class ASTTerm
           { ASTTerm tt = (ASTTerm) subterms.get(1); 
   
             String coef1 = ASTTerm.coefficientOfSquare(var, tt); 
-            if (coef1.equals("0"))
+            if (coef1.equals("0") || coef1.equals("0.0"))
             { return coef1; } 
             return "-(" + coef1 + ")"; 
           } 
@@ -4967,6 +5340,12 @@ public abstract class ASTTerm
             String coef1 = t1.literalForm(); 
             String coef2 = t2.literalForm();
 
+            Vector vv = new Vector(); 
+            vv.add(var); 
+
+            String cnst1 = ASTTerm.constantTerms(vv,t1); 
+            String cnst2 = ASTTerm.constantTerms(vv,t2); 
+              
             if (v.equals(coef1) && 
                 v.equals(coef2))
             { return "1"; } 
@@ -4974,56 +5353,73 @@ public abstract class ASTTerm
             if (vpow.equals(coef2) ||
                 vpow2.equals(coef2) ||
                 vsqr.equals(coef2))
-            { return coef1; }
+            { return cnst1; }
 
-            if (vpowb.equals(coef2) ||
-                vpow2b.equals(coef2) ||
-                vsqrb.equals(coef2))
-            { return coef1; }
+            if (vsqrb.equals(coef2) || 
+                coef2.equals("(" + vpow + ")") || 
+                vpowb.equals(coef2) || 
+                coef2.equals("(" + vpow2 + ")") ||
+                vpow2b.equals(coef2))
+            { return cnst1; } 
 
             if (vpow.equals(coef1) ||
                 vpow2.equals(coef1) ||
                 vsqr.equals(coef1))
-            { return coef2; }
+            { return cnst2; }
 
             if (vpowb.equals(coef1) ||
+                coef1.equals("(" + vpow + ")") || 
                 vpow2b.equals(coef1) ||
+                coef1.equals("(" + vpow2 + ")") ||
                 vsqrb.equals(coef1))
-            { return coef2; }
+            { return cnst2; }
 
-            Vector powers1 = ASTTerm.powersOf(var,t1); 
-            Vector powers2 = ASTTerm.powersOf(var,t2); 
+            String sqcoef1 = 
+              ASTTerm.coefficientOfSquare(var, t1);
+            String sqcoef2 = 
+              ASTTerm.coefficientOfSquare(var, t2);
 
-            if ( (
-              VectorUtil.containsEqualString("1", powers1) ||      
-              VectorUtil.containsEqualString("1.0", powers1))  && 
-              ( VectorUtil.containsEqualString("1", powers2) ||
-              VectorUtil.containsEqualString("1.0", powers2) ) )
-            { coef1 = ASTTerm.coefficientOf(var, t1); 
-              coef2 = ASTTerm.coefficientOf(var, t2); 
+            coef1 = 
+              ASTTerm.coefficientOf(var, t1);
+            coef2 = 
+              ASTTerm.coefficientOf(var, t2);
+
+            String total = "0"; 
+
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 =
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(coef2);
+              total = "" + (val1 * val2); 
             } 
-            else if (VectorUtil.containsEqualString(
-                      "2", powers1) ||
-              VectorUtil.containsEqualString("2.0", powers1))
-            { coef1 = ASTTerm.coefficientOfSquare(var, t1); } 
-            else if (VectorUtil.containsEqualString(
-                 "2", powers2) || 
-              VectorUtil.containsEqualString("2.0", powers2))
-            { coef2 = ASTTerm.coefficientOfSquare(var, t2); } 
             else 
-            { return "0"; }
-       
-            if ("1".equals(coef1)) { return coef2; } 
-            if ("1".equals(coef2)) { return coef1; }
+            { total = "(" + coef1 + ")*(" + coef2 + ")"; } 
 
-            if (AuxMath.isNumeric(coef1) &&
-                AuxMath.isNumeric(coef2))
-            { double val1 = Double.parseDouble(coef1); 
-              double val2 = Double.parseDouble(coef2);
-              return "" + (val1 * val2); 
+            if (AuxMath.isGeneralNumeric(sqcoef1) &&
+                AuxMath.isGeneralNumeric(cnst2))
+            { double val1 =
+                AuxMath.generalNumericValue(sqcoef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(cnst2);
+              total = total + " + " + (val1 * val2); 
             } 
+            else 
+            { total = total + " + (" + sqcoef1 + ")*(" + cnst2 + ")"; } 
+
+            if (AuxMath.isGeneralNumeric(sqcoef2) &&
+                AuxMath.isGeneralNumeric(cnst1))
+            { double val1 =
+                AuxMath.generalNumericValue(sqcoef2); 
+              double val2 = 
+                AuxMath.generalNumericValue(cnst1);
+              total = total + " + " + (val1 * val2); 
+            } 
+            else 
+            { total = total + " + (" + sqcoef2 + ")*(" + cnst1 + ")"; } 
  
-            return "(" + coef1 + ")*(" + coef2 + ")"; 
+            return total; 
           } 
           else if ("/".equals(opr))
           { ASTTerm t1 = (ASTTerm) subterms.get(0);  
@@ -5044,10 +5440,10 @@ public abstract class ASTTerm
             ASTTerm t2 = (ASTTerm) subterms.get(2);  
             String coef1 = ASTTerm.coefficientOfSquare(var, t1); 
             String coef2 = ASTTerm.coefficientOfSquare(var, t2);
-            if (AuxMath.isNumeric(coef1) &&
-                AuxMath.isNumeric(coef2))
-            { double val1 = Double.parseDouble(coef1); 
-              double val2 = Double.parseDouble(coef2);
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 = AuxMath.generalNumericValue(coef1); 
+              double val2 = AuxMath.generalNumericValue(coef2);
               return "" + (val1 - val2); 
             } 
 
@@ -5102,10 +5498,10 @@ public abstract class ASTTerm
             if ("0".equals(val1))
             { return "-(" + val2 + ")"; } 
 
-            if (AuxMath.isNumeric(val1) &&
-                AuxMath.isNumeric(val2))
-            { double v1 = Double.parseDouble(val1); 
-              double v2 = Double.parseDouble(val2);
+            if (AuxMath.isGeneralNumeric(val1) &&
+                AuxMath.isGeneralNumeric(val2))
+            { double v1 = AuxMath.generalNumericValue(val1); 
+              double v2 = AuxMath.generalNumericValue(val2);
               return "" + (v1 - v2); 
             } 
 
@@ -5132,10 +5528,12 @@ public abstract class ASTTerm
             if ("0".equals(coef1) && "+".equals(opr))
             { return coef2; } 
 
-            if (AuxMath.isNumeric(coef1) &&
-                AuxMath.isNumeric(coef2))
-            { double val1 = Double.parseDouble(coef1); 
-              double val2 = Double.parseDouble(coef2);
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 = 
+                 AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                 AuxMath.generalNumericValue(coef2);
               if ("+".equals(opr))
               { return "" + (val1 + val2); } 
               else 
@@ -5188,10 +5586,12 @@ public abstract class ASTTerm
             if ("*".equals(opr) && "0".equals(coef2))
             { return "0"; } 
 
-            if (AuxMath.isNumeric(coef1) &&
-                AuxMath.isNumeric(coef2))
-            { double val1 = Double.parseDouble(coef1); 
-              double val2 = Double.parseDouble(coef2);
+            if (AuxMath.isGeneralNumeric(coef1) &&
+                AuxMath.isGeneralNumeric(coef2))
+            { double val1 = 
+                AuxMath.generalNumericValue(coef1); 
+              double val2 = 
+                AuxMath.generalNumericValue(coef2);
               if ("*".equals(opr))
               { return "" + (val1 * val2); } 
               else 
@@ -5204,31 +5604,44 @@ public abstract class ASTTerm
       }
     } 
 
+    String lit = expr.literalForm(); 
+
     for (int i = 0; i < vars.size(); i++) 
     { ASTTerm var = (ASTTerm) vars.get(i); 
+      String v = var.literalForm(); 
 
-      if (",".equals(var + "")) 
+      if (",".equals(v)) 
       { continue; } 
 
-      boolean isIn = ASTTerm.isSubterm(var,expr); 
-      if (isIn)
+      // boolean isIn = ASTTerm.isSubterm(var,expr); 
+      if (lit.equals(v))
       { return "0"; }
     } 
    
-    return expr.literalForm(); 
+    return lit; // for numbers only 
   }  
 
   public static String symbolicEvaluation(ASTTerm e1)
-  { String a = e1.literalForm(); 
+  { String a = ""; 
+    String e1lit = e1.literalForm(); 
 
     if (e1 instanceof ASTSymbolTerm) 
-    { return a; } 
+    { return e1lit; } 
 
     if (e1 instanceof ASTBasicTerm) 
-    { return a; } 
+    { return e1lit; } 
 
     String tg = e1.getTag(); 
     int n = e1.arity(); 
+
+    if (tg.equals("basicExpression"))
+    { if (n == 1) 
+      { return e1lit; } 
+
+      if (n == 3 && 
+          e1lit.startsWith("g{"))
+      { return e1lit; } 
+    } 
 
     if (n == 1) 
     { ASTTerm trm = e1.getTerm(0); 
@@ -5252,16 +5665,41 @@ public abstract class ASTTerm
     else if (tg.equals("factorExpression") && 
              "-".equals(e1.getTerm(0) + ""))
     { a = symbolicNegative(e1.getTerm(1)); } 
-    else if (tg.equals("basicExpression") && 
-             "(".equals(e1.getTerm(0) + "") && 
-             ")".equals(e1.getTerm(2) + ""))
-    { String apart = ASTTerm.symbolicEvaluation(e1.getTerm(1)); 
+    else if (tg.equals("factorExpression") && 
+             "+".equals(e1.getTerm(0) + ""))
+    { a = symbolicEvaluation(e1.getTerm(1)); } 
+    else if (tg.equals("factorExpression") && 
+             "†".equals(e1.getTerm(0) + ""))
+    { a = symbolicSqrt(e1.getTerm(1)); } 
+    else if (tg.equals("factor2Expression") && 
+             "^{".equals(e1.getTerm(1) + ""))
+    { return symbolicExponentiation(
+                e1.getTerm(0), e1.getTerm(2)); 
+    } 
+    else if (tg.equals("factor2Expression") && 
+             "^".equals(e1.getTerm(1) + "") && 
+             "{".equals(e1.getTerm(2) + ""))
+    { /* JOptionPane.showMessageDialog(null, 
+           ">>> Symbolic exponentiation : " + e1.getTerm(0) + "^{" + e1.getTerm(3), 
+           "", 
+           JOptionPane.INFORMATION_MESSAGE); */ 
+ 
+      return symbolicExponentiation(
+                e1.getTerm(0), e1.getTerm(3)); 
+    } 
+    else if (ASTTerm.isMathOCLBracketed(e1))
+    { ASTTerm t1 = ASTTerm.mathOCLContent(e1); 
+
+      String apart = ASTTerm.symbolicEvaluation(t1);
+ 
       if (AuxMath.isGeneralNumeric(apart))
       { return "" + AuxMath.generalNumericValue(apart); } 
       if (ASTTerm.isMathOCLIdentifier(apart))
       { return apart; }
       a = "(" + apart + ")"; 
     } 
+    else 
+    { a = e1.evaluationLiteralForm(); }
 
     if (AuxMath.isGeneralNumeric(a))
     { a = "" + AuxMath.generalNumericValue(a);
@@ -5279,18 +5717,8 @@ public abstract class ASTTerm
   } 
 
   public static String symbolicLess(ASTTerm e1, ASTTerm e2)
-  { String a = e1.literalForm(); 
-    String b = e2.literalForm(); 
-
-    if (e1.getTag().equals("additiveExpression") && 
-        "+".equals(e1.getTerm(1) + ""))
-    { a = symbolicAddition(e1.getTerm(0), e1.getTerm(2)); } 
-    else if (e1.getTag().equals("additiveExpression") && 
-        "-".equals(e1.getTerm(1) + ""))
-    { a = symbolicSubtraction(e1.getTerm(0), e1.getTerm(2)); }
-    else if (e1.getTag().equals("factorExpression") && 
-             "*".equals(e1.getTerm(1) + ""))
-    { a = symbolicMultiplication(e1.getTerm(0), e1.getTerm(2)); }
+  { String a = ASTTerm.symbolicEvaluation(e1); 
+    String b = ASTTerm.symbolicEvaluation(e2); 
 
     if (e2.getTag().equals("additiveExpression") && 
         "+".equals(e2.getTerm(1) + ""))
@@ -5317,14 +5745,9 @@ public abstract class ASTTerm
  
       b = symbolicAddition(t1,t2); 
     } 
-    else if (e2.getTag().equals("additiveExpression") && 
-        "-".equals(e2.getTerm(1) + ""))
-    { b = symbolicSubtraction(e2.getTerm(0), e2.getTerm(2)); }
-    else if (e2.getTag().equals("factorExpression") && 
-        "*".equals(e2.getTerm(1) + ""))
-    { b = symbolicMultiplication(e2.getTerm(0), e2.getTerm(2)); } 
 
-    if (AuxMath.isGeneralNumeric(a) && AuxMath.isGeneralNumeric(b))
+    if (AuxMath.isGeneralNumeric(a) && 
+        AuxMath.isGeneralNumeric(b))
     { double aval = AuxMath.generalNumericValue("" + a); 
       double bval = AuxMath.generalNumericValue("" + b); 
       if (aval < bval) 
@@ -5336,18 +5759,8 @@ public abstract class ASTTerm
   }  
 
   public static String symbolicLeq(ASTTerm e1, ASTTerm e2)
-  { String a = e1.literalForm(); 
-    String b = e2.literalForm(); 
-
-    if (e1.getTag().equals("additiveExpression") && 
-        "+".equals(e1.getTerm(1) + ""))
-    { a = symbolicAddition(e1.getTerm(0), e1.getTerm(2)); } 
-    else if (e1.getTag().equals("additiveExpression") && 
-        "-".equals(e1.getTerm(1) + ""))
-    { a = symbolicSubtraction(e1.getTerm(0), e1.getTerm(2)); }
-    else if (e1.getTag().equals("factorExpression") && 
-             "*".equals(e1.getTerm(1) + ""))
-    { a = symbolicMultiplication(e1.getTerm(0), e1.getTerm(2)); }
+  { String a = ASTTerm.symbolicEvaluation(e1); 
+    String b = ASTTerm.symbolicEvaluation(e2); 
 
     if (e2.getTag().equals("additiveExpression") && 
         "+".equals(e2.getTerm(1) + ""))
@@ -5374,14 +5787,9 @@ public abstract class ASTTerm
  
       b = symbolicAddition(t1,t2); 
     } 
-    else if (e2.getTag().equals("additiveExpression") && 
-        "-".equals(e2.getTerm(1) + ""))
-    { b = symbolicSubtraction(e2.getTerm(0), e2.getTerm(2)); }
-    else if (e2.getTag().equals("factorExpression") && 
-        "*".equals(e2.getTerm(1) + ""))
-    { b = symbolicMultiplication(e2.getTerm(0), e2.getTerm(2)); } 
 
-    if (AuxMath.isGeneralNumeric(a) && AuxMath.isGeneralNumeric(b))
+    if (AuxMath.isGeneralNumeric(a) && 
+        AuxMath.isGeneralNumeric(b))
     { double aval = AuxMath.generalNumericValue("" + a); 
       double bval = AuxMath.generalNumericValue("" + b); 
       if (aval <= bval) 
@@ -5395,6 +5803,15 @@ public abstract class ASTTerm
   public static String symbolicAddition(ASTTerm e1, ASTTerm e2)
   { String a = ASTTerm.symbolicEvaluation(e1); 
     String b = ASTTerm.symbolicEvaluation(e2); 
+
+    if (ASTTerm.isMathOCLSubtraction(e1))
+    { ASTTerm add2 = ASTTerm.mathOCLArgument(e1,2);
+      String add2val = symbolicEvaluation(add2); 
+      if (add2val.equals(b))
+      { ASTTerm add1 = ASTTerm.mathOCLArgument(e1,0); 
+        return ASTTerm.symbolicEvaluation(add1); 
+      }
+    }  // (a - b) + b |-->a
 
     if (AuxMath.isGeneralNumeric(a) && 
         AuxMath.isGeneralNumeric(b))
@@ -5411,12 +5828,30 @@ public abstract class ASTTerm
 
     // Group by powers of x?
 
+    if (a.equals("?") || b.equals("?"))
+    { return "?"; }  
+
     if (a.equals("0") || a.equals("0.0"))
     { return b; } 
 
     if (b.equals("0") || b.equals("0.0"))
     { return a; }  
+
+    if (a.equals("…") && b.equals("…"))
+    { return a; }  
+
+    if (a.equals("-…") && b.equals("…"))
+    { return "?"; }  
+
+    if (a.equals("…") && b.equals("-…"))
+    { return "?"; }  
+
+    if (a.equals("…") || b.equals("…"))
+    { return "…"; }  
     
+    if (a.equals("-…") || b.equals("-…"))
+    { return "-…"; }  
+
     return a + " + " + b; 
   }  
      
@@ -5424,6 +5859,37 @@ public abstract class ASTTerm
   { String a = ASTTerm.symbolicEvaluation(e1); 
     String b = ASTTerm.symbolicEvaluation(e2); 
 
+    boolean bneedsBracket = ASTTerm.mathOCLNeedsBracket(e2); 
+
+    if (ASTTerm.isMathOCLAddition(e2))
+    { ASTTerm add1 = ASTTerm.mathOCLArgument(e2,0); 
+      ASTTerm add2 = ASTTerm.mathOCLArgument(e2,2);
+       
+      // e1 - (add1 + add2)
+      a = 
+          ASTTerm.symbolicSubtraction(e1,add1); 
+      b = symbolicEvaluation(add2);
+      bneedsBracket = ASTTerm.mathOCLNeedsBracket(add2);
+    } 
+    else if (ASTTerm.isMathOCLSubtraction(e2)) 
+    { ASTTerm add1 = ASTTerm.mathOCLArgument(e2,0); 
+      ASTTerm add2 = ASTTerm.mathOCLArgument(e2,2);
+      // e1 - (add1 - add2)
+      a = 
+        ASTTerm.symbolicAddition(e1,add2); 
+      b = symbolicEvaluation(add1); 
+      bneedsBracket = ASTTerm.mathOCLNeedsBracket(add1);
+    }  
+    else if (ASTTerm.isMathOCLAddition(e1))
+    { ASTTerm add2 = ASTTerm.mathOCLArgument(e1,2);
+      String add2val = symbolicEvaluation(add2); 
+      if (add2val.equals(b))
+      { ASTTerm add1 = ASTTerm.mathOCLArgument(e1,0); 
+        return ASTTerm.symbolicEvaluation(add1); 
+      }
+    }  
+    // Case of (A+B)-B |-->A
+      
     if (AuxMath.isGeneralNumeric(a) && 
         AuxMath.isGeneralNumeric(b))
     { double aval = AuxMath.generalNumericValue(a); 
@@ -5435,22 +5901,59 @@ public abstract class ASTTerm
     { a = "" + AuxMath.generalNumericValue(a); }
 
     if (AuxMath.isGeneralNumeric(b))
-    { b = "" + AuxMath.generalNumericValue(b);
-      return a + " - " + b; 
+    { double bval = AuxMath.generalNumericValue(b);
+      /* if (bval < 0) 
+      { double b1 = -bval; 
+        return a + " + " + b1; 
+      } */ 
+
+      b = "" + bval; 
     }
 
+    if (b.equals(a))
+    { return "0"; }  
+
     if (a.equals("0") || a.equals("0.0"))
-    { return "-(" + b + ")"; } 
+    { if (ASTTerm.isMathOCLIdentifier(b) ||
+          AuxMath.isGeneralNumeric(b))
+      { return "-" + b; } 
+      return "-(" + b + ")"; 
+    } 
 
     if (b.equals("0") || b.equals("0.0"))
     { return a; }  
+
+    if (a.equals("…") && b.equals("…"))
+    { return "?"; }  
+
+    if (a.equals("-…") && b.equals("…"))
+    { return "-…"; }  
+
+    if (a.equals("…") && b.equals("-…"))
+    { return "…"; }  
+
+    if (a.equals("-…") && b.equals("-…"))
+    { return "?"; }  
     
-    return a + " - (" + b + ")"; 
+    if (a.equals("…") || b.equals("-…"))
+    { return "…"; }  
+
+    if (a.equals("-…") || b.equals("…"))
+    { return "-…"; }  
+
+    if (ASTTerm.isMathOCLIdentifier(b) || 
+        AuxMath.isGeneralNumeric(b))
+    { bneedsBracket = false; } 
+    
+    if (bneedsBracket)
+    { return a + " - (" + b + ")"; } 
+    return a + " - " + b; 
   }  
      
   public static String symbolicMultiplication(ASTTerm e1, ASTTerm e2)
   { String a = ASTTerm.symbolicEvaluation(e1); 
     String b = ASTTerm.symbolicEvaluation(e2); 
+
 
     // a/c * c is a: 
     if (ASTTerm.isMathOCLDivision(e1))
@@ -5475,6 +5978,15 @@ public abstract class ASTTerm
       b = ASTTerm.symbolicDivision(numer,denom);  
     } 
 
+    if (ASTTerm.isMathOCLBracketed(e1))
+    { ASTTerm parg = ASTTerm.mathOCLContent(e1); 
+      return "(" + symbolicMultiplication(parg,e2) + ")";
+    }
+    else if (ASTTerm.isMathOCLBracketed(e2))
+    { ASTTerm qarg = ASTTerm.mathOCLContent(e2); 
+      return "(" + symbolicMultiplication(e1,qarg) + ")";
+    } 
+
     if (AuxMath.isGeneralNumeric(a) && 
         AuxMath.isGeneralNumeric(b))
     { double aval = AuxMath.generalNumericValue(a); 
@@ -5485,14 +5997,36 @@ public abstract class ASTTerm
     // Group by powers of x?
 
     if (AuxMath.isGeneralNumeric(a))
-    { a = "" + AuxMath.generalNumericValue(a); } 
+    { double aval = AuxMath.generalNumericValue(a);
+      a = "" + aval; 
+
+      if (aval > 0 && b.equals("…"))
+      { return b; } 
+      if (aval < 0 && b.equals("…"))
+      { return "-…"; } 
+      if (aval < 0 && b.equals("-…"))
+      { return "…"; } 
+      if (aval > 0 && b.equals("-…"))
+      { return "-…"; } 
+    } 
 
     if (AuxMath.isGeneralNumeric(b))
-    { b = "" + AuxMath.generalNumericValue(b); } 
+    { double bval = AuxMath.generalNumericValue(b); 
 
-    if (a.equals("0") || a.equals("0.0") || 
-        b.equals("0") || b.equals("0.0"))
-    { return "0"; } 
+      b = "" + bval; 
+ 
+      if (bval > 0 && a.equals("…"))
+      { return a; } 
+      if (bval < 0 && a.equals("…"))
+      { return "-…"; } 
+      if (bval < 0 && a.equals("-…"))
+      { return "…"; } 
+      if (bval > 0 && a.equals("-…"))
+      { return "-…"; } 
+    } 
+
+    if (a.equals("?") || b.equals("?"))
+    { return "?"; }  
 
     if (b.equals("1") || b.equals("1.0") ||
         b.equals("(1)") || b.equals("(1.0)"))
@@ -5502,19 +6036,41 @@ public abstract class ASTTerm
         a.equals("(1)") || a.equals("(1.0)"))
     { return b; }  
 
+    if (a.equals("…") && b.equals("…"))
+    { return a; }  
+
+    if (a.equals("-…") && b.equals("-…"))
+    { return "…"; }  
+
+    if (a.equals("…") && b.equals("-…"))
+    { return b; }  
+
+    if (a.equals("-…") && b.equals("…"))
+    { return a; }  
+
+    if ((a.equals("…") || a.equals("-…")) && b.equals("0"))
+    { return "?"; }  
+
+    if ((b.equals("…") || b.equals("-…")) && a.equals("0"))
+    { return "?"; }  
+
+    if (a.equals("0") || a.equals("0.0") || 
+        b.equals("0") || b.equals("0.0"))
+    { return "0"; } 
+
     String abrack = a; 
     String bbrack = b; 
 
     if (AuxMath.isNumeric(a) || 
         ASTTerm.isMathOCLIdentifier(a))
     { } 
-    else 
+    else if (ASTTerm.mathOCLNeedsBracket(e1))
     { abrack = "(" + a + ")"; } 
 
     if (AuxMath.isNumeric(b) || 
         ASTTerm.isMathOCLIdentifier(b))
     { } 
-    else 
+    else if (ASTTerm.mathOCLNeedsBracket(e2))
     { bbrack = "(" + b + ")"; } 
 
  
@@ -5524,8 +6080,8 @@ public abstract class ASTTerm
   public static String symbolicNegateMultiplication(
                               ASTTerm e1, 
                               ASTTerm e2)
-  { String a = e1.literalForm(); 
-    String b = e2.literalForm();
+  { String a = ASTTerm.symbolicEvaluation(e1); 
+    String b = ASTTerm.symbolicEvaluation(e2);
 
     if (AuxMath.isGeneralNumeric(a) && 
         AuxMath.isGeneralNumeric(b))
@@ -5556,6 +6112,13 @@ public abstract class ASTTerm
   
   public static String symbolicNegative(ASTTerm e1) 
   { // for -x 
+
+    if ("factorExpression".equals(e1.getTag()) && 
+        "-".equals(e1.getTerm(0) + ""))
+    { ASTTerm trm = e1.getTerm(1); 
+      return ASTTerm.symbolicEvaluation(trm); 
+    } 
+
     String a = ASTTerm.symbolicEvaluation(e1); 
 
     if (AuxMath.isGeneralNumeric(a))
@@ -5566,36 +6129,76 @@ public abstract class ASTTerm
     if (a.equals("0") || a.equals("0.0"))
     { return "0"; } 
     
-    return "(-" + a + ")"; 
+    return "-" + a; 
   }  
+
+
+  public static String symbolicSqrt(ASTTerm e1) 
+  { // for †expr 
+
+    if ("factorExpression".equals(e1.getTag()) && 
+        "*".equals(e1.getTerm(1) + "") && 
+        e1.getTerm(0).equals(e1.getTerm(2)))
+    { return ASTTerm.symbolicEvaluation(e1.getTerm(0)); } 
+
+    String a = ASTTerm.symbolicEvaluation(e1); 
+
+    if (a.equals("?"))
+    { return "?"; }  
+
+
+    if (AuxMath.isPerfectSquare(a))
+    { double aval = AuxMath.generalNumericValue(a); 
+      return "" + Math.sqrt(aval); 
+    }
+
+    if (a.equals("0") || a.equals("0.0"))
+    { return "0"; } 
+
+    if (a.equals("1") || a.equals("1.0"))
+    { return "1"; } 
+
+    if (a.equals("…"))
+    { return a; }  
+
+    if (a.equals("-…"))
+    { return "?"; }  
+    
+    return "†" + a; 
+  } 
+
+  public static String symbolicExponentiation(ASTTerm e1, 
+                                              ASTTerm e2) 
+  { // for e1^{e2}
+
+    String a = ASTTerm.symbolicEvaluation(e1); 
+    String b = ASTTerm.symbolicEvaluation(e2); 
+
+    if (a.equals("?") || b.equals("?"))
+    { return "?"; }  
+
+    if (b.equals("0") || b.equals("0.0"))
+    { return "1"; } 
+
+    if (a.equals("1") || a.equals("1.0"))
+    { return "1"; } 
+
+    if (b.equals("1") || b.equals("1.0"))
+    { return a; } 
+    
+    return a + "^{" + b + "}"; 
+  } 
     
   public static String symbolicDivision(ASTTerm e1, ASTTerm e2)
-  { String a = e1.literalForm(); 
-    String b = e2.literalForm(); 
-
-    if (e1.getTag().equals("additiveExpression") && 
-        "+".equals(e1.getTerm(1) + ""))
-    { a = symbolicAddition(e1.getTerm(0), e1.getTerm(2)); } 
-    else if (e1.getTag().equals("additiveExpression") && 
-        "-".equals(e1.getTerm(1) + ""))
-    { a = symbolicSubtraction(e1.getTerm(0), e1.getTerm(2)); }
-    else if (e1.getTag().equals("factorExpression") && 
-             "*".equals(e1.getTerm(1) + ""))
-    { a = symbolicMultiplication(
-                    e1.getTerm(0), e1.getTerm(2)); 
-    }
-
-    if (e2.getTag().equals("additiveExpression") && 
-        "+".equals(e2.getTerm(1) + ""))
-    { b = symbolicAddition(e2.getTerm(0), e2.getTerm(2)); } 
-    else if (e2.getTag().equals("additiveExpression") && 
-        "-".equals(e2.getTerm(1) + ""))
-    { b = symbolicSubtraction(e2.getTerm(0), e2.getTerm(2)); }
-    else if (e2.getTag().equals("factorExpression") && 
-             "*".equals(e2.getTerm(1) + ""))
-    { b = symbolicMultiplication(
-                    e2.getTerm(0), e2.getTerm(2)); 
-    }
+  { if (ASTTerm.isMathOCLNegative(e1) && 
+        ASTTerm.isMathOCLNegative(e2))
+    { ASTTerm t1 = ASTTerm.mathOCLArgument(e1,1); 
+      ASTTerm t2 = ASTTerm.mathOCLArgument(e2,1);
+      return symbolicDivision(t1,t2); 
+    } 
+ 
+    String a = ASTTerm.symbolicEvaluation(e1); 
+    String b = ASTTerm.symbolicEvaluation(e2); 
 
     if (AuxMath.isGeneralNumeric(a) && 
         AuxMath.isGeneralNumeric(b))
@@ -5618,18 +6221,41 @@ public abstract class ASTTerm
     if (AuxMath.isGeneralNumeric(b))
     { b = "" + AuxMath.generalNumericValue(b); }  
 
+    if (a.equals("?") || b.equals("?"))
+    { return "?"; }  
+
     if (a.equals("0") || a.equals("0.0"))
-    { return "0"; } 
+    { if (b.equals("0") || b.equals("0.0"))
+      { return "?"; } 
+      return "0"; 
+    } 
+
+    if ((a.equals("…") || a.equals("…")) && 
+        (b.equals("-…") || b.equals("…")))
+    { return "?"; }  
+
+    if ((a.equals("…") || a.equals("-…")) && b.equals("0"))
+    { return a; }  
 
     if (b.equals("1") || b.equals("1.0"))
     { return a; }  
 
+    if (a.equals(b))
+    { return "1"; } 
+
     if (b.equals("-1") || b.equals("-1.0"))
-    { return "-(" + a + ")"; }  
+    { if (ASTTerm.isMathOCLIdentifier(a) || 
+          AuxMath.isGeneralNumeric(a))
+      { return "-" + a; } 
+      return "-(" + a + ")"; 
+    }  
 
     if (a.equals("1") || a.equals("1.0"))
     { return "1/" + b; }  
     
+    if (ASTTerm.mathOCLNeedsBracket(e2))
+    { return a + "/(" + b + ")"; } 
+
     return a + "/" + b; 
   }  
 
@@ -5675,7 +6301,7 @@ public abstract class ASTTerm
           ASTTerm t1 = (ASTTerm) subterms.get(1);  
           String m1 = ASTTerm.symbolicMultiplication(var,t1); 
           return opr + " " + m1;  
-        }  
+        }  // for -expr, +expr
 
       }  
 
@@ -5687,6 +6313,9 @@ public abstract class ASTTerm
             ASTTerm t2 = (ASTTerm) subterms.get(2); 
             String coef1 = ASTTerm.symbolicMultiplication(var, t1); 
             String coef2 = ASTTerm.symbolicMultiplication(var, t2); 
+
+            if ("+".equals(opr))
+            { return coef1 + " " + opr + " " + coef2; } 
             return coef1 + " " + opr + " (" + coef2 + ")"; 
           } 
         } // var * a+b is var*a + var*b
@@ -5764,8 +6393,160 @@ public abstract class ASTTerm
     return var + "*(" + ee + ")"; 
   }  
 
+  public static String symbolicPostMultiplication(
+                            String var, ASTTerm expr)
+  { // result is expr*var
+
+    if (expr instanceof ASTCompositeTerm)
+    { // (factorExpression _1 * _2), etc
+      
+      ASTCompositeTerm ct = (ASTCompositeTerm) expr;
+      Vector subterms = ct.getTerms(); 
+ 
+      if (subterms.size() == 1) 
+      { return ASTTerm.symbolicPostMultiplication(var, 
+                                (ASTTerm) subterms.get(0)); 
+      } 
+
+      if ("basicExpression".equals(ct.tag))
+      { if (subterms.size() == 3 && 
+            "(".equals(subterms.get(0) + "") && 
+            ")".equals(subterms.get(2) + ""))
+        { ASTTerm tt = (ASTTerm) subterms.get(1); 
+          return "(" + 
+            ASTTerm.symbolicPostMultiplication(var, tt) + ")"; 
+        } 
+      } // var * (expr) is (var*expr)
+
+      if ("logicalExpression".equals(ct.tag) || 
+          "equalityExpression".equals(ct.tag))
+      { if (subterms.size() == 3)
+        { String opr = subterms.get(1) + ""; 
+          ASTTerm t1 = (ASTTerm) subterms.get(0);  
+          ASTTerm t2 = (ASTTerm) subterms.get(2);  
+          String m1 =
+            ASTTerm.symbolicPostMultiplication(var,t1); 
+          String m2 = 
+            ASTTerm.symbolicPostMultiplication(var,t2);
+          return m1 + " " + opr + " " + m2;  
+        }  
+        
+        if (subterms.size() == 2) 
+        { String opr = subterms.get(0) + ""; 
+          ASTTerm t1 = (ASTTerm) subterms.get(1);  
+          String m1 = 
+             ASTTerm.symbolicPostMultiplication(var,t1);
+
+          if ("+".equals(opr))
+          { return m1; }  
+          return opr + " " + m1;  
+        }  // for -expr, +expr
+
+      }  
+
+      if ("additiveExpression".equals(ct.tag))
+      { if (subterms.size() == 3)
+        { String opr = subterms.get(1) + ""; 
+          if ("+".equals(opr) || "-".equals(opr))
+          { ASTTerm t1 = (ASTTerm) subterms.get(0);  
+            ASTTerm t2 = (ASTTerm) subterms.get(2); 
+            String coef1 = 
+              ASTTerm.symbolicPostMultiplication(var, t1); 
+            String coef2 = 
+              ASTTerm.symbolicPostMultiplication(var, t2); 
+
+            if ("+".equals(opr))
+            { return coef1 + " " + opr + " " + coef2; }
+            if (mathOCLNeedsBracket(t2)) 
+            { return coef1 + " " + opr + " (" + coef2 + ")"; } 
+            return coef1 + " " + opr + " " + coef2; 
+          } 
+        } // var * a+b is var*a + var*b
+      }  
+
+      if ("factorExpression".equals(ct.tag))
+      { if (subterms.size() == 2)
+        { String opr = subterms.get(0) + ""; 
+
+          if ("-".equals(opr))
+          { ASTTerm tt = (ASTTerm) subterms.get(1); 
+
+            String coef1 = 
+              ASTTerm.symbolicPostMultiplication(var, tt); 
+            if (mathOCLNeedsBracket(tt))
+            { return "-(" + coef1 + ")"; } 
+            return "-" + coef1; 
+          } 
+
+          if ("+".equals(opr))
+          { ASTTerm tt = (ASTTerm) subterms.get(1); 
+
+            String coef1 = 
+              ASTTerm.symbolicPostMultiplication(var, tt); 
+            return coef1; 
+          } 
+        }
+
+        if (subterms.size() == 3)
+        { String opr = subterms.get(1) + ""; 
+
+          if ("*".equals(opr))
+          { ASTTerm t1 = (ASTTerm) subterms.get(0);  
+            ASTTerm t2 = (ASTTerm) subterms.get(2); 
+
+            String mult2 = 
+              ASTTerm.symbolicPostMultiplication(var, t2);
+            String coef1 = t1.literalForm();
+
+            if ("0".equals(coef1) || 
+                "0.0".equals(coef1)) 
+            { return "0"; } 
+            if ("1".equals(coef1) || 
+                "1.0".equals(coef1)) 
+            { return mult2; } 
+            if ("0".equals(mult2) ||
+                "0.0".equals(mult2))
+            { return "0"; } 
+            if ("1".equals(mult2) || 
+                "1.0".equals(mult2)) 
+            { return coef1; } 
+            
+            return "(" + coef1 + ")*(" + mult2 + ")"; 
+          } 
+          else if ("/".equals(opr))
+          { ASTTerm t1 = (ASTTerm) subterms.get(0);  
+            ASTTerm t2 = (ASTTerm) subterms.get(2); 
+
+            String coef2 = t2.literalForm(); 
+            if (var.equals(coef2))
+            { return t1.literalForm(); }
+
+            String coef1 = 
+              ASTTerm.symbolicPostMultiplication(var,t1); 
+
+            if ("0".equals(coef1) || 
+                "0.0".equals(coef1)) 
+            { return "0"; } 
+            if ("1".equals(coef2) || 
+                "1.0".equals(coef2)) 
+            { return coef1; } 
+            return "(" + coef1 + ")/" + coef2; 
+          } 
+        } 
+      }
+    } 
+   
+    String ee = expr.literalFormSpaces(); 
+    if ("0".equals(ee) || "0.0".equals(ee)) 
+    { return "0"; } 
+    return "(" + ee + ")*" + var; 
+  }  
+
   public static String groupTermsByPower(ASTTerm expr, ASTTerm var)
-  { Vector powers = ASTTerm.powersOf(var,expr);
+  { // Assume that it is in plain polynomial form, no products
+    // of polynomials. 
+
+    Vector powers = ASTTerm.powersOf(var,expr);
     Vector vars = new Vector();
     vars.add(var);  
 
@@ -5793,6 +6574,320 @@ public abstract class ASTTerm
     return res + cnsts; 
   } // Normalises a polynomial
 
+  public static String expressAsPolynomial(ASTTerm trm, ASTTerm var)
+  { if (ASTTerm.isMathOCLDivision(trm))
+    { ASTTerm num = ASTTerm.mathOCLNumerator(trm); 
+      ASTTerm den = ASTTerm.mathOCLDenominator(trm); 
+      return ASTTerm.polynomialDivision(num,den,var); 
+    } 
+    else if (ASTTerm.isMathOCLMultiplication(trm))
+    { ASTTerm num = ASTTerm.mathOCLArgument(trm,0); 
+      ASTTerm den = ASTTerm.mathOCLArgument(trm,2); 
+      return ASTTerm.polynomialMultiplication(num,den,var); 
+    } 
+
+    return trm.literalFormSpaces(); 
+  } // and multiplication
+
+  public static String polynomialMultiplication(ASTTerm p, ASTTerm q, ASTTerm var)
+  { // result = p*q with terms expressed as coef*var^{pow}
+
+    String ptg = p.getTag();
+    Vector pargs = p.getTerms(); 
+
+    String qtg = q.getTag();
+    Vector qargs = q.getTerms();
+
+    String v0 = var.literalForm();  
+
+    String plit = p.literalForm(); 
+    String qlit = q.literalForm(); 
+
+    /* JOptionPane.showMessageDialog(null, 
+        "Polynomial multiplication of " + plit + " and " + qlit,   "",         
+        JOptionPane.INFORMATION_MESSAGE); */ 
+
+    if ("1".equals(plit)) { return qlit; } 
+    if ("1".equals(qlit)) { return plit; } 
+
+    if (ASTTerm.isMathOCLBracketed(p))
+    { ASTTerm parg = ASTTerm.mathOCLContent(p); 
+      return "(" + polynomialMultiplication(parg,q,var) + ")";
+    }
+    else if (ASTTerm.isMathOCLBracketed(q))
+    { ASTTerm qarg = ASTTerm.mathOCLContent(q); 
+      return "(" + polynomialMultiplication(p,qarg,var) + ")";
+    } 
+    else if (ptg.equals("additiveExpression") && 
+        pargs.size() == 3) 
+    { ASTTerm parg1 = (ASTTerm) pargs.get(0); 
+      ASTTerm parg2 = (ASTTerm) pargs.get(2); 
+      String f1 = polynomialMultiplication(parg1,q,var); 
+      String f2 = polynomialMultiplication(parg2,q,var);
+ 
+      String opr = "" + pargs.get(1); 
+      if ("+".equals(opr))
+      { return f1 + " " + opr + " " + f2; }
+      return f1 + " " + opr + " (" + f2 + ")";  
+    } 
+    else if (qtg.equals("additiveExpression") && 
+        qargs.size() == 3) 
+    { ASTTerm qarg1 = (ASTTerm) qargs.get(0); 
+      ASTTerm qarg2 = (ASTTerm) qargs.get(2); 
+      String f1 = polynomialMultiplication(p,qarg1,var); 
+      String f2 = polynomialMultiplication(p,qarg2,var); 
+
+      String opr = "" + qargs.get(1); 
+      if ("+".equals(opr))
+      { return f1 + " " + opr + " " + f2; }
+      return f1 + " " + opr + " (" + f2 + ")";   
+    }
+    else if (ASTTerm.isMathOCLMultiplication(p))
+    { ASTTerm parg1 = ASTTerm.mathOCLArgument(p,0); 
+      ASTTerm parg2 = ASTTerm.mathOCLArgument(p,2);
+      String p1lit = parg1.literalForm(); 
+
+      if (v0.equals(p1lit))
+      { String mult = polynomialMultiplication(parg2,q,var); 
+        return "(" + mult + ")*" + v0; 
+      } 
+      else if (v0.equals(parg2.literalForm()))
+      { String mult = polynomialMultiplication(parg1,q,var); 
+        return "(" + mult + ")*" + v0; 
+      }
+
+      return p1lit + "*" + polynomialMultiplication(parg2,q,var);
+    }
+    else if (ASTTerm.isMathOCLMultiplication(q))
+    { ASTTerm qarg1 = ASTTerm.mathOCLArgument(q,0);
+      ASTTerm qarg2 = ASTTerm.mathOCLArgument(q,2); 
+      String q1lit = qarg1.literalForm(); 
+
+      if (v0.equals(q1lit))
+      { String mult = polynomialMultiplication(p,qarg2,var); 
+        return "(" + mult + ")*" + v0; 
+      } 
+      else if (v0.equals(qarg2.literalForm()))
+      { String mult = polynomialMultiplication(p,qarg1,var); 
+        return "(" + mult + ")*" + v0; 
+      }
+
+      return q1lit + "*" + polynomialMultiplication(p,qarg2,var);
+    }
+    else if (v0.equals(p.literalForm()))
+    { return symbolicEvaluation(q) + "*" + v0; } 
+    else if (v0.equals(q.literalForm()))
+    { return p.literalForm() + "*" + v0; } 
+    else if (pargs.size() == 1) 
+    { return ASTTerm.polynomialMultiplication( 
+                                (ASTTerm) pargs.get(0),q,var); 
+    } 
+    else if (qargs.size() == 1) 
+    { return ASTTerm.polynomialMultiplication( 
+                             p, (ASTTerm) qargs.get(0),var); 
+    } 
+
+    return symbolicMultiplication(p,q); 
+  } 
+
+  public static String polynomialDivision(ASTTerm p, ASTTerm q, ASTTerm var)
+  { // P = (cP/cQ)*(x^{n})*Q + R where n is maxp - maxq
+    // cP is coefP of maxp, cQ is coefQ of maxq
+    // So P/Q = (cP/cQ)*(x^{n}) + R/Q
+
+    Vector powersP = ASTTerm.powersOf(var,p);
+    Vector powersQ = ASTTerm.powersOf(var,q);
+    
+    Vector vars = new Vector();
+    vars.add(var);  
+
+    String v0 = var.literalForm(); 
+
+
+    //  double minp = VectorUtil.vectorMinimum(powers); 
+    double maxp = VectorUtil.vectorMaximum(powersP); 
+    double maxq = VectorUtil.vectorMaximum(powersQ); 
+
+    if (maxp < maxq)
+    { return "(" + p.literalFormSpaces() + ")/(" + q.literalFormSpaces() + ")"; } 
+
+    int n = (int) (maxp - maxq); 
+
+    Vector coefsP = new Vector(); 
+    Vector powsP = ASTTerm.constructAllPowers((int) maxp,
+                                powersP, var, p, 
+                                coefsP);
+
+    /* JOptionPane.showMessageDialog(null, 
+        "powers of " + v0 + " in " + p + " are " + powsP + " coefficients: " + coefsP,   "",         
+        JOptionPane.INFORMATION_MESSAGE); */ 
+
+    Vector coefsQ = new Vector(); 
+    Vector powsQ = ASTTerm.constructAllPowers((int) maxq,
+                                powersQ, var, q, 
+                                coefsQ);
+
+  /*  JOptionPane.showMessageDialog(null, 
+        "powers of " + v0 + " in " + q + " are " + powsQ + " coefficients: " + coefsQ,   "",         
+        JOptionPane.INFORMATION_MESSAGE); */ 
+
+    ASTTerm maxPpower = (ASTTerm) powsP.get(0);  
+      // ASTTerm.constructNPower(((int) maxp) + "", var);
+
+    String maxPcoef = (String) coefsP.get(0); 
+      // ASTTerm.coefficientOf(maxPpower,p); 
+
+    ASTTerm maxQpower = (ASTTerm) powsQ.get(0); 
+      // ASTTerm.constructNPower(((int) maxq) + "", var);
+
+    String maxQcoef = (String) coefsQ.get(0);  
+      // ASTTerm.coefficientOf(maxQpower,q); 
+
+    String mfactor = "((" + maxPcoef + ")/(" + maxQcoef + "))"; 
+    if (maxPcoef.equals(maxQcoef))
+    { mfactor = "1"; } 
+    else if (maxQcoef.equals("1") || maxQcoef.equals("1.0"))
+    { mfactor = maxPcoef; } 
+
+    String res = mfactor + "*" + v0 + "^{" + n + "}"; 
+    if (n == 0) 
+    { res = mfactor; } 
+    else if (n == 1) 
+    { res = mfactor + "*" + v0; } 
+    else if (n == 2) 
+    { res = mfactor + "*" + v0 + "*" + v0; } 
+
+    // String cnstsP = 
+    //           ASTTerm.constantTerms(vars,p);
+
+    // String cnstsQ = 
+    //           ASTTerm.constantTerms(vars,q);
+
+    // coefficient of x^m in R is 
+    // coefP(m) - mfactor*coefQ(m - n)
+        
+    String r = "0"; 
+
+    for (int i = 1; i < powsP.size(); i++) 
+    { // powers are in descending order
+      ASTTerm powi = (ASTTerm) powsP.get(i);
+ 
+      if (i < coefsQ.size())
+      { String coefQ = (String) coefsQ.get(i);
+
+        if ("0".equals(coefQ))
+        { r = r +  
+            " + (" + coefsP.get(i) + ")*" + 
+            powi.literalForm();
+        }
+        else  
+        { r = r +  
+            " + (" + coefsP.get(i) + " - " + mfactor + "*" +
+                coefQ + ")*" + 
+            powi.literalForm();
+        } 
+      } 
+      else 
+      { r = r +  
+            " + (" + coefsP.get(i) + ")*" + 
+            powi.literalForm();
+      } 
+    } 
+  
+    return res + " + (" + r + ")/(" + 
+           q.literalFormSpaces() + ")"; 
+  } 
+
+  public static boolean mathOCLNeedsBracket(ASTTerm trm)
+  { if (trm instanceof ASTBasicTerm) 
+    { return false; } 
+
+    if (trm instanceof ASTSymbolTerm) 
+    { return false; } 
+
+    if (ASTTerm.isMathOCLBracketed(trm))
+    { return false; } 
+
+    String tg = trm.getTag();
+    Vector args = trm.getTerms(); 
+
+    if ("basicExpression".equals(tg) && 
+        args.size() == 3 && 
+        "(".equals(args.get(1) + "") && 
+        ")".equals(args.get(2) + ""))
+    { return false; } // expr()
+
+    if ("basicExpression".equals(tg) && 
+        args.size() == 3 && 
+        "g{".equals(args.get(0) + "") && 
+        "}".equals(args.get(2) + ""))
+    { return false; } 
+
+    if ("basicExpression".equals(tg) && 
+        args.size() == 4 && 
+        "(".equals(args.get(1) + "") && 
+        ")".equals(args.get(3) + ""))
+    { return false; } // expr(args)
+
+    String lit = trm.literalForm(); 
+
+    if (AuxMath.isGeneralNumeric(lit))
+    { return false; } 
+
+    if (ASTTerm.isMathOCLIdentifier(lit))
+    { return false; } 
+
+    if (args.size() == 1)
+    { return ASTTerm.mathOCLNeedsBracket(
+                       (ASTTerm) args.get(0)); 
+    } 
+
+    return true; 
+  } 
+
+  public static boolean isMathOCLBracketed(ASTTerm trm)
+  { String tg = trm.getTag();
+    Vector args = trm.getTerms(); 
+
+    if ("basicExpression".equals(tg) && 
+        args.size() == 3 && 
+        "(".equals(args.get(0) + "") && 
+        ")".equals(args.get(2) + ""))
+    { return true; } 
+
+    if (args.size() == 1) 
+    { ASTTerm arg0 = (ASTTerm) args.get(0); 
+      return ASTTerm.isMathOCLBracketed(arg0); 
+    } 
+
+    return false; 
+  } 
+
+  public static ASTTerm mathOCLContent(ASTTerm trm)
+  { String tg = trm.getTag();
+    Vector args = trm.getTerms(); 
+
+    if (trm instanceof ASTBasicTerm) 
+    { return trm; } 
+
+    if (trm instanceof ASTSymbolTerm) 
+    { return trm; } 
+
+    if ("basicExpression".equals(tg) &&
+        args.size() == 3 && 
+        "(".equals(args.get(0) + "") && 
+        ")".equals(args.get(2) + ""))
+    { ASTTerm arg = (ASTTerm) args.get(1); 
+      return ASTTerm.mathOCLContent(arg); 
+    } 
+
+    if (args.size() == 1) 
+    { ASTTerm arg0 = (ASTTerm) args.get(0); 
+      return ASTTerm.mathOCLContent(arg0); 
+    }
+
+    return trm; 
+  } 
 
   public static boolean isMathOCLConjunction(ASTTerm trm)
   { String tg = trm.getTag();
@@ -6465,6 +7560,133 @@ public abstract class ASTTerm
     return false; 
   } 
 
+  public static boolean isMathOCLPolynomial(
+                                    ASTTerm trm, ASTTerm var)
+  { // + or - with at least one term having var
+    // a + b + c is bracketed as a + (b + c)
+
+    if (ASTTerm.isMathOCLAddition(trm) || 
+        ASTTerm.isMathOCLSubtraction(trm)) 
+    { } 
+    else 
+    { return false; } 
+
+    ASTTerm arg1 = ASTTerm.mathOCLArgument(trm,0); 
+    ASTTerm arg2 = ASTTerm.mathOCLArgument(trm,2); 
+
+    boolean hasX1 = 
+        ASTTerm.isSubterm(var, arg1);  
+    boolean hasX2 = 
+        ASTTerm.isSubterm(var, arg2);
+
+    if (hasX1 || hasX2) { } 
+    else 
+    { return false; }   
+
+    if (ASTTerm.isPolynomialTerm(arg1)) { } 
+    else 
+    { return false; } 
+
+    if (ASTTerm.isPolynomialTerm(arg2)) 
+    { return true; } 
+
+    return ASTTerm.isMathOCLPolynomial(arg2,var); 
+  } 
+
+  public static boolean isPolynomialTerm(ASTTerm trm)
+  { // A basic expression or multiplication of a basic 
+    // and polynomial term
+
+    String tg = trm.getTag();
+    Vector args = trm.getTerms(); 
+
+    if ("basicExpression".equals(tg)) 
+    { return true; }  
+
+    if ("factorExpression".equals(tg) &&
+        args.size() == 3 && 
+        "*".equals(args.get(1) + ""))
+    { ASTTerm arg1 = ASTTerm.mathOCLArgument(trm,0); 
+      ASTTerm arg2 = ASTTerm.mathOCLArgument(trm,2); 
+      if (ASTTerm.isBasicExpression(arg1))
+      { if (ASTTerm.isPolynomialTerm(arg2))
+        { return true; } 
+        return ASTTerm.isBasicExpression(arg2); 
+      } 
+      return false; 
+    } 
+
+    if (args.size() == 1) 
+    { ASTTerm arg0 = (ASTTerm) args.get(0);
+      return ASTTerm.isPolynomialTerm(arg0); 
+    }
+
+    return false; 
+  } 
+
+  public static boolean isBasicExpression(ASTTerm trm)
+  { // A basic expression 
+
+    String tg = trm.getTag();
+    Vector args = trm.getTerms(); 
+
+    if ("basicExpression".equals(tg)) 
+    { return true; }  
+
+    if (args.size() == 1) 
+    { ASTTerm arg0 = (ASTTerm) args.get(0);
+      return ASTTerm.isBasicExpression(arg0); 
+    }
+
+    return false; 
+  } 
+
+  public static boolean isMathOCLAddition(ASTTerm trm)
+  { String tg = trm.getTag();
+    Vector args = trm.getTerms(); 
+
+    if ("additiveExpression".equals(tg) &&
+        args.size() == 3 && 
+        "+".equals(args.get(1) + ""))
+    { return true; } 
+
+    if ("basicExpression".equals(tg) &&
+        args.size() == 3 && 
+        "(".equals(args.get(0) + "") && 
+        ")".equals(args.get(2) + ""))
+    { return isMathOCLAddition((ASTTerm) args.get(1)); } 
+
+    if (args.size() == 1) 
+    { ASTTerm arg0 = (ASTTerm) args.get(0);
+      return ASTTerm.isMathOCLAddition(arg0); 
+    }
+
+    return false; 
+  } 
+
+  public static boolean isMathOCLSubtraction(ASTTerm trm)
+  { String tg = trm.getTag();
+    Vector args = trm.getTerms(); 
+
+    if ("additiveExpression".equals(tg) &&
+        args.size() == 3 && 
+        "-".equals(args.get(1) + ""))
+    { return true; } 
+
+    if ("basicExpression".equals(tg) &&
+        args.size() == 3 && 
+        "(".equals(args.get(0) + "") && 
+        ")".equals(args.get(2) + ""))
+    { return isMathOCLSubtraction((ASTTerm) args.get(1)); } 
+
+    if (args.size() == 1) 
+    { ASTTerm arg0 = (ASTTerm) args.get(0);
+      return ASTTerm.isMathOCLSubtraction(arg0); 
+    }
+
+    return false; 
+  } 
+
   public static boolean isMathOCLMultiplication(ASTTerm trm)
   { String tg = trm.getTag();
     Vector args = trm.getTerms(); 
@@ -6536,10 +7758,19 @@ public abstract class ASTTerm
   public static ASTTerm mathOCLArgument(ASTTerm trm, int i)
   { // For i-th argument of binary or higher expressions
 
-    // String tg = trm.getTag();
+    String tg = trm.getTag();
     Vector args = trm.getTerms(); 
 
+    if ("basicExpression".equals(tg) &&
+        args.size() == 3 && 
+        "(".equals(args.get(0) + "") && 
+        ")".equals(args.get(2) + ""))
+    { return mathOCLArgument((ASTTerm) args.get(1), i); } 
+
     if (args.size() >= 3 && i <= 2)
+    { return (ASTTerm) args.get(i); } 
+
+    if (args.size() >= 2 && i < 2)
     { return (ASTTerm) args.get(i); } 
 
     if (args.size() == 1) 
@@ -6550,6 +7781,22 @@ public abstract class ASTTerm
     return null; 
   } // Nested unary terms until the expected n-ary term.
 
+  public static boolean isMathOCLNegative(ASTTerm trm)
+  { String tg = trm.getTag();
+    Vector args = trm.getTerms(); 
+
+    if ("factorExpression".equals(tg) &&
+        args.size() == 2 && 
+        "-".equals(args.get(0) + ""))
+    { return true; } 
+
+    if (args.size() == 1) 
+    { ASTTerm arg0 = (ASTTerm) args.get(0);
+      return ASTTerm.isMathOCLNegative(arg0); 
+    }
+
+    return false; 
+  } 
 
   public static boolean isMathOCLDisjunction(ASTTerm trm)
   { String tg = trm.getTag();
@@ -6624,6 +7871,11 @@ public abstract class ASTTerm
     { return true; } 
 
     if ("logicalExpression".equals(tg) &&
+        args.size() == 3 && 
+        "=>".equals(args.get(1) + ""))
+    { return true; } 
+
+    if ("logicalExpression".equals(tg) &&
         args.size() == 2 && 
         "not".equals(args.get(0) + "") && 
         ASTTerm.isMathOCLConjunction((ASTTerm) args.get(1)))
@@ -6647,12 +7899,33 @@ public abstract class ASTTerm
       return ASTTerm.isMathOCLDisjunction(arg0); 
     } 
 
+    if ("expressionList".equals(tg) && 
+        args.size() > 1) 
+    { ASTTerm arg0 = (ASTTerm) args.get(0); 
+      if (ASTTerm.isMathOCLDisjunction(arg0))
+      { return true; } 
+      Vector argstail = new Vector(); 
+      argstail.addAll(args); 
+      argstail.remove(0); 
+      ASTCompositeTerm newante = 
+        new ASTCompositeTerm("expressionList", argstail); 
+      return ASTTerm.isMathOCLDisjunction(newante);  
+    } 
+
     return false; 
   } 
 
   public static Vector mathOCLDisjuncts(ASTTerm trm)
   { String tg = trm.getTag();
     Vector args = trm.getTerms(); 
+
+    if ("basicExpression".equals(tg) &&
+        args.size() == 3 && 
+        "(".equals(args.get(0) + "") && 
+        ")".equals(args.get(2) + ""))
+    { ASTTerm tt = (ASTTerm) args.get(1);
+      return ASTTerm.mathOCLDisjuncts(tt);
+    } // ( expr )
 
     if ("equalityExpression".equals(tg) &&
         args.size() == 3 && 
@@ -7174,6 +8447,21 @@ public abstract class ASTTerm
     } 
 
     if ("logicalExpression".equals(tg) &&
+        args.size() == 3 && 
+        "=>".equals(args.get(1) + ""))
+    { // A => B is not(A) or B
+      Vector res = new Vector(); 
+      ASTTerm lhs = (ASTTerm) args.get(0); 
+      ASTTerm rhs = (ASTTerm) args.get(2); 
+      Vector notlhs = new Vector(); 
+      notlhs.add(new ASTSymbolTerm("not")); 
+      notlhs.add(lhs); 
+      res.add(new ASTCompositeTerm("logicalExpression", notlhs)); 
+      res.addAll(ASTTerm.mathOCLDisjuncts(rhs)); 
+      return res; 
+    } 
+
+    if ("logicalExpression".equals(tg) &&
         args.size() == 2 && 
         "not".equals(args.get(0) + "") && 
         ASTTerm.isMathOCLConjunction((ASTTerm) args.get(1)))
@@ -7194,14 +8482,6 @@ public abstract class ASTTerm
         return res; 
       } 
     }  
-
-    if ("basicExpression".equals(tg) &&
-        args.size() == 3 && 
-        "(".equals(args.get(0) + "") && 
-        ")".equals(args.get(2) + ""))
-    { ASTTerm tt = (ASTTerm) args.get(1); 
-      return ASTTerm.mathOCLDisjuncts(tt); 
-    } 
  
 
     if ("logicalExpression".equals(tg) && 
@@ -7220,6 +8500,47 @@ public abstract class ASTTerm
         args.size() == 1) 
     { ASTTerm arg0 = (ASTTerm) args.get(0); 
       return ASTTerm.mathOCLDisjuncts(arg0); 
+    } 
+
+    if ("expressionList".equals(tg) && 
+        args.size() > 1) 
+    { ASTTerm arg0 = (ASTTerm) args.get(0); 
+      if (ASTTerm.isMathOCLDisjunction(arg0))
+      { Vector res = new Vector(); 
+        Vector arg0disjuncts = 
+          ASTTerm.mathOCLDisjuncts(arg0);
+        for (int i = 0; i < arg0disjuncts.size(); i++) 
+        { ASTTerm disj = (ASTTerm) arg0disjuncts.get(i);  
+          Vector newargs = new Vector();
+          newargs.add(disj); 
+          for (int j = 1; j < args.size(); j++) 
+          { newargs.add(args.get(j)); } 
+          res.add(
+            new ASTCompositeTerm("expressionList", newargs));  
+        } 
+        return res; 
+      } 
+
+      Vector argstail = new Vector(); 
+      argstail.addAll(args); 
+      argstail.remove(0); 
+      ASTCompositeTerm newante = 
+        new ASTCompositeTerm("expressionList", argstail); 
+      if (ASTTerm.isMathOCLDisjunction(newante))
+      { Vector res = new Vector(); 
+        Vector exprs = ASTTerm.mathOCLDisjuncts(newante); 
+        for (int i = 0; i < exprs.size(); i++) 
+        { ASTTerm expr = (ASTTerm) exprs.get(i); 
+          // (expressionList terms)
+          Vector oldlist = expr.getTerms(); 
+          Vector newlist = new Vector(); 
+          newlist.add(arg0); 
+          newlist.addAll(oldlist); 
+          res.add(  
+            new ASTCompositeTerm("expressionList", newlist));
+        } 
+        return res; 
+      } 
     } 
 
     Vector res = new Vector(); 
@@ -7482,7 +8803,7 @@ public abstract class ASTTerm
         }
         return res;
       } 
-    } // also case of (A or B), C  
+    } // also case of (A or B), C  disjuncts are A, C and B, C
 
     // If succ is a disjunction, it holds if any disjunct is 
     // also equal to or a conjunct of the ante.
@@ -7522,7 +8843,7 @@ public abstract class ASTTerm
         res = res + "  Prove " + subdisj + " if "; 
         for (int k = 0; k < remainingDisjuncts.size(); k++) 
         { String rdis = (String) remainingDisjuncts.get(k); 
-          res = res + "(not " + rdis + "), "; 
+          res = res + "not (" + rdis + "), "; 
         } 
         res = res + alist + "\n"; 
       } 
@@ -7593,7 +8914,7 @@ public abstract class ASTTerm
     // String alitspaces = ante.literalFormSpaces(); 
     String slitspaces = succ.literalFormSpaces(); 
 
-    return "  Simplify " + alit + " => " + slitspaces; 
+    return "  Simplify (" + alit + ") => " + slitspaces; 
   } 
 
   public static String solveEquations(ASTTerm exprs, ASTTerm vars)
@@ -7849,27 +9170,32 @@ public abstract class ASTTerm
           { // Solution is 
             // "A*e^{-(" + coeff + ")/(" + coefd1 + ")}"; 
 
+            mathoclfunctionIndex++; 
+            String A = "A" + mathoclfunctionIndex; 
+
             return 
-              "  Define A\n" + 
+              "  Define " + A + "\n" + 
               "  Define " + vx0 + 
-                   " = A*e^{(" + frac + ")*x}\n";
+                   " = " + A + "*e^{(" + frac + ")*x}\n";
           } 
           else 
           { // Solution is above + g
             // for g = -dcnst/coeff or g = -dcnst*x/coefd1
- 
+            mathoclfunctionIndex++; 
+            String A = "A" + mathoclfunctionIndex; 
+
             if ("0".equals(coeff) || "0.0".equals(coeff))
             { return 
-                "  Define A\n" + 
+                "  Define " + A + "\n" + 
                 "  Define " + vx0 + 
-                   " = A*e^{(" + frac + ")*x} - " + 
+                   " = " + A + "*e^{(" + frac + ")*x} - " + 
                         dcnst + "*x/(" + coefd1 + ")\n";
             }  
             else 
             { return 
-                "  Define A\n" + 
+                "  Define " + A + "\n" + 
                 "  Define " + vx0 + 
-                   " = A*e^{(" + frac + ")*x} - " + 
+                   " = " + A + "*e^{(" + frac + ")*x} - " + 
                         dcnst + "/(" + coeff + ")\n";
             }  
           } 
@@ -7948,16 +9274,20 @@ public abstract class ASTTerm
             }  
           } 
           
+          mathoclfunctionIndex++; 
+          String A = "A" + mathoclfunctionIndex; 
+          String B = "B" + mathoclfunctionIndex; 
+
           if (quadf1.equals(quadf2))
           { return 
-              "  Define A\n" + 
-              "  Define B\n" + 
-              "  Define " + vx0 + " = (A + B*x)*e^{" + quadf1 + "*x}" + specialSolution;
+              "  Define " + A + "\n" + 
+              "  Define " + B + "\n" + 
+              "  Define " + vx0 + " = (" + A + " + " + B + "*x)*e^{" + quadf1 + "*x}" + specialSolution;
           } 
           return 
-            "  Define A\n" + 
-            "  Define B\n" + 
-            "  Define " + vx0 + " = A*e^{(" + quadf1 + ")*x} + B*e^{(" + quadf2 + ")*x}" + specialSolution; 
+            "  Define " + A + "\n" + 
+            "  Define " + B + "\n" + 
+            "  Define " + vx0 + " = " + A + "*e^{(" + quadf1 + ")*x} + " + B + "*e^{(" + quadf2 + ")*x}" + specialSolution; 
         } 
         else if (maxdp == 1 && vdiffs.size() == 2 && 
                  maxvdiffp <= 1) 
@@ -7978,15 +9308,19 @@ public abstract class ASTTerm
             coeff = "(" + coeff + ")/" + coefd1; 
           } 
 
-          String J = "e^{‡ " + coeff + " dx}";
+          String Jvalue = "e^{‡ " + coeff + " dx}";
+          ASTTerm.mathoclfunctionIndex++; 
+          String J = "J" + ASTTerm.mathoclfunctionIndex + "(x)"; 
+          String A = "A" + ASTTerm.mathoclfunctionIndex; 
+
           String integralTerm = 
-            "(1/J)*(‡ (" + cc + ")*J dx) +"; 
+            "(1/" + J + ")*(‡ (" + cc + ")*" + J + " dx) +"; 
           if ("0".equals(cc) || "0.0".equals(cc))
           { integralTerm = ""; } 
 
-          return "  Define J = " + J + "\n" +
-            "  Define A\n" + 
-            "  Define " + vx0 + " = " + integralTerm + " A/J\n";   
+          return "  Define " + J + " = " + Jvalue + "\n" +
+            "  Define " + A + "\n" + 
+            "  Define " + vx0 + "(x) = " + integralTerm + " " + A + "/" + J + "\n";   
         } 
  
         return "  Solve " + exprs.literalForm() + " for " + vars.literalForm() + "\n";
@@ -8078,15 +9412,15 @@ public abstract class ASTTerm
       { double commonDivisor = 
           Math.pow(-1,msize) *
           AuxMath.determinant(msize, divisorMatrix); 
-        divisorString = "" + commonDivisor; 
+        divisorString = "(" + commonDivisor + ")"; 
       } 
       else if (msize % 2 == 0) 
       { divisorString = "(" + 
           AuxMath.symbolicDeterminant(msize, divisorMatrix) + ")"; 
       } 
       else  
-      { divisorString = "-1*(" + 
-          AuxMath.symbolicDeterminant(msize, divisorMatrix) + ")"; 
+      { divisorString = "(-1*(" + 
+          AuxMath.symbolicDeterminant(msize, divisorMatrix) + "))"; 
       } 
 
   /* 
@@ -8210,15 +9544,15 @@ public abstract class ASTTerm
       ASTTerm vpow =
           ASTTerm.constructNPower("" + i, v); 
  
-      String dcoef = ASTTerm.coefficientOf(vpow,expr0); 
+      String dcoef = ASTTerm.coefficientOfPower(v,i,expr0); 
 
-      ASTTerm vpow2 =
-          ASTTerm.constructNPowerProd(i, v); 
+      // ASTTerm vpow2 =
+      //     ASTTerm.constructNPowerProd(i, v); 
  
-      String dcoef2 = ASTTerm.coefficientOf(vpow2,expr0); 
+      // String dcoef2 = ASTTerm.coefficientOf(vpow2,expr0); 
 
       res.add(vpow); 
-      coefs.add("(" + dcoef + " + " + dcoef2 + ")"); 
+      coefs.add(dcoef); 
     } 
     return res; 
   }  
@@ -8245,15 +9579,16 @@ public abstract class ASTTerm
       if (j > 2)
       { ASTTerm vpow =
           ASTTerm.constructNPower("" + j, v); 
-        String vcoef = ASTTerm.coefficientOf(vpow,expr0);
+        // String vcoef = ASTTerm.coefficientOf(vpow,expr0);
         res.add(vpow); 
       
-        ASTTerm vpow2 =
-          ASTTerm.constructNPowerProd(j, v); 
+        // ASTTerm vpow2 =
+        //   ASTTerm.constructNPowerProd(j, v); 
  
-        String vcoef2 = ASTTerm.coefficientOf(vpow2,expr0); 
+        String vcoef2 = 
+          ASTTerm.coefficientOfPower(v,j,expr0); 
 
-        coefs.add("(" + vcoef + " + " + vcoef2 + ")");
+        coefs.add(vcoef2);
       } 
       else if (j == 1)  
       { String vcoef = ASTTerm.coefficientOf(v,expr0);
@@ -8268,6 +9603,68 @@ public abstract class ASTTerm
         coefs.add(vcoef2); 
       }
     } 
+    return res; 
+  }  
+
+  public static Vector constructAllPowers(int n, 
+                   Vector powers, ASTTerm v, ASTTerm expr0, 
+                   Vector coefs)
+  { // for i = n down to 1, if  
+    // i : powers, find coefficient of i-th power of v
+    // otherwise give coefficient 0
+    
+    Vector processed = new Vector(); 
+    Vector res = new Vector(); 
+
+    for (int i = n; i > 1; i--) 
+    { if (processed.contains("" + i)) 
+      { continue; } 
+
+      processed.add("" + i); 
+
+      if (powers.contains(i))
+      { if (i > 2)
+        { ASTTerm vpow =
+            ASTTerm.constructNPower("" + i, v); 
+          String vcoef = ASTTerm.coefficientOf(vpow,expr0);
+          res.add(vpow); 
+      
+          ASTTerm vpow2 =
+            ASTTerm.constructNPowerProd(i, v); 
+ 
+          String vcoef2 = ASTTerm.coefficientOf(vpow2,expr0); 
+
+          coefs.add("(" + vcoef + " + " + vcoef2 + ")");
+        } 
+        else if (i == 2)  
+        { String vcoef2 = 
+            ASTTerm.coefficientOfSquare(v,expr0);
+          ASTTerm vpower2 =
+            ASTTerm.constructNPower("2", v); 
+          res.add(vpower2); 
+          coefs.add(vcoef2); 
+        }
+      } 
+      else // i not in powers
+      { ASTTerm vpoweri =
+            ASTTerm.constructNPower(i + "", v); 
+        res.add(vpoweri); 
+        coefs.add("0"); 
+      } 
+    } 
+
+    String vcoef = ASTTerm.coefficientOf(v,expr0);
+    res.add(v); 
+    coefs.add(vcoef); 
+   
+    Vector vs = new Vector(); 
+    vs.add(v); 
+
+    String cnst = constantTerms(vs, expr0); 
+
+    res.add(new ASTBasicTerm("basicExpression", "1")); 
+    coefs.add(cnst); 
+
     return res; 
   }  
 
@@ -8429,7 +9826,7 @@ public abstract class ASTTerm
     System.out.println(ASTTerm.isIntegerValued(0.0)); 
     System.out.println(ASTTerm.isIntegerValued(3.0)); 
     System.out.println(ASTTerm.isIntegerValued(-1.5)); 
-    System.out.println(ASTTerm.isIntegerValued(-5.0)); */ 
+    System.out.println(ASTTerm.isIntegerValued(-5.0)); 
 
     Vector trms1 = new Vector(); 
     trms1.add(new ASTSymbolTerm("exp")); 
@@ -8460,7 +9857,100 @@ public abstract class ASTTerm
     leq.hasMatch(scheme, mm); 
     System.out.println(mm);  
 
-    System.out.println(scheme.instantiate(mm)); 
+    System.out.println(scheme.instantiate(mm)); */ 
+
+    /* (3*x - 2)/(2*x - 1) */ 
+
+    ASTBasicTerm ttx = new ASTBasicTerm("basicExpression", "x"); 
+    ASTBasicTerm tt3 = new ASTBasicTerm("basicExpression", "3");
+    ASTSymbolTerm ttmult = new ASTSymbolTerm("*"); 
+
+    Vector vect0 = new Vector(); 
+    vect0.add(ttx); 
+    vect0.add(ttmult); 
+    vect0.add(ttx); 
+    
+    ASTCompositeTerm ttxx = 
+       new ASTCompositeTerm("factorExpression", vect0); 
+    // x*x
+ 
+    Vector vect = new Vector(); 
+    vect.add(tt3); 
+    vect.add(ttmult); 
+    vect.add(ttxx); 
+    
+    ASTCompositeTerm ttc = 
+       new ASTCompositeTerm("factorExpression", vect); 
+    // 3*x*x
+
+    ASTBasicTerm tt2 = new ASTBasicTerm("basicExpression", "2");
+    ASTSymbolTerm ttsub = new ASTSymbolTerm("-"); 
+
+    Vector vect1 = new Vector(); 
+    vect1.add(ttc); 
+    vect1.add(ttsub); 
+    vect1.add(tt2); 
+    ASTCompositeTerm ttc1 = 
+       new ASTCompositeTerm("additiveExpression", vect1); 
+    // 3*x*x - 2
+
+    System.out.println(ttc1.literalFormSpaces()); 
+    System.out.println(ASTTerm.isMathOCLPolynomial(ttc1,ttx)); 
+    System.out.println(ASTTerm.powersOf(ttx,ttc1)); 
+
+    
+    Vector vect2 = new Vector(); 
+    vect2.add(tt2); 
+    vect2.add(ttmult); 
+    vect2.add(ttx); 
+    
+    ASTCompositeTerm ttc2 = 
+       new ASTCompositeTerm("factorExpression", vect2); 
+    // 2*x
+
+    ASTBasicTerm tt1 = new ASTBasicTerm("basicExpression", "1");
+
+    Vector vect3 = new Vector(); 
+    vect3.add(ttc2); 
+    vect3.add(ttsub); 
+    vect3.add(tt1); 
+    ASTCompositeTerm ttc3 = 
+       new ASTCompositeTerm("additiveExpression", vect3); 
+    // 2*x - 1
+
+    System.out.println(ttc3.literalFormSpaces());
+    System.out.println(ASTTerm.isMathOCLPolynomial(ttc3,ttx));
+    // System.out.println(ASTTerm.powersOf(ttx,ttc3)); 
+
+    String divs = 
+      ASTTerm.polynomialDivision(ttc1,ttc3,ttx); 
+    System.out.println(divs);
+
+    String mults = 
+      ASTTerm.polynomialMultiplication(ttc1,ttc3,ttx); 
+    System.out.println(mults);
+
+    Vector mv = new Vector(); 
+    mv.add(ttc1); mv.add(ttmult); mv.add(ttc3); 
+    ASTTerm mult = 
+      new ASTCompositeTerm("factorExpression", mv); 
+    Vector pwrs = ASTTerm.powersOf(ttx,mult); 
+    System.out.println(pwrs); 
+    Vector coefs = new Vector(); 
+    // Vector pows = ASTTerm.constructNPowers(
+    //                             pwrs, ttx, mult, 
+    //                             coefs);
+    // System.out.println(coefs); 
+
+    Vector vvx = new Vector(); 
+    vvx.add(ttx); 
+
+    String p3 = coefficientOfPower(ttx, 3, mult); 
+    String p2 = coefficientOfPower(ttx, 2, mult); 
+    String p1 = coefficientOfPower(ttx, 1, mult); 
+    String p0 = constantTerms(vvx, mult); 
+
+    System.out.println(p3 + " " + p2 + " " + p1 + " " + p0); 
   }
 } 
 

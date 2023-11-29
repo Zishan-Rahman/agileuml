@@ -663,9 +663,13 @@ public class Compiler2
   { return (Character.isLetterOrDigit(c) || c == '.' || c == '$' || c == '@' || c == ':'); } 
         
   private static boolean isSymbolCharacterText(char c)
-  { return (c == '(' || c == ')' || c == '{' || c == '}' || c == '[' ||
+  { return (c == '(' || c == ')' || 
+            c == '{' || c == '}' || c == '[' ||
             c == ']'); 
   } 
+
+  private static boolean isSymbolCharacterAST(char c)
+  { return (c == '(' || c == ')'); } 
   
   public void nospacelexicalanalysis(String str) 
   { int in = INUNKNOWN; 
@@ -971,7 +975,7 @@ public class Compiler2
 
     int explen = str.length(); 
     lexicals = new Vector(explen);  /* Sequence of lexicals */ 
-    StringBuffer sb = null;    /* Holds current lexical item */ 
+    StringBuffer sb = null;         /* Current lexical item */ 
 
     char prev = ' '; 
 
@@ -1059,6 +1063,102 @@ public class Compiler2
     }
   }
 
+  public void nospacelexicalanalysisAST(String str) 
+  { int in = INUNKNOWN; 
+    char previous = ' '; 
+
+    boolean instring = false; 
+    boolean inchar = false; 
+
+    int explen = str.length(); 
+    lexicals = new Vector(explen);  /* Sequence of lexicals */ 
+    StringBuffer sb = null;         /* Current lexical item */ 
+
+    char prev = ' '; 
+
+    for (int i = 0; i < explen; i++)
+    { char c = str.charAt(i); 
+
+      if (c == '\"' && prev != '\\') 
+      { if (inchar) // '"' is ok but should be '\"' 
+        { if (sb != null) 
+          { sb.append("\""); }
+        }  
+        else if (instring) 
+        { instring = false; 
+          if (sb != null) 
+          { sb.append(c); 
+            sb = null; 
+          } // ends a literal string. 
+        }  
+        else // starts a literal string. 
+        { instring = true; 
+          sb = new StringBuffer();     // start new buffer
+          lexicals.addElement(sb);  
+          sb.append(c); 
+        } 
+        prev = updatePrev(prev,c); 
+      } 
+      else if (instring)
+      { if (sb != null) // should always be true. 
+        { sb.append(c); } 
+        else 
+        { sb = new StringBuffer();     // start new buffer for the text
+          lexicals.add(sb); 
+          sb.append(c); 
+        }
+        prev = updatePrev(prev,c); 
+      } 
+      else if (c == '\'' && prev != '\\') 
+      { if (inchar) 
+        { inchar = false; 
+          if (sb != null) 
+          { sb.append(c); 
+            sb = null; 
+          } // ends a literal char string. 
+        }  
+        else // starts a literal char string. 
+        { inchar = true; 
+          sb = new StringBuffer();     // start new buffer
+          lexicals.addElement(sb);  
+          sb.append(c); 
+        } 
+        prev = updatePrev(prev,c); 
+      } 
+      else if (inchar)
+      { if (sb != null) // should always be true. 
+        { sb.append(c); } 
+        else 
+        { sb = new StringBuffer();  // new buffer for the text
+          lexicals.add(sb); 
+          sb.append(c); 
+        }
+        prev = updatePrev(prev,c); 
+      } 
+      else if (isSymbolCharacterAST(c)) // && !instring)
+      { sb = new StringBuffer();   // new buffer for symbol
+        lexicals.addElement(sb);  
+        sb.append(c); 
+        sb = null; 
+        prev = updatePrev(prev,c); 
+      }        
+      else if (c == ' ' || c == '\n' || 
+               c == '\t' || c == '\r') 
+      { sb = null; 
+        prev = updatePrev(prev,c); 
+      } // end current buffer - not in a string 
+      else // if (isBasicExpCharacter(c))
+      { if (sb != null) 
+        { sb.append(c); } 
+        else 
+        { sb = new StringBuffer();     // start new buffer for the text
+          lexicals.add(sb); 
+          sb.append(c); 
+        }
+        prev = updatePrev(prev,c);            
+      } 
+    }
+  }
 
   private char updatePrev(char prev, char current)
   { if (prev == '\\' && current == '\\') 
@@ -1702,7 +1802,8 @@ public class Compiler2
       if (c == '|' && i + 2 < rule.length() && rule.charAt(i+1) == '-' && 
           rule.charAt(i+2) == '-' && rule.charAt(i+3) == '>') 
       { String lhs = rule.substring(0,i); 
-        nospacelexicalanalysisText(lhs);
+        // nospacelexicalanalysisText(lhs);
+        nospacelexicalanalysisAST(lhs);
         int sz = lexicals.size();
 
         Vector variables = new Vector();
@@ -4322,8 +4423,6 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
     } 
   
   } 
-     
-
   
   public ASTTerm parseGeneralAST(String xstring)
   { nospacelexicalanalysisText(xstring);
@@ -4334,6 +4433,13 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
 
   public ASTTerm parseSimpleAST(String xstring)
   { nospacelexicalanalysisSimpleText(xstring);
+    int sz = lexicals.size();  
+    ASTTerm res = parseGeneralAST(0,sz-1); 
+    return res;
+  }
+
+  public ASTTerm parseMathOCLAST(String xstring)
+  { nospacelexicalanalysisAST(xstring);
     int sz = lexicals.size();  
     ASTTerm res = parseGeneralAST(0,sz-1); 
     return res;
@@ -10483,15 +10589,37 @@ private Vector parseUsingClause(int st, int en, Vector entities, Vector types)
 
     System.out.println(c.lexicals); */ 
 
+    String testast = "(expression (logicalExpression (equalityExpression (additiveExpression (factorExpression C_{ (expression (logicalExpression (equalityExpression (additiveExpression (factorExpression (factor2Expression (basicExpression 2))))))) } ^{ (expression (logicalExpression (equalityExpression (additiveExpression (factorExpression (factor2Expression (basicExpression 4))))))) })))))"; 
+
+  /* "(expression (logicalExpression (equalityExpression (additiveExpression (factorExpression (factor2Expression (factor2Expression (basicExpression (identifier e))) ^{ (expression (logicalExpression (equalityExpression (additiveExpression (factorExpression (factor2Expression (basicExpression 3))))))) }))))))"; */ 
+ 
+    // ASTTerm asst = c.parseGeneralAST(testast); 
+    // System.out.println(asst); 
+
+    ASTTerm asst = c.parseMathOCLAST(testast); 
+    System.out.println(asst.literalForm());
+    System.out.println(asst.literalFormSpaces());
+
+          Vector ents = new Vector(); 
+          Vector typs = new Vector(); 
+          CGSpec cgs = new CGSpec(ents,typs); 
+          File fs = new File("cg/simplify.cstl"); 
+          CSTL.loadCSTL(cgs,fs,ents,typs);
+ 
+          String entcode = asst.cg(cgs);
+
+          System.out.println(entcode); 
+ 
+
     // c.nospacelexicalanalysis("sq->iterate(v; acc = 0 | v + acc)"); 
 
     // Expression zz = c.parseExpression(); 
 
-    Compiler2 ccx = new Compiler2(); 
-    ccx.nospacelexicalanalysis("x : int"); 
-    ModelElement zz = ccx.parseParameterDeclaration(new Vector(), new Vector()); 
-    System.out.println(zz); 
-    System.out.println(zz.getType()); 
+    // Compiler2 ccx = new Compiler2(); 
+    // ccx.nospacelexicalanalysis("x : int"); 
+    // ModelElement zz = ccx.parseParameterDeclaration(new Vector(), new Vector()); 
+    // System.out.println(zz); 
+    // System.out.println(zz.getType()); 
 
     // c.nospacelexicalanalysis("E<String,int>"); 
      

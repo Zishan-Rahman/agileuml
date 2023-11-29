@@ -777,10 +777,16 @@ public class SetExpression extends Expression
       for (int i = 0; i < elements.size(); i++)
       { Expression elem = (Expression) elements.get(i);
         BasicExpression vari = (BasicExpression) var.clone();
-        vari.setArrayIndex(new BasicExpression(i+1));
-        BinaryExpression seti = new BinaryExpression("=", elem, vari );
-        UnaryExpression varsize = new UnaryExpression("->size", var );
-        BinaryExpression se = new BinaryExpression(">", varsize, new BasicExpression(i));
+        // vari.setArrayIndex(new BasicExpression(i+1));
+        BinaryExpression elemi = 
+          new BinaryExpression("->at", vari, 
+                               new BasicExpression(i+1)); 
+        BinaryExpression seti = 
+            new BinaryExpression("=", elem, elemi); // vari
+        UnaryExpression varsize = 
+            new UnaryExpression("->size", var );
+        BinaryExpression se = 
+            new BinaryExpression(">", varsize, new BasicExpression(i));
         res = res + "  if (" + se.queryForm(language,env,local) + ") { " + seti.updateForm(language,env,local) + " }\n";
      }
    }  
@@ -836,6 +842,12 @@ public class SetExpression extends Expression
 
   public int typeCheck(final Vector sms)
   { return SENSOR; }
+
+  public boolean typeInference(final Vector typs, 
+                                        final Vector ents,
+                   final Vector contexts, final Vector env, 
+                   java.util.Map vartypes)
+  { return typeCheck(typs,ents,contexts,env); } 
 
   public boolean typeCheck(final Vector types, final Vector entities,
                            final Vector contexts, final Vector env)

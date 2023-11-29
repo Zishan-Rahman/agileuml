@@ -383,6 +383,29 @@ public class UCDArea extends JPanel
     }
   } // and entity activities. 
 
+  public void typeInference()
+  { for (int i = 0; i < entities.size(); i++) 
+    { Entity e = (Entity) entities.get(i);
+      java.util.Map vartypes = new java.util.HashMap();  
+      e.typeInference(types,entities,vartypes); 
+    } 
+
+    /* for (int j = 0; j < useCases.size(); j++) 
+    { if (useCases.get(j) instanceof UseCase)
+      { UseCase uc = (UseCase) useCases.get(j); 
+        uc.typeCheck(types,entities); 
+      } 
+    } 
+	
+    Vector contexts = new Vector(); 
+	
+    for (int i = 0; i < constraints.size(); i++) 
+    { Constraint con = (Constraint) constraints.get(i); 
+      con.typeCheck(types,entities,contexts); 
+    } */ 
+
+  } // and entity activities. 
+
 
   public void deleteUseCase(String nme)
   { if (nme == null)
@@ -6669,6 +6692,78 @@ public class UCDArea extends JPanel
     System.out.println(">> Set activity for operation " + nme + " of entity " + ent); 
   }
 
+  public void hoistOperationLocalDecs(Entity ent)
+  { String nme = 
+          JOptionPane.showInputDialog("Enter operation name:");
+    BehaviouralFeature bf = ent.getOperation(nme); 
+    if (bf == null) 
+    { System.err.println("!! ERROR: No such operation: " + nme); 
+      return; 
+    } 
+
+    Statement stat = bf.getActivity();
+    bf.hoistLocalDeclarations(); 
+    Statement effect = bf.getActivity(); 
+ 
+    if (effect == null)
+    { System.err.println("!!! ERROR: Syntax error in activity"); 
+      return; 
+    } 
+    else if (effect == stat) 
+    { System.out.println(">>> No change to activity"); 
+      return; 
+    } 
+    
+    Vector contexts = new Vector(); 
+    contexts.add(ent); 
+    Vector pars = new Vector(); 
+
+    effect.setEntity(ent); 
+    pars.addAll(bf.getParameters()); 
+
+    effect.typeCheck(types,entities,contexts,pars); 
+    
+    bf.setActivity(effect); 
+    updateActivities(ent, bf, effect); 
+    System.out.println(">> Set activity for operation " + nme + " of entity " + ent); 
+  }
+
+  public void reduceCodeNesting(Entity ent)
+  { String nme = 
+          JOptionPane.showInputDialog("Enter operation name:");
+    BehaviouralFeature bf = ent.getOperation(nme); 
+    if (bf == null) 
+    { System.err.println("!! ERROR: No such operation: " + nme); 
+      return; 
+    } 
+
+    Statement stat = bf.getActivity();
+    bf.reduceCodeNesting(); 
+    Statement effect = bf.getActivity(); 
+ 
+    if (effect == null)
+    { System.err.println("!!! ERROR: Syntax error in activity"); 
+      return; 
+    } 
+    else if (effect == stat) 
+    { System.out.println(">>> No change to activity"); 
+      return; 
+    } 
+    
+    Vector contexts = new Vector(); 
+    contexts.add(ent); 
+    Vector pars = new Vector(); 
+
+    effect.setEntity(ent); 
+    pars.addAll(bf.getParameters()); 
+
+    effect.typeCheck(types,entities,contexts,pars); 
+    
+    bf.setActivity(effect); 
+    updateActivities(ent, bf, effect); 
+    System.out.println(">> Set activity for operation " + nme + " of entity " + ent); 
+  }
+
   public void replaceCallsByDefinitions(Entity ent)
   { String nme = 
       JOptionPane.showInputDialog("Name of operation to be replaced by its code:");
@@ -10818,6 +10913,8 @@ public void produceCUI(PrintWriter out)
     out.println("\n" + mop);  
     mop = BSystemTypes.generateInsertAtOp(); 
     out.println("\n" + mop);  
+    mop = BSystemTypes.generateInsertIntoOp(); 
+    out.println("\n" + mop);  
     mop = BSystemTypes.generateRemoveSetAtOps(); 
     out.println("\n" + mop);  
 
@@ -11044,6 +11141,8 @@ public void produceCUI(PrintWriter out)
     mop = BSystemTypes.generateConcatAllOpJava6(); 
     out.println("\n" + mop);  
     mop = BSystemTypes.generateInsertAtOpJava6(); 
+    out.println("\n" + mop);  
+    mop = BSystemTypes.generateInsertIntoOpJava6(); 
     out.println("\n" + mop);  
     mop = BSystemTypes.generateRemoveSetAtOpsJava6(); 
     out.println("\n" + mop);  
@@ -11285,6 +11384,8 @@ public void produceCUI(PrintWriter out)
     out.println("\n" + mop);  
     mop = BSystemTypes.generateInsertAtOpJava7(); 
     out.println("\n" + mop);  
+    mop = BSystemTypes.generateInsertIntoOpJava7(); 
+    out.println("\n" + mop);  
     mop = BSystemTypes.generateRemoveSetAtOpsJava7(); 
     out.println("\n" + mop);  
 
@@ -11477,6 +11578,8 @@ public void produceCUI(PrintWriter out)
     mop = BSystemTypes.generateUnionAllOpCSharp(); 
     out.println("\n" + mop);  
     mop = BSystemTypes.generateInsertAtOpCSharp(); 
+    out.println("\n" + mop);  
+    mop = BSystemTypes.generateInsertIntoOpCSharp(); 
     out.println("\n" + mop);  
     mop = BSystemTypes.generateRemoveSetAtOpsCSharp(); 
     out.println("\n" + mop);  

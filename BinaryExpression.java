@@ -22,7 +22,8 @@ class BinaryExpression extends Expression
 
   String iteratorVariable = null; // for ->exists( x, ->forAll( x, etc
   Attribute accumulator = null;      // let and ->iterate(  )
-  Expression keyValue = null;   // for map operators ->including(key,right), ->excluding(key,right)
+  Expression keyValue = null;   
+    // for map operators ->including(key,right), ->excluding(key,right)
 
   public BinaryExpression(String op, Expression ll, Expression rr)
   { operator = op; 
@@ -2778,16 +2779,17 @@ class BinaryExpression extends Expression
     if (operator.equals("->closure")) 
     { return left.getBaseEntityUses(); } 
 
-    if ("->iterate".equals(operator))
+    if ("->iterate".equals(operator) || "let".equals(operator))
     { Vector ss1 = left.getBaseEntityUses();  
+      Vector ss2 = right.getBaseEntityUses(); 
 
       if (accumulator != null) 
       { Expression expr = accumulator.getInitialExpression(); 
         if (expr != null) 
         { ss1.addAll(expr.allPreTerms()); } 
-      } 
+      }
 
-      return VectorUtil.union(ss1,right.getBaseEntityUses());
+      return VectorUtil.union(ss1,ss2);
     } 
 
     if (operator.equals("!") || operator.equals("#") || operator.equals("#LC") ||
@@ -2837,15 +2839,15 @@ class BinaryExpression extends Expression
       return ss; 
     } 
     
-    if ("->iterate".equals(operator))
-    { Vector ss2 = left.getVariableUses();
-      ss2 = VectorUtil.union(ss2,right.getVariableUses());
+    if ("->iterate".equals(operator) || "let".equals(operator))
+    { Vector ss1 = left.getVariableUses();
+      Vector ss2 = right.getVariableUses();
       Vector removals = new Vector(); 
 
       if (accumulator != null) 
       { Expression expr = accumulator.getInitialExpression(); 
         if (expr != null) 
-        { ss2.addAll(expr.getVariableUses()); } 
+        { ss1.addAll(expr.getVariableUses()); } 
         String acc = accumulator.getName(); 
 
         for (int i = 0; i < ss2.size(); i++) 
@@ -2855,14 +2857,8 @@ class BinaryExpression extends Expression
         } 
       } 
 
-      for (int i = 0; i < ss2.size(); i++) 
-      { Expression e1 = (Expression) ss2.get(i); 
-        if ((e1 + "").equals(iteratorVariable))
-        { removals.add(e1); } 
-      } 
-
       ss2.removeAll(removals);          
-      return ss2; 
+      return VectorUtil.union(ss1,ss2); 
     } 
 
     Vector res = left.getVariableUses();
@@ -3542,6 +3538,1170 @@ public void findClones(java.util.Map clones,
     }
   }
 
+  public boolean typeInference(final Vector types, 
+                               final Vector entities,
+                   final Vector contexts, final Vector env, 
+                   java.util.Map vartypes)
+  { left.typeInference(types,entities,contexts,env,vartypes); 
+    right.typeInference(types,entities,contexts,env,vartypes);
+
+    Type tleft = left.getType(); 
+    Type tright = right.getType(); 
+
+    if (operator.equals("let") && accumulator != null)
+    { // let v : T = left in right 
+
+      Vector context = new Vector(); 
+      context.addAll(contexts); 
+
+      String vname = accumulator.getName(); 
+      Type vtype = accumulator.getType(); 
+      // Expression vinit = accumulator.getInitialisation(); 
+
+      java.util.Map vartypes1 = new java.util.HashMap(); 
+      vartypes1.putAll(vartypes); 
+
+      Vector env1 = new Vector(); 
+      env1.addAll(env); 
+      env1.add(accumulator); 
+
+      if (Type.isVacuousType(vtype) && 
+          !Type.isVacuousType(left.getType()))
+      { accumulator.setType(left.getType()); 
+        vtype = accumulator.getType(); 
+      }  
+
+      boolean rtc = right.typeInference(types,entities,
+                                context,env1,vartypes1);
+
+      Type vetype = (Type) vartypes1.get(vname); 
+
+      if (Type.isVacuousType(vtype) && 
+          !Type.isVacuousType(vetype))
+      { accumulator.setType(vetype); } 
+
+      type = right.type; 
+      elementType = right.elementType;  
+      System.out.println(">>> Typechecked let expression: let " + vname + " : " + accumulator.getType() + " = " + left + " in (" + type + ")"); 
+      return true; 
+    }
+
+    if (operator.equals("->exists") || 
+        operator.equals("->exists1") ||
+        "->existsLC".equals(operator) || 
+        operator.equals("->isUnique") || 
+        operator.equals("->forAll"))
+    { // left must be a collection, right must be boolean
+
+      type = new Type("boolean", null); 
+      elementType = new Type("boolean", null); 
+      multiplicity = ModelElement.ONE; 
+
+      if (left.isCollection()) { } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+        left.setType(new Type("Sequence", null)); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+
+      if (right.isBoolean()) { } 
+      else 
+      { System.err.println("!! Right argument of " + operator + 
+                           " must be boolean"); 
+        right.setType(new Type("boolean", null)); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      } 
+    } 
+    else if (operator.equals("#") || operator.equals("#1") || 
+        operator.equals("#LC") || operator.equals("!"))
+    { BinaryExpression lexp = (BinaryExpression) left; 
+      Expression scope = lexp.right; 
+
+      type = new Type("boolean", null); 
+      elementType = new Type("boolean", null); 
+      multiplicity = ModelElement.ONE; 
+
+      if (scope.isCollection()) { } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+        scope.setType(new Type("Sequence", null)); 
+
+        if (scope instanceof BasicExpression)
+        { String vname = ((BasicExpression) scope).basicString(); 
+          vartypes.put(vname, scope.getType()); 
+        } 
+      } 
+
+      if (right.isBoolean()) { } 
+      else 
+      { System.err.println("!! Right argument of " + operator + 
+                           " must be boolean"); 
+        right.setType(new Type("boolean", null)); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      } 
+    } 
+    else if (operator.equals("->select") || 
+             operator.equals("->reject"))
+    { if (left.isCollection()) { } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+        left.setType(new Type("Sequence", null)); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+
+      if (right.isBoolean()) { } 
+      else 
+      { System.err.println("!! Right argument of " + operator + 
+                           " must be boolean"); 
+        right.setType(new Type("boolean", null)); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      } 
+
+      type = left.type; 
+      elementType = left.elementType; 
+      multiplicity = ModelElement.MANY; 
+    } 
+    else if (operator.equals("|") || operator.equals("|R"))
+    { BinaryExpression lexp = (BinaryExpression) left; 
+      Expression scope = lexp.right;
+      Expression vbl = lexp.left; 
+
+      Type vblType = (Type) vartypes.get(vbl + ""); 
+
+      if (scope.isCollection()) 
+      { if (Type.isVacuousType(scope.elementType))
+        { System.err.println("!! No element type for " + scope); 
+          Type tt = (Type) vartypes.get(scope + ""); 
+          if (tt != null && 
+              !Type.isVacuousType(tt.elementType)) 
+          { scope.setElementType(tt.elementType);
+            vbl.setType(tt.elementType);
+          } 
+          else if (vblType != null) 
+          { scope.setElementType(vblType);
+            vbl.setType(vblType);
+          } 
+
+          System.out.println(">> Set element type to " + scope.getElementType()); 
+        } 
+      } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+      
+        Type tt = (Type) vartypes.get(scope + "");
+        if (tt != null) 
+        { scope.setType(tt); } 
+        else 
+        { scope.setType(new Type("Sequence", null)); } 
+ 
+        if (tt != null && 
+            !Type.isVacuousType(tt.elementType)) 
+        { scope.setElementType(tt.elementType);
+          vbl.setType(tt.elementType);
+        } 
+        else if (vblType != null) 
+        { scope.setElementType(vblType);
+          vbl.setType(vblType);
+        } 
+
+        if (scope instanceof BasicExpression)
+        { String vname = ((BasicExpression) scope).basicString(); 
+          vartypes.put(vname, scope.getType()); 
+        } 
+      } 
+
+      if (right.isBoolean()) { } 
+      else 
+      { System.err.println("!! Right argument of " + operator + 
+                           " must be boolean"); 
+        right.setType(new Type("boolean", null)); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      } 
+
+      type = scope.type; 
+      elementType = scope.elementType; 
+      multiplicity = ModelElement.MANY; 
+    } 
+    else if (operator.equals("->selectMinimals") || 
+             operator.equals("->selectMaximals"))
+    { if (left.isCollection()) { } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+        left.setType(new Type("Sequence", null)); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+
+      // right argument should be comparables. 
+
+      type = left.type; 
+      elementType = left.elementType; 
+      multiplicity = ModelElement.MANY; 
+    } 
+    else if ("|selectMinimals".equals(operator) || 
+             "|selectMaximals".equals(operator))
+    { BinaryExpression lexp = (BinaryExpression) left; 
+      Expression scope = lexp.right;
+
+      if (scope.isCollection()) { } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+        scope.setType(new Type("Sequence", null)); 
+
+        if (scope instanceof BasicExpression)
+        { String vname = ((BasicExpression) scope).basicString(); 
+          vartypes.put(vname, scope.getType()); 
+        } 
+      } 
+
+      type = scope.type; 
+      elementType = scope.elementType; 
+      multiplicity = ModelElement.MANY; 
+    } 
+    else if (operator.equals("->sortedBy"))
+    { if (left.isCollection()) { } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+        left.setType(new Type("Sequence", null)); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+
+      // right argument should be comparables. 
+
+      type = new Type("Sequence", null); 
+      type.setElementType(left.elementType); 
+      elementType = left.elementType; 
+      multiplicity = ModelElement.MANY; 
+    }   
+    else if ("|sortedBy".equals(operator))
+    { BinaryExpression lexp = (BinaryExpression) left; 
+      Expression scope = lexp.right;
+
+      if (scope.isCollection()) { } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+        scope.setType(new Type("Sequence", null)); 
+
+        if (scope instanceof BasicExpression)
+        { String vname = ((BasicExpression) scope).basicString(); 
+          vartypes.put(vname, scope.getType()); 
+        } 
+      } 
+
+      // right argument should be comparables. 
+
+      type = new Type("Sequence", null); 
+      type.setElementType(scope.elementType); 
+      elementType = scope.elementType; 
+      multiplicity = ModelElement.MANY; 
+    }    
+    else if (operator.equals("->collect") || 
+             operator.equals("->unionAll") ||
+             operator.equals("->intersectAll") || 
+             operator.equals("->concatenateAll") || 
+             operator.equals("->any"))   
+    { if (left.isCollection()) { } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+        left.setType(new Type("Sequence", null)); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+
+      if (operator.equals("->any"))
+      { if (right.isBoolean()) { } 
+        else 
+        { System.err.println("!! Right argument of " + operator + 
+                           " must be boolean"); 
+          right.setType(new Type("boolean", null)); 
+
+          if (right instanceof BasicExpression)
+          { String vname = ((BasicExpression) right).basicString(); 
+            vartypes.put(vname, right.getType()); 
+          } 
+        }
+
+        type = left.elementType; 
+      }  
+    } 
+    else if (operator.equals("|C") || 
+        "|unionAll".equals(operator) || 
+        "|intersectAll".equals(operator) ||
+        "|concatenateAll".equals(operator))
+    { BinaryExpression lexp = (BinaryExpression) left; 
+      Expression scope = lexp.right;
+      Expression vbl = lexp.left; 
+
+      Type vblType = (Type) vartypes.get(vbl + ""); 
+
+      if (scope.isCollection()) 
+      { if (Type.isVacuousType(scope.elementType))
+        { System.err.println("!! No element type for " + scope); 
+          Type tt = (Type) vartypes.get(scope + ""); 
+          if (tt != null && 
+              !Type.isVacuousType(tt.elementType)) 
+          { scope.setElementType(tt.elementType);
+            vbl.setType(tt.elementType);
+          } 
+          else if (vblType != null) 
+          { scope.setElementType(vblType);
+            vbl.setType(vblType);
+          } 
+
+          System.out.println(">> Set element type to " + scope.getElementType()); 
+        }
+      } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+        scope.setType(new Type("Sequence", null)); 
+
+        if (scope instanceof BasicExpression)
+        { String vname = ((BasicExpression) scope).basicString(); 
+          vartypes.put(vname, scope.getType()); 
+        } 
+      } 
+    } 
+    else if ("->closure".equals(operator))
+    { if (left.isCollection()) { } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a collection"); 
+        left.setType(new Type("Set", null)); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+    }
+    else if (":".equals(operator) || "/:".equals(operator))
+    { // right must be a collection 
+      if (right.isCollection()) { } 
+      else 
+      { System.err.println("!! Right argument of " + operator + 
+                           " must be a collection"); 
+        right.setType(new Type("Set", null)); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      } 
+
+      type = new Type("boolean", null); 
+    }
+    else if ("=".equals(operator) || "/=".equals(operator))
+    { type = new Type("boolean", null); 
+      if (Type.hasVacuousType(left) && 
+          !Type.hasVacuousType(right))
+      { left.setType(right.getType()); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      } // and vice-versa
+    } 
+    else if ("->compareTo".equals(operator))
+    { type = new Type("int", null); 
+      if (Type.hasVacuousType(left) && 
+          !Type.hasVacuousType(right))
+      { left.setType(right.getType()); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      } 
+    } 
+    else if ("->count".equals(operator) || 
+             "->indexOf".equals(operator) || 
+             operator.equals("->lastIndexOf"))
+    { type = new Type("int",null);
+
+      // left must be string or sequence: 
+      if (left.isSequence() || left.isString()) { } 
+      else 
+      { System.err.println("!! Left argument of " + operator + 
+                           " must be a string or sequence"); 
+      } 
+    } 
+    else if ("->oclAsType".equals(operator))
+    { type = Type.getTypeFor(right + "", types, entities); 
+      if (type == null) 
+      { System.err.println("!! ERROR: unrecognised type in cast expression: " + this);
+        // JOptionPane.showMessageDialog(null, "Unrecognised type in cast " + this, 
+        // "Type error", JOptionPane.ERROR_MESSAGE);
+        type = left.getType(); 
+      }
+      else if (type.getElementType() != null) 
+      { elementType = type.getElementType(); } 
+      else 
+      { elementType = left.getElementType(); }
+
+      System.out.println(">>> Type of " + this + " is " + type);  
+    }  
+    else if ("->at".equals(operator))
+    { if (left.isSequence() || left.isMap() || left.isString()) 
+      { }
+      else 
+      { System.err.println("!! Left hand side of ->at must be a sequence, string or map!"); 
+      } 
+
+      if (left.isString() && right.isInt()) { } 
+      else if (left.isSequence() && right.isInt()) { } 
+      else if (left.isString() || left.isSequence())
+      { System.err.println("!! Index of " + this + " must be an integer"); 
+        right.setType(new Type("int", null)); 
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      } 
+      
+      type = left.elementType; 
+    }  // and right for map must be of keytype of left.
+    else if ("->apply".equals(operator)) 
+    { // lhs must be a function
+      if (left.hasFunctionType()) 
+      { Type ftype = left.getType(); 
+        type = type.getElementType();
+        if (Type.isVacuousType(type))
+        { Type vtype = (Type) vartypes.get(left + ""); 
+          if (vtype != null && 
+              !Type.isVacuousType(vtype.getElementType()))
+          { type = vtype.getElementType(); } 
+        }  
+      } 
+      else 
+      { System.err.println("!! LHS of " + this + " must be a function"); 
+        Type ftype = new Type("Function", null); 
+        ftype.setKeyType(right.getType()); 
+        ftype.setElementType(new Type("OclAny", null)); 
+        left.setType(ftype); 
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+    }  
+    else if ("->pow".equals(operator))
+    { type = new Type("double",null); 
+      elementType = type;
+
+      if (left.isNumeric()) { } 
+      else 
+      { System.err.println("!! LHS of " + this + " must be a number"); 
+        Type ftype = new Type("double", null); 
+        ftype.setElementType(new Type("double", null)); 
+        left.setType(ftype); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+
+      if (right.isNumeric()) { } 
+      else 
+      { System.err.println("!! RHS of " + this + " must be a number"); 
+        Type ftype = new Type("double", null); 
+        ftype.setElementType(new Type("double", null)); 
+        right.setType(ftype); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+    } 
+    else if ("->roundTo".equals(operator) || 
+             "->truncateTo".equals(operator))
+    { type = new Type("double",null); 
+      elementType = type; 
+
+      if (left.isNumeric()) { } 
+      else 
+      { System.err.println("!! LHS of " + this + " must be a number"); 
+        Type ftype = new Type("double", null); 
+        ftype.setElementType(new Type("double", null)); 
+        left.setType(ftype); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+
+      if (right.isInt()) { } 
+      else 
+      { System.err.println("!! RHS of " + this + " must be an int"); 
+        Type ftype = new Type("int", null); 
+        ftype.setElementType(new Type("int", null)); 
+        right.setType(ftype); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+    } 
+    else if ("->gcd".equals(operator) || 
+             operator.equals("div") ||
+             operator.equals("mod"))
+    { type = left.getType(); 
+      if (type == null) 
+      { type = new Type("long", null); } 
+
+      if (left.isInteger()) { } 
+      else 
+      { System.err.println("!! LHS of " + this + " must be an integer"); 
+        Type ftype = new Type("long", null); 
+        ftype.setElementType(new Type("long", null)); 
+        left.setType(ftype); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+
+      if (right.isInteger()) { } 
+      else 
+      { System.err.println("!! RHS of " + this + " must be an integer"); 
+        Type ftype = new Type("long", null); 
+        ftype.setElementType(new Type("long", null)); 
+        right.setType(ftype); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+    } 
+    if (operator.equals("->oclIsKindOf".equals(operator) || 
+             "->oclIsTypeOf".equals(operator)))
+    { type = new Type("boolean",null); 
+      type = Type.getTypeFor(right + "", types, entities); 
+      if (type == null) 
+      { System.err.println("!! ERROR: unrecognised type in cast expression: " + this);
+        type = left.getType();
+        right.setType(new Type("OclType", null));  
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      }
+    } // right must be a type
+    else if ("->hasPrefix".equals(operator) || 
+             "->hasSuffix".equals(operator) ||
+             "->hasMatch".equals(operator) || 
+             "->isMatch".equals(operator) ||
+             operator.equals("->equalsIgnoreCase"))
+    { type = new Type("boolean",null);
+
+      if (left.isString()) { } 
+      else 
+      { System.err.println("!! LHS of " + this + " must be a string"); 
+        Type ftype = new Type("String", null); 
+        ftype.setElementType(new Type("String", null)); 
+        left.setType(ftype); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+
+      if (right.isString()) { } 
+      else 
+      { System.err.println("!! RHS of " + this + " must be a string"); 
+        Type ftype = new Type("String", null); 
+        ftype.setElementType(new Type("String", null)); 
+        right.setType(ftype); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+    } 
+    else if (operator.equals("->before") || 
+             operator.equals("->after") || 
+             operator.equals("->firstMatch")) 
+    { type = new Type("String",null); 
+      elementType = new Type("String", null); 
+
+      if (left.isString()) { } 
+      else 
+      { System.err.println("!! LHS of " + this + " must be a string"); 
+        Type ftype = new Type("String", null); 
+        ftype.setElementType(new Type("String", null)); 
+        left.setType(ftype); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+
+      if (right.isString()) { } 
+      else 
+      { System.err.println("!! RHS of " + this + " must be a string"); 
+        Type ftype = new Type("String", null); 
+        ftype.setElementType(new Type("String", null)); 
+        right.setType(ftype); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+    }  
+    else if (operator.equals("->excludingAt") && left.isString()) 
+    { type = new Type("String",null);
+      elementType = new Type("String", null); 
+
+      if (right.isString()) { } 
+      else 
+      { System.err.println("!! RHS of " + this + " must be a string"); 
+        Type ftype = new Type("String", null); 
+        ftype.setElementType(new Type("String", null)); 
+        right.setType(ftype); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+    }  
+    else if (operator.equals("->excludingAt") && 
+             left.isCollection()) 
+    { type = left.type;
+      elementType = left.elementType; 
+    }  
+    else if ("->split".equals(operator) || 
+             "->allMatches".equals(operator))
+    { type = new Type("Sequence",null); 
+      elementType = new Type("String",null);
+      type.elementType = elementType;  
+
+      if (left.isString()) { } 
+      else 
+      { System.err.println("!! LHS of " + this + " must be a string"); 
+        Type ftype = new Type("String", null); 
+        ftype.setElementType(new Type("String", null)); 
+        left.setType(ftype); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+
+      if (right.isString()) { } 
+      else 
+      { System.err.println("!! RHS of " + this + " must be a string"); 
+        Type ftype = new Type("String", null); 
+        ftype.setElementType(new Type("String", null)); 
+        right.setType(ftype); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+    } 
+    else if ("->restrict".equals(operator) || 
+             "->antirestrict".equals(operator))
+    { if (tleft != null) 
+      { type = tleft; 
+        elementType = left.elementType; 
+      } 
+      else 
+      { type = new Type("Map", null); } 
+
+      if (left.isMap()) { } 
+      else 
+      { System.err.println("!! LHS of " + this + " must be a map"); 
+        Type ftype = new Type("Map", null); 
+        ftype.setElementType(new Type("OclAny", null)); 
+        ftype.setKeyType(right.elementType); 
+        left.setType(ftype); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+
+      if (right.isCollection()) { } 
+      else 
+      { System.err.println("!! RHS of " + this + " must be a collection"); 
+        Type ftype = new Type("Set", null); 
+        right.setType(ftype); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, ftype); 
+        } 
+      } 
+    } 
+    else if (operator.equals("->resizeTo"))
+    { type = new Type("Ref", null); 
+      elementType = left.elementType; 
+      type.setElementType(left.elementType); 
+      left.setArray(true); 
+      isArray = true; 
+    }         
+    else if (operator.equals("->sequenceRange"))
+    { type = new Type("Sequence", null); 
+      elementType = left.elementType; 
+      type.setElementType(left.elementType); 
+    }      
+    else if (operator.equals("<>=") ||
+             comparitors.contains(operator))
+    { type = new Type("boolean", null); 
+      elementType = new Type("boolean", null);
+
+      if (Type.hasVacuousType(left) && 
+          !Type.hasVacuousType(right))
+      { left.setType(right.getType()); 
+
+        if (left instanceof BasicExpression)
+        { String vname = ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      }
+      else if (Type.hasVacuousType(right) && 
+               !Type.hasVacuousType(left))
+      { right.setType(left.getType()); 
+
+        if (right instanceof BasicExpression)
+        { String vname = ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      }
+    }
+    else if (operator.equals("+"))
+    { // either one or both is a string, 
+      // or both are numeric
+
+      if (left.isString() || right.isString())
+      { type = new Type("String", null); 
+        elementType = new Type("String", null);
+      } 
+      else if (left.isNumeric() && right.isNumeric())
+      { } 
+      else 
+      { if (!right.isNumeric())
+        { System.err.println("!! RHS of " + this + 
+                           " must be numeric"); 
+          right.setType(new Type("double", null)); 
+          type = new Type("double", null); 
+          elementType = new Type("double", null);
+
+          if (right instanceof BasicExpression)
+          { String vname = 
+              ((BasicExpression) right).basicString(); 
+            vartypes.put(vname, right.getType()); 
+          } 
+        } 
+      
+        if (!left.isNumeric())
+        { System.err.println("!! LHS of " + this + 
+                           " must be numeric"); 
+          left.setType(new Type("double", null)); 
+          type = new Type("double", null); 
+          elementType = new Type("double", null);
+
+          if (left instanceof BasicExpression)
+          { String vname = 
+              ((BasicExpression) left).basicString(); 
+            vartypes.put(vname, left.getType()); 
+          } 
+        } 
+      }
+    }
+    else if (operator.equals("*") || operator.equals("/"))
+    { // both are numeric
+
+      if (left.isNumeric() && right.isNumeric())
+      { } 
+      else 
+      { if (!right.isNumeric())
+        { System.err.println("!! RHS of " + this + 
+                           " must be numeric"); 
+          right.setType(new Type("double", null)); 
+          type = new Type("double", null); 
+          elementType = new Type("double", null);
+
+          if (right instanceof BasicExpression)
+          { String vname = 
+              ((BasicExpression) right).basicString(); 
+            vartypes.put(vname, right.getType()); 
+          } 
+        } 
+      
+        if (!left.isNumeric())
+        { System.err.println("!! LHS of " + this + 
+                           " must be numeric"); 
+          left.setType(new Type("double", null)); 
+          type = new Type("double", null); 
+          elementType = new Type("double", null);
+
+          if (left instanceof BasicExpression)
+          { String vname = 
+              ((BasicExpression) left).basicString(); 
+            vartypes.put(vname, left.getType()); 
+          } 
+        } 
+      }
+    }
+    else if (operator.equals("-"))
+    { // Either both are maps, both are collections or
+      // both are numeric
+
+      if (left.isNumeric() && !right.isNumeric())
+      { System.err.println("!! RHS of " + this + 
+                           " must be numeric"); 
+        right.setType(new Type("double", null)); 
+        type = new Type("double", null); 
+        elementType = new Type("double", null);
+
+        if (right instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      }
+      else if (!left.isNumeric() && right.isNumeric())
+      { System.err.println("!! LHS of " + this + 
+                           " must be numeric"); 
+        left.setType(new Type("double", null)); 
+        type = new Type("double", null); 
+        elementType = new Type("double", null);
+
+        if (left instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      }
+      else if (left.isMap() && !right.isMap())
+      { System.err.println("!! RHS of " + this + 
+                           " must be map"); 
+        right.setType(new Type("Map", null)); 
+        type = new Type("Map", null); 
+        elementType = left.elementType;
+        type.setKeyType(left.getType().getKeyType()); 
+
+        if (right instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      }
+      else if (!left.isMap() && right.isMap())
+      { System.err.println("!! LHS of " + this + 
+                           " must be map"); 
+        left.setType(new Type("Map", null)); 
+        type = new Type("Map", null); 
+        elementType = right.elementType;
+        type.setKeyType(right.getType().getKeyType()); 
+
+        if (left instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      }
+      else if (left.isCollection() && !right.isCollection())
+      { System.err.println("!! RHS of " + this + 
+                           " must be collection"); 
+        right.setType(left.getType()); 
+        type = left.getType(); 
+        elementType = left.getElementType();
+        
+        if (right instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      }
+      else if (!left.isCollection() && right.isCollection())
+      { System.err.println("!! LHS of " + this + 
+                           " must be collection"); 
+        left.setType(right.getType()); 
+        type = right.getType(); 
+        elementType = right.getElementType();
+
+        if (left instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      }
+    }
+    else if (operator.equals("\\/") || 
+             operator.equals("->union") || 
+             operator.equals("->symmetricDifference") || 
+             operator.equals("->intersection") || 
+             operator.equals("/\\") || 
+             operator.equals("<:") || 
+             operator.equals("->includesAll") ||
+             operator.equals("/<:") || 
+             operator.equals("->excludesAll"))
+    { // both are maps or both are collections
+      if (left.isMap() && !right.isMap())
+      { System.err.println("!! RHS of " + this + 
+                           " must be map"); 
+        right.setType(new Type("Map", null)); 
+        type = new Type("Map", null); 
+        elementType = left.elementType;
+        type.setKeyType(left.getType().getKeyType()); 
+
+        if (right instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      }
+      else if (!left.isMap() && right.isMap())
+      { System.err.println("!! LHS of " + this + 
+                           " must be map"); 
+        left.setType(new Type("Map", null)); 
+        type = new Type("Map", null); 
+        elementType = right.elementType;
+        type.setKeyType(right.getType().getKeyType()); 
+
+        if (left instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      }
+      else if (left.isCollection() && !right.isCollection())
+      { System.err.println("!! RHS of " + this + 
+                           " must be collection"); 
+        right.setType(left.getType()); 
+        type = left.getType(); 
+        elementType = left.getElementType();
+        
+        if (right instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      }
+      else if (!left.isCollection() && right.isCollection())
+      { System.err.println("!! LHS of " + this + 
+                           " must be collection"); 
+        left.setType(right.getType()); 
+        type = right.getType(); 
+        elementType = right.getElementType();
+
+        if (left instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+    }
+    else if (operator.equals("^")  || 
+             "->concatenate".equals(operator))
+    { // both are sequences 
+      if (left.isSequence() && !right.isSequence())
+      { System.err.println("!! RHS of " + this + 
+                           " must be sequence"); 
+        right.setType(left.getType()); 
+        type = left.getType(); 
+        elementType = left.getElementType();
+        
+        if (right instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      }
+      else if (!left.isSequence() && right.isSequence())
+      { System.err.println("!! LHS of " + this + 
+                           " must be sequence"); 
+        left.setType(right.getType()); 
+        type = right.getType(); 
+        elementType = right.getElementType();
+
+        if (left instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+    } 
+    else if (operator.equals("->including") ||
+             operator.equals("->excluding") ||
+             operator.equals("->excludingFirst"))
+    { // LHS must be a collection 
+
+      if (!left.isCollection())
+      { System.err.println("!! LHS of " + this + 
+                           " must be a collection"); 
+        left.setType(new Type("Sequence", null)); 
+        elementType = right.getType();
+        left.setElementType(elementType); 
+
+        if (left instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+    }  
+    else if (operator.equals("->prepend") || 
+             operator.equals("->append"))
+    { // LHS must be a sequence 
+
+      if (!left.isSequence())
+      { System.err.println("!! LHS of " + this + 
+                           " must be sequence"); 
+        left.setType(new Type("Sequence", null)); 
+        elementType = right.getType();
+        left.setElementType(elementType); 
+
+        if (left instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+    }  
+    else if (operator.equals("|->"))
+    { type = new Type("OclAny", null); 
+      elementType = tright; 
+      type.setElementType(tright); 
+    } // Really a Tuple type. 
+    else if (operator.equals("<+"))
+    { type = tleft; } // Map override. 
+    else if (operator.equals(":") ||
+             operator.equals("/:"))
+    { 
+      type = new Type("boolean",null);
+
+      if (!right.isCollection())
+      { System.err.println("!! RHS of " + this + 
+                           " must be a collection"); 
+        right.setType(new Type("Sequence", null)); 
+        elementType = left.getType();
+        right.setElementType(elementType); 
+
+        if (right instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) right).basicString(); 
+          vartypes.put(vname, right.getType()); 
+        } 
+      } 
+    }
+    else if (operator.equals("->includes") || 
+             operator.equals("->excludes"))
+    { type = new Type("boolean",null); 
+      if (!left.isCollection())
+      { System.err.println("!! LHS of " + this + 
+                           " must be a collection"); 
+        left.setType(new Type("Sequence", null)); 
+        left.setElementType(right.getType()); 
+
+        if (left instanceof BasicExpression)
+        { String vname = 
+            ((BasicExpression) left).basicString(); 
+          vartypes.put(vname, left.getType()); 
+        } 
+      } 
+    }
+    else if (operator.equals("&") || operator.equals("<=>") || 
+             operator.equals("xor") ||  
+             operator.equals("or") || operator.equals("=>"))
+    { // both must be boolean
+      
+      if (left.isBoolean() && right.isBoolean()) { } 
+      else 
+      { if (!right.isBoolean())
+        { System.err.println("!! RHS of " + this + 
+                           " must be boolean"); 
+          right.setType(new Type("boolean", null)); 
+          type = new Type("boolean", null); 
+          elementType = new Type("boolean", null);
+
+          if (right instanceof BasicExpression)
+          { String vname = 
+              ((BasicExpression) right).basicString(); 
+            vartypes.put(vname, right.getType()); 
+          } 
+        } 
+      
+        if (!left.isBoolean())
+        { System.err.println("!! LHS of " + this + 
+                           " must be boolean"); 
+          left.setType(new Type("boolean", null)); 
+          type = new Type("boolean", null); 
+          elementType = new Type("boolean", null);
+
+          if (left instanceof BasicExpression)
+          { String vname = 
+              ((BasicExpression) left).basicString(); 
+            vartypes.put(vname, left.getType()); 
+          } 
+        } 
+      }
+    } 
+ 
+    return true; 
+    // return typeCheck(types,entities,contexts,env); 
+  } 
+
   public boolean typeCheck(final Vector types,
                            final Vector entities,
                            final Vector contexts, 
@@ -3705,7 +4865,8 @@ public void findClones(java.util.Map clones,
              "|selectMinimals".equals(operator) || 
              "|selectMaximals".equals(operator))
     { BinaryExpression lexp = (BinaryExpression) left; 
-      boolean lrt = lexp.right.typeCheck(types,entities,contexts,env); 
+      boolean lrt = 
+        lexp.right.typeCheck(types,entities,contexts,env); 
 
       // lexp.right must be multiple 
 
@@ -3722,10 +4883,17 @@ public void findClones(java.util.Map clones,
       System.out.println(">> *** Type of " + lexp.right + " = " + lexp.right.type + "(" + et + ")"); 
 
       if (et == null)
-      { System.err.println("!! Warning: no element type for " + lexp.right + " in " + this); 
+      { System.err.println("!! Warning: no element type for " + lexp.right + " in " + this + " in environment " + env); 
         // JOptionPane.showMessageDialog(null, "no element type for " + lexp.right + " in " + this, 
-        //      "Type error", JOptionPane.ERROR_MESSAGE); 
-        et = new Type("OclAny", null); 
+        //      "Type error", JOptionPane.ERROR_MESSAGE);
+        Attribute attr = 
+          (Attribute) ModelElement.lookupByName(lexp.right + "", env); 
+
+        if (attr != null && 
+            !Type.isVacuousType(attr.getElementType()))
+        { et = attr.getElementType(); }   
+        else 
+        { et = new Type("OclAny", null); }  
       } 
 
       //  && et.isEntity())
@@ -3866,7 +5034,7 @@ public void findClones(java.util.Map clones,
       else if (ctleft != null && ctleft.isEntity())
       { ccontext.add(ctleft.getEntity()); }   
       else if (celtype == null) 
-      { System.err.println("! Warning: no element type in " + left + " in " + this); 
+      { System.err.println("!! Warning: no element type in " + left + " in " + this); 
         // JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
         //  "Type error", JOptionPane.ERROR_MESSAGE);
         celtype = new Type("OclAny", null); 
@@ -4360,15 +5528,24 @@ public void findClones(java.util.Map clones,
  
         // JOptionPane.showMessageDialog(null, "Disallowed types in " + this, 
         //                              "Type error", JOptionPane.WARNING_MESSAGE);
-        type = tleft; // new Type("double",null);
+
+        if (tleft != null && tleft.isNumeric())
+        { 
+          type = tleft; // new Type("double",null);
+        }
+        else if (tright != null && tright.isNumeric())
+        { type = tright; } 
+        else 
+        { type = new Type("OclAny", null); } 
       } 
     }
     else
-    { if (tright == null && tleft != null)
+    { if (tright == null && !Type.isVacuousType(tleft))
       { right.setType(tleft);
         type = tleft;
       }
-      else if (tleft == null && tright != null)
+      else if (tleft == null && 
+               !Type.isVacuousType(tright))
       { left.setType(tright);
         type = tright;
       }

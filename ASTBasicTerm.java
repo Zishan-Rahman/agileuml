@@ -178,14 +178,13 @@ public class ASTBasicTerm extends ASTTerm
   } 
 
   public String literalForm()
-  { String res = value; 
-    return res; 
-  } 
+  { return value; } 
 
   public String literalFormSpaces()
-  { String res = value; 
-    return res; 
-  } 
+  { return value; } 
+
+  public String evaluationLiteralForm()
+  { return value; } 
 
   public Vector tokenSequence()
   { Vector res = new Vector(); 
@@ -1288,6 +1287,13 @@ public class ASTBasicTerm extends ASTTerm
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence"; 
     } 
+
+    if ("Multiset".equals(value) || 
+        "MultiSet".equals(value))
+    { modelElement = new Type("Sequence", null); 
+      expression = new BasicExpression((Type) modelElement); 
+      return "Sequence"; 
+    } 
      
     if ("BitSet".equals(value))
     { modelElement = new Type("Sequence", null);
@@ -1296,11 +1302,25 @@ public class ASTBasicTerm extends ASTTerm
       return "Sequence(boolean)";
     } 
 
-    if ("ByteBuffer".equals(value))
+    if ("ByteBuffer".equals(value) || 
+        "IntBuffer".equals(value) ||
+        "ShortBuffer".equals(value) || 
+        "CharBuffer".equals(value) || 
+        "LongBuffer".equals(value) 
+       )
     { modelElement = new Type("Sequence", null);
       ((Type) modelElement).setElementType(new Type("int", null));  
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence(int)";
+    } 
+
+    if ("FloatBuffer".equals(value) || 
+        "DoubleBuffer".equals(value)
+       )
+    { modelElement = new Type("Sequence", null);
+      ((Type) modelElement).setElementType(new Type("double", null));  
+      expression = new BasicExpression((Type) modelElement); 
+      return "Sequence(double)";
     } 
 
     if ("Set".equals(value) || "HashSet".equals(value) ||
@@ -1324,6 +1344,7 @@ public class ASTBasicTerm extends ASTTerm
     }
  
     if ("HashMap".equals(value) || 
+        "LinkedHashMap".equals(value) || 
         "EnumMap".equals(value))
     { modelElement = new Type("Map", null); 
       expression = new BasicExpression((Type) modelElement); 
@@ -1489,29 +1510,37 @@ public class ASTBasicTerm extends ASTTerm
       return "OclFile"; 
     }
  
-    if ("Reader".equals(value))
+    if ("Reader".equals(value) || "FileReader".equals(value))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclFile"; } 
-    if ("FileReader".equals(value))
-    { modelElement = new Type("OclFile", null); 
-      expression = new BasicExpression((Type) modelElement); 
-      return "OclFile"; } 
+      return "OclFile"; 
+    } 
+
     if ("Writer".equals(value) ||
         "StringWriter".equals(value) || 
         "FileWriter".equals(value))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclFile"; } 
+      return "OclFile"; 
+    }
+ 
     if ("RandomAccessFile".equals(value))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclFile"; } 
-    if ("BufferedReader".equals(value))
+      return "OclFile"; 
+    }
+ 
+    if ("BufferedReader".equals(value) || 
+        "LittleEndianInput".equals(value) ||
+        "BigEndianInput".equals(value))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclFile"; } 
-    if ("BufferedWriter".equals(value))
+      return "OclFile"; 
+    }
+ 
+    if ("BufferedWriter".equals(value) ||
+        "LittleEndianOutput".equals(value) ||
+        "BigEndianOutput".equals(value))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "OclFile"; 
@@ -1675,7 +1704,10 @@ public class ASTBasicTerm extends ASTTerm
         "LinkageError".equals(value) || 
         "SecurityException".equals(value) ||  
         "NoClassDefFoundError".equals(value) ||
-        "BindException".equals(value))
+        "BindException".equals(value) ||
+        "ReadOnlyBufferException".equals(value) || 
+        "ReadOnlySystemException".equals(value)
+       )
     { modelElement = new Type("AccessingException", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "AccessingException"; 
@@ -2042,6 +2074,13 @@ public class ASTBasicTerm extends ASTTerm
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence"; 
     } 
+
+    if ("Multiset".equals(value) || 
+        "MultiSet".equals(value))
+    { modelElement = new Type("Sequence", null); 
+      expression = new BasicExpression((Type) modelElement); 
+      return "Sequence"; 
+    } 
      
     if ("BitSet".equals(value))
     { modelElement = new Type("Sequence", null);
@@ -2050,11 +2089,25 @@ public class ASTBasicTerm extends ASTTerm
       return "Sequence(boolean)"; 
     } 
 
-    if ("ByteBuffer".equals(value))
+    if ("ByteBuffer".equals(value) || 
+        "IntBuffer".equals(value) ||
+        "ShortBuffer".equals(value) || 
+        "CharBuffer".equals(value) || 
+        "LongBuffer".equals(value) 
+       )
     { modelElement = new Type("Sequence", null);
       ((Type) modelElement).setElementType(new Type("int", null));  
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence(int)";
+    } 
+
+    if ("FloatBuffer".equals(value) || 
+        "DoubleBuffer".equals(value)
+       )
+    { modelElement = new Type("Sequence", null);
+      ((Type) modelElement).setElementType(new Type("double", null));  
+      expression = new BasicExpression((Type) modelElement); 
+      return "Sequence(double)";
     } 
 
     if ("Set".equals(value) ||
@@ -2078,6 +2131,7 @@ public class ASTBasicTerm extends ASTTerm
     }
  
     if ("HashMap".equals(value) || 
+        "LinkedHashMap".equals(value) || 
         "EnumMap".equals(value))
     { modelElement = new Type("Map", null); 
       expression = new BasicExpression((Type) modelElement); 
@@ -2262,12 +2316,19 @@ public class ASTBasicTerm extends ASTTerm
     if ("RandomAccessFile".equals(value))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclFile"; } 
-    if ("BufferedReader".equals(value))
+      return "OclFile"; }
+ 
+    if ("BufferedReader".equals(value) || 
+        "LittleEndianInput".equals(value) ||
+        "BigEndianInput".equals(value))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclFile"; } 
-    if ("BufferedWriter".equals(value))
+      return "OclFile"; 
+    }
+ 
+    if ("BufferedWriter".equals(value) || 
+        "LittleEndianOutput".equals(value) ||
+        "BigEndianOutput".equals(value))
     { modelElement = new Type("OclFile", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "OclFile"; 
@@ -2414,7 +2475,9 @@ public class ASTBasicTerm extends ASTTerm
         "LinkageError".equals(value) || 
         "SecurityException".equals(value) ||  
         "NoClassDefFoundError".equals(value) ||
-        "BindException".equals(value))
+        "BindException".equals(value) ||
+        "ReadOnlyBufferException".equals(value) || 
+        "ReadOnlySystemException".equals(value))
     { modelElement = new Type("AccessingException", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "AccessingException"; 
@@ -2721,6 +2784,9 @@ public class ASTBasicTerm extends ASTTerm
     return "OclAny"; 
   }
 
+  public ASTTerm updatedObject()
+  { return this; } 
+
   public boolean updatesObject(ASTTerm t)
   { return false; } 
 
@@ -2869,6 +2935,10 @@ public class ASTBasicTerm extends ASTTerm
     if ("identifier".equals(tag))
     { ASTTerm t1 = getTerm(0); 
       String vv = t1.literalForm(); 
+
+      if ("e".equals(vv))
+      { return; } 
+
       Object val = ASTTerm.mathoclvars.get(vv); 
       if (val == null) 
       { JOptionPane.showMessageDialog(null, 

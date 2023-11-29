@@ -371,14 +371,89 @@ public class Attribute extends ModelElement
       if (entity != null) 
       { cntx.add(entity); } 
       Vector env = new Vector(); 
-      initialExpression.typeCheck(types,entities,cntx,env); 
+      initialExpression.typeCheck(types,entities,cntx,env);
+ 
       System.out.println(">> Type of attribute: " + name + " is " + type + "(" + elementType + ")");
-      if (type == null) 
+
+      if (Type.isVacuousType(type) && 
+          !Type.isVacuousType(initialExpression.type)) 
       { type = initialExpression.type; 
         elementType = initialExpression.elementType;
         type.elementType = elementType;   
       } 
-      System.out.println(">> Type of initialiser: " + initialExpression + " is " + type + "(" + elementType + ")");
+
+      System.out.println(">> Type of initialiser: " + initialExpression + " is " + initialExpression.type + "(" + initialExpression.elementType + ")");
+
+      return true; 
+    } 
+
+    if (type == null) 
+    { type = new Type("OclAny", null); 
+      return true; 
+    } 
+
+    String tname = type + ""; 
+    Type t = Type.getTypeFor(tname, types, entities); 
+    if (t == null) 
+    { System.err.println("!! Warning: null type for attribute " + name); 
+      // type = new Type("OclAny", null); 
+      return true; 
+    } 
+
+    type = t; 
+
+    Type et = elementType; 
+    if (elementType != null) 
+    { String etname = elementType + ""; 
+      et = Type.getTypeFor(etname, types, entities); 
+      if (et == null) 
+      { System.err.println("!! Warning: null element type for attribute " + name); 
+        et = elementType; 
+        type.elementType = elementType; 
+      } 
+      else 
+      { elementType = et; 
+        type.elementType = et; 
+      }  
+    } 
+
+    System.out.println(">> Updated type of attribute: " + name + " is " + type + "(" + elementType + ")");
+
+    if (initialExpression != null && 
+        initialExpression.type == null) 
+    { initialExpression.type = type; 
+      initialExpression.elementType = et; 
+    } 
+
+    return true; 
+  } 
+
+  public boolean typeInference(Vector types, Vector entities, 
+                               java.util.Map vtypes)
+  { if (initialExpression != null) 
+    { Vector cntx = new Vector(); 
+      if (entity != null) 
+      { cntx.add(entity); } 
+      Vector env = new Vector(); 
+      initialExpression.typeCheck(types,entities,cntx,env);
+ 
+      System.out.println(">> Type of attribute: " + name + " is " + type + "(" + elementType + ")");
+
+      if (Type.isVacuousType(type) && 
+          !Type.isVacuousType(initialExpression.type)) 
+      { type = initialExpression.type; 
+        elementType = initialExpression.elementType;
+        type.elementType = elementType;   
+      } 
+
+      System.out.println(">> Type of initialiser: " + initialExpression + " is " + initialExpression.type + "(" + initialExpression.elementType + ")");
+
+      if (initialExpression.type == null) 
+      { System.err.println("!! Invalid initial expression !!"); 
+        initialExpression = 
+           Type.defaultInitialValueExpression(type); 
+      } 
+
       return true; 
     } 
 
@@ -1282,6 +1357,18 @@ public class Attribute extends ModelElement
     } 
     return res; 
   } 
+
+  public static String parListJava7(Vector pars)
+  { String res = ""; 
+    for (int i = 0; i < pars.size(); i++) 
+    { Attribute par = (Attribute) pars.get(i); 
+      res = res + " " + par.getName() + 
+            " " + par.getParTypeJava7();
+      if (i < pars.size() - 1)
+      { res = res + ", "; } 
+    } 
+    return res; 
+  } 
  
   public String underscoreName()
   { if (navigation.size() <= 1) 
@@ -1481,6 +1568,18 @@ public class Attribute extends ModelElement
 
   public Type getType()
   { return type; }
+
+  public String getTypeJava7()
+  { if (type != null) 
+    { return type.getJava7(); } 
+    return "Object"; 
+  } 
+
+  public String getParTypeJava7()
+  { if (type != null) 
+    { return type.getParJava7(); } 
+    return "Object"; 
+  } 
 
   public int getKind()
   { return kind; } 
@@ -3174,6 +3273,7 @@ public class Attribute extends ModelElement
   }  // actuators -- include a message?  Should not be local?
 
 
+  /* add/remove operation for the owning entity */ 
   public String addremOperation(Entity ent)
   { String res = "";
     if (!isMultiple()) { return res; }

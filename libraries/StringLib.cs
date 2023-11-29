@@ -1,5 +1,8 @@
     class StringLib
     {
+       public static string newString(object s)
+       { return "" + s; }  
+
         public static string leftTrim(string s)
         {
             string result = "";
@@ -16,7 +19,20 @@
             return result;
         }
 
-        private static string nCopies(string s, int n)
+        public static string sumStringsWithSeparator(ArrayList lst, string sep)
+        {
+            string res = "";
+            for (int i = 0; i < lst.Count; i++)
+            {
+                string xx = (string) lst[i];
+                res = res + xx;
+                if (i < lst.Count - 1)
+                { res = res + sep; }
+            }
+            return res; 
+        } 
+
+        public static string nCopies(string s, int n)
         { String result = "";
           for (int _icollect = 0; _icollect < n; _icollect++)
           {
@@ -134,7 +150,8 @@
         }
 
         public static string format(string f, ArrayList sq)
-        {
+        { /* For C-style formats f */ 
+
             object[] args = new object[sq.Count];
             for (int i = 0; i < sq.Count; i++)
             { args[i] = sq[i]; }
@@ -142,6 +159,9 @@
             string formattedString = String.Format(fmt, args);
             return formattedString; 
         }
+
+        public static string formattedString(string f)
+        { return f; } 
 
         public static ArrayList scan(string s, string fmt)
         {
@@ -222,7 +242,7 @@
         }
 
         public static string interpolateStrings(string f, ArrayList sq)
-        {
+        { /* f must have {0} {1} etc with C# formats */
             object[] args = new object[sq.Count];
             for (int i = 0; i < sq.Count; i++)
             { args[i] = sq[i]; }
