@@ -1182,6 +1182,28 @@ public class Entity extends ModelElement implements Comparable
   { Attribute att = new Attribute(nme, t, ModelElement.INTERNAL); 
     addAttribute(att); 
   } 
+
+  // For COBOL: 
+  public void setAttributeType(Attribute att, Type t) 
+  { String nme = att.getName(); 
+    Attribute attx = 
+      (Attribute) ModelElement.lookupByName(nme,
+                                            attributes); 
+    if (attx == null) 
+    { attx = new Attribute(nme, t, ModelElement.INTERNAL); 
+      addAttribute(attx); 
+    } 
+    else 
+    { attx.setType(t); }
+
+    Expression expr = attx.getInitialExpression(); 
+    if (expr == null || ("" + expr).equals("\"\""))
+    { String defValue = t.defaultValue(); 
+      Expression defExpr = new BasicExpression(defValue); 
+      defExpr.setType(t); 
+      attx.setInitialExpression(defExpr); 
+    }  
+  } 
  
   public void addAttribute(Attribute att)
   { if (att == null || attributes.contains(att)) 
@@ -1350,6 +1372,18 @@ public class Entity extends ModelElement implements Comparable
       { Attribute p = new Attribute(qop); 
         res.add(p); 
       } 
+    } 
+    return res; 
+  } 
+
+  public Vector allZeroArgumentOperations()
+  { Vector res = new Vector(); 
+    
+    for (int i = 0; i < operations.size(); i++) 
+    { BehaviouralFeature qop = 
+        (BehaviouralFeature) operations.get(i); 
+      if (qop.isZeroArgument())
+      { res.add(qop); } 
     } 
     return res; 
   } 
@@ -4939,7 +4973,7 @@ public class Entity extends ModelElement implements Comparable
 
   public void extractOperations()
   { // Looks for clones within operations, replaces these 
-    // by calls to new operations. 
+    // by calls to new operations, or new local declarations. 
 
     java.util.Map clones = new java.util.HashMap(); 
     java.util.Map cdefs = new java.util.HashMap(); 
@@ -4947,43 +4981,84 @@ public class Entity extends ModelElement implements Comparable
     int ops = operations.size(); 
 
     for (int i = 0; i < ops; i++)
-    { BehaviouralFeature op = (BehaviouralFeature) operations.get(i);
+    { BehaviouralFeature op = 
+          (BehaviouralFeature) operations.get(i);
       
       op.findClones(clones,cdefs); 
     } 
 
+    // System.out.println(">> Potential clones " + clones); 
+    // System.out.println(">> Potential clone definitions " + cdefs); 
+
+
     Vector vkeys = new Vector(); 
-    vkeys.addAll(clones.keySet()); 
+    vkeys.addAll(clones.keySet());
+ 
     for (int i = 0; i < vkeys.size(); i++) 
     { String clne = (String) vkeys.get(i); 
       Vector copies = (Vector) clones.get(clne); 
       if (copies != null && copies.size() > 1)
       { Object obj = cdefs.get(clne); 
-        System.out.println(">>> Extracting operation for clone: " + clne + " " + obj);
+        System.out.println(">>> Extracting operation for clone: " + clne + " with copies " + copies);
  
         if (obj instanceof Expression)
-        { Expression expr = (Expression) obj; 
+        { Expression expr = (Expression) obj;
+
+          // If clones all in same op, then try to refactor
+          // using a new local variable of the op - at first
+          // location where read frame is not subsequently 
+          // written. 
+ 
           Type etype = expr.getType(); 
           Type elemtype = expr.getElementType(); 
-          System.out.println(">> Type: " + etype + " " + elemtype); 
+          System.out.println(">> Clone expression type: " + etype + " (" + elemtype + ")"); 
+
+          String opname = (String) copies.get(0); 
+          int colonIndex = opname.indexOf("::"); 
+          opname = 
+              opname.substring(colonIndex+2,opname.length()); 
+          BehaviouralFeature oper = 
+              getOperation(opname); 
+
+          if (VectorUtil.allElementsEqual(copies) && 
+              oper != null)
+          { System.out.println(">>> Copies in same operation " + opname); 
+            Statement bfactivity = oper.getActivity(); 
+            Statement newcode = 
+              Statement.tryInsertCloneDeclaration(
+                          bfactivity, expr, etype, elemtype);
+            if (newcode != null) 
+            { System.out.println(">>> New code for " + opname + " is " + newcode); 
+              oper.setActivity(newcode); 
+              continue; 
+            } 
+          } 
+
           Vector vars = expr.getVariableUses(); 
           Vector pars = new Vector();
-          Vector pnames = new Vector();  
+          Vector parexprs = new Vector();
+          Vector pnames = new Vector();
+  
           for (int j = 0; j < vars.size(); j++) 
           { Expression ve = (Expression) vars.get(j);
-            if (pnames.contains(ve + "")) { } 
+            if (pnames.contains(ve + "") || 
+                "self".equals(ve + "") ||
+                "super".equals(ve + "")) { } 
             else  
             { Attribute par = 
                 new Attribute(ve + "", ve.getType(), ModelElement.INTERNAL); 
               par.setElementType(ve.getElementType()); 
               pars.add(par);
+              BasicExpression parexpr = 
+                new BasicExpression(par); 
+              parexprs.add(parexpr); 
               pnames.add(ve + ""); 
             }  
           } 
           
-          System.out.println(">> Variables: " + vars);
+          // System.out.println(">> Variables: " + vars);
           Vector attrs = expr.allAttributesUsedIn();  
-          System.out.println(">> Attributes: " + attrs);
+          // System.out.println(">> Attributes: " + attrs);
 
           // new operation with type etype, postcondition
           // result = expr
@@ -4997,7 +5072,7 @@ public class Entity extends ModelElement implements Comparable
             new BinaryExpression("=", res, expr); 
 
           String fname = 
-              Identifier.nextIdentifier("factored_op");
+              Identifier.nextIdentifier("factored_expr");
  
           BehaviouralFeature bf = 
               new BehaviouralFeature(fname,pars,true,etype); 
@@ -5009,7 +5084,7 @@ public class Entity extends ModelElement implements Comparable
 
           BasicExpression bfcall = 
             BasicExpression.newCallBasicExpression(fname,
-                                           selfvar,pars); 
+                                           selfvar,parexprs); 
           for (int j = 0; j < ops; j++)
           { BehaviouralFeature op = 
                  (BehaviouralFeature) operations.get(j);
@@ -5018,36 +5093,74 @@ public class Entity extends ModelElement implements Comparable
           } 
 
           bf.setOwner(this); 
-          this.addOperation(bf); 
+          this.addOperation(bf);
+
+          System.out.println(">>> Extracted operation " + fname);  
         }
         else if (obj instanceof Statement) 
         { Statement stat = (Statement) obj;
 
           Vector rets = Statement.getReturnValues(stat); 
-          System.out.println(">> Return values: " + rets);
+          System.out.println(">> Cloned statement return values: " + rets);
           Vector jumps = Statement.getBreaksContinues(stat); 
           System.out.println(">> Jump statements: " + jumps);
           Vector vars = stat.getVariableUses(); 
-          System.out.println(">> Variables: " + vars);
+          System.out.println(">> Cloned statement used variables: " + vars);
+          Vector wrvars = stat.writeFrame(); 
+          System.out.println(">> Write frame: " + wrvars);
+
+          // It can only write attributes, not variables
+          // parameters are vars
+
+          Vector writtenVars = new Vector(); 
+          for (int j = 0; j < wrvars.size(); j++) 
+          { String wv = (String) wrvars.get(j); 
+            if (wv.indexOf("::") > 0) { } 
+            else 
+            { writtenVars.add(wv); } 
+          } 
 
           if (rets.size() == 0 && jumps.size() == 0 && 
-              vars.size() == 0)
+              writtenVars.size() == 0)
           { 
             String fname = 
-              Identifier.nextIdentifier("factored_op"); 
-            BehaviouralFeature bf = 
-              new BehaviouralFeature(
-                      fname,new Vector(),false,null); 
-            bf.setPostcondition(new BasicExpression(true));  
-            bf.setActivity(stat); 
+              Identifier.nextIdentifier("factored_code"); 
 
             BasicExpression selfvar = 
               BasicExpression.newVariableBasicExpression(
                   "self", new Type(this)); 
 
+            Vector oppars = new Vector();
+            Vector parexprs = new Vector();
+            Vector pnames = new Vector();
+  
+            for (int j = 0; j < vars.size(); j++) 
+            { Expression ve = (Expression) vars.get(j);
+              if (pnames.contains(ve + "") || 
+                  "self".equals(ve + "") ||
+                  "super".equals(ve + "")) { } 
+              else  
+              { Attribute par = 
+                  new Attribute(ve + "", ve.getType(), ModelElement.INTERNAL); 
+                par.setElementType(ve.getElementType()); 
+                oppars.add(par);
+                BasicExpression parexpr = 
+                  new BasicExpression(par); 
+                parexprs.add(parexpr); 
+                pnames.add(ve + ""); 
+              }  
+            } 
+  
+            BehaviouralFeature bf = 
+              new BehaviouralFeature(
+                      fname,oppars,false,null); 
+            bf.setPostcondition(new BasicExpression(true));  
+            bf.setActivity(stat); 
+
             BasicExpression bfcall = 
-              BasicExpression.newCallBasicExpression(fname,
-                                                     selfvar); 
+              BasicExpression.newCallBasicExpression(
+                               fname,
+                               selfvar,parexprs); 
 
             for (int j = 0; j < ops; j++)
             { BehaviouralFeature op = 
@@ -5058,6 +5171,7 @@ public class Entity extends ModelElement implements Comparable
 
             bf.setOwner(this); 
             this.addOperation(bf); 
+            System.out.println(">>> Extracted operation " + fname);  
           }
         }
       } 
@@ -6014,16 +6128,17 @@ public class Entity extends ModelElement implements Comparable
       for (int i = 0; i < attributes.size(); i++) 
       { Attribute att = (Attribute) attributes.get(i); 
         int awidth = att.getWidth(); 
+        Type atype = att.getType(); 
         int amult = att.getMultiplicity();   
         String aname = att.getName(); 
 
         Expression expr = new BasicExpression(att);
       
-            JOptionPane.showMessageDialog(null, 
-              ">> Attribute " + att + " Width: " + awidth + 
-              " Multiplicity: " + amult, 
-              "", 
-              JOptionPane.INFORMATION_MESSAGE);
+        //    JOptionPane.showMessageDialog(null, 
+        //      ">> Attribute " + att + " Width: " + awidth + 
+        //      " Multiplicity: " + amult, 
+        //      "", 
+        //      JOptionPane.INFORMATION_MESSAGE);
 
         if (att.isSequence())
         { Expression xvar = 
@@ -6049,12 +6164,35 @@ public class Entity extends ModelElement implements Comparable
 
         if (awidth > 0)
         { Vector exprs = new Vector(); 
-          exprs.add(new BinaryExpression("+", 
-                      new BasicExpression("\"\""), expr)); 
-          exprs.add(new BasicExpression(awidth)); 
-          expr =
-            BasicExpression.newStaticCallBasicExpression(
-              "leftAlignInto", "StringLib", exprs); 
+          BinaryExpression avalue = 
+            new BinaryExpression("+", 
+                      new BasicExpression("\"\""), expr);
+          exprs.add(avalue);  
+          exprs.add(new BasicExpression("\" \"")); 
+          exprs.add(new BasicExpression(awidth));
+           
+          if (att.isNumeric())
+          { expr =
+              BasicExpression.newStaticCallBasicExpression(
+                "padLeftWithInto", "StringLib", exprs); 
+          } 
+          else 
+          { Vector exprs0 = new Vector();
+            exprs0.add(avalue);  
+            Expression widthExpr = new BasicExpression(awidth); 
+            exprs0.add(widthExpr);
+          
+            expr =
+              BasicExpression.newStaticCallBasicExpression(
+                "leftAlignInto", "StringLib", exprs0);
+            atype.setFixedSize(true, widthExpr);  
+          } 
+
+          JOptionPane.showMessageDialog(null, 
+             ">> Attribute " + att + " Type: " + atype + 
+             " Type is fixed size: " + atype.hasFixedSize(), 
+             "", 
+             JOptionPane.INFORMATION_MESSAGE);
         } 
  
         sumExpr = 
@@ -6145,12 +6283,27 @@ public class Entity extends ModelElement implements Comparable
 
           if (awidth > 0)
           { Vector exprs = new Vector(); 
-            exprs.add(new BinaryExpression("+", 
-                      new BasicExpression("\"\""), exprh)); 
-            exprs.add(new BasicExpression(awidth)); 
-            exprh =
-              BasicExpression.newStaticCallBasicExpression(
-                "leftAlignInto", "StringLib", exprs); 
+            BinaryExpression avalueh = 
+              new BinaryExpression("+", 
+                      new BasicExpression("\"\""), exprh);
+            exprs.add(avalueh);  
+            exprs.add(new BasicExpression("\" \"")); 
+            exprs.add(new BasicExpression(awidth));
+
+            if (Type.isNumericType(att.getElementType())) 
+            { exprh =
+                BasicExpression.newStaticCallBasicExpression(
+                  "padLeftWithInto", "StringLib", exprs);
+            } 
+            else 
+            { Vector exprs0 = new Vector();
+              exprs0.add(avalueh);  
+              exprs0.add(new BasicExpression(awidth));
+          
+              exprh =
+                BasicExpression.newStaticCallBasicExpression(
+                  "leftAlignInto", "StringLib", exprs0); 
+            } 
           } 
 
           sumExprh = 
@@ -6318,20 +6471,20 @@ public class Entity extends ModelElement implements Comparable
         } 
       } 
     }  
-  } 
+  } // These are fixed-size sequences. 
 
   public void addFillerAttributes(Entity root)
   { // For each FILLER, add to the CSTL-generated main class
+    // For each other String attribute, make its type fixed size
 
     for (int i = 0; i < attributes.size(); i++) 
     { Attribute att = (Attribute) attributes.get(i); 
       String aname = att.getName(); 
-        
+      int wdth = att.getWidth(); 
+          
       if (aname.startsWith("FILLER_"))
-      { int wdth = att.getWidth(); 
-        String spacesString = ""; 
-        for (int j = 0; j < wdth; j++) 
-        { spacesString = spacesString + " "; } 
+      { String spacesString = 
+          AuxMath.nCopiesOfString(" ", wdth);  
         Expression fillerInit = 
           BasicExpression.newValueBasicExpression(
                            "\"" + spacesString + "\"");
@@ -6341,6 +6494,11 @@ public class Entity extends ModelElement implements Comparable
         att.setInitialExpression(fillerInit); 
         root.addAttribute(att);  
       }
+      else if (att.isString())
+      { Type typ = att.getType(); 
+        typ.setFixedSize(true, new BasicExpression(wdth)); 
+        root.setAttributeType(att,typ); 
+      } 
     }   
   } 
 
@@ -19210,7 +19368,9 @@ public BehaviouralFeature designAbstractKillOp()
               bf.formMutantCallsPython(nme,mutantoperations,
                       bfcases,opTests,testcalls); 
 
-          String bfmutanttest = "  def " + bfname + "_mutation_tests(_self, _counts, _totals) :\n";  
+          String bfmutanttest = 
+          "  def " + bfname + "_mutation_tests(_self, _counts, _totals) :\n" + 
+          "    pass\n";  
           
           for (int j = 0; j < mutationTests.size() && j < testcalls.size() && j < 100; j++) 
           { String tst = (String) testcalls.get(j); 

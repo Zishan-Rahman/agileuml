@@ -33,6 +33,10 @@ public class Type extends ModelElement
 
   Type alias = null;  // For datatypes 
 
+  boolean isFixedSize = false; // fixed-size sequences, Strings
+  Expression fixedSize = null; 
+
+
   static java.util.Map exceptions2java = new java.util.HashMap(); 
   static 
   { exceptions2java.put("OclException", "Throwable"); 
@@ -176,7 +180,7 @@ public class Type extends ModelElement
     if (exceptions2java.get(tname) != null) 
     { return true; } 
     return false; 
-  } // MathLib, Excel, OclRegex, 
+  } // MathLib, FinanceLib, Excel, OclRegex, 
     // StringLib and OclComparator are static
 
   public static boolean isDefinedType(Type t) 
@@ -364,6 +368,17 @@ public class Type extends ModelElement
   public Vector getParameters()
   { return new Vector(); } 
 
+  public boolean hasFixedSize()
+  { return isFixedSize; } 
+
+  public Expression getFixedSize()
+  { return fixedSize; } 
+
+  public void setFixedSize(boolean fs, Expression expr)
+  { isFixedSize = fs;
+    fixedSize = expr; 
+  } 
+
   public Object clone()
   { Type result; 
     if (isEntity) 
@@ -384,6 +399,8 @@ public class Type extends ModelElement
     { result.setKeyType(keyType); } 
  
     result.setAlias(alias); 
+
+    result.setFixedSize(isFixedSize, fixedSize); 
 
     return result; 
   } 
@@ -2655,10 +2672,15 @@ public class Type extends ModelElement
         tname.equals("long") || tname.equals("boolean"))
     { return true; } 
 
-    if (tname.equals("String") || tname.equals("Set") || tname.equals("Sequence"))
+    if (tname.equals("String") || tname.equals("Set") || 
+        tname.equals("Sequence"))
     { return false; }
 
-    if (tname.equals("Map") || tname.equals("Function")) { return false; } 
+    if (tname.equals("Map") || tname.equals("Function")) 
+    { return false; } 
+
+    if (Type.isOclLibraryType(tname))
+    { return false; } 
 
     if (t.getEntity() != null)  { return false; } 
 
@@ -2823,23 +2845,36 @@ public class Type extends ModelElement
   { if (values == null) // so not enumerated
     { String nme = getName();
       if (nme.equals("String"))
-      { return "\"\""; }
+      { if (isFixedSize && fixedSize != null) 
+        { int fs = Expression.convertInteger("" + fixedSize); 
+          String ini = AuxMath.nCopiesOfString(" ", fs); 
+          return "\"" + ini + "\""; 
+        } 
+        return "\"\""; 
+      }
+
       if (nme.equals("boolean"))
       { return "false"; }
+
       if (nme.equals("int") || nme.equals("long"))
       { return "0"; }
+
       if (nme.equals("double"))
       { return "0.0"; } 
+
       if (nme.equals("Set") || nme.equals("Sequence") ||
           nme.equals("SortedSequence"))
       { return "new Vector()"; }
+
       if (nme.equals("Map")) 
       { return "new HashMap()"; } 
+
       if (nme.equals("Ref"))
       { if (elementType != null) 
         { return "new " + elementType.getJava() + "[1]"; } 
         return "new Object[1]"; 
       } 
+
       if (alias != null)    // For datatypes
       { return alias.getDefault(); } 
 
@@ -2858,7 +2893,13 @@ public class Type extends ModelElement
     String res = "\"\"";  
     String nme = getName();
     if (nme.equals("String"))
-    { res = "\"\""; }
+    { if (isFixedSize && fixedSize != null) 
+      { int fs = Expression.convertInteger("" + fixedSize); 
+        String ini = AuxMath.nCopiesOfString(" ", fs); 
+        return "\"" + ini + "\""; 
+      } 
+      res = "\"\""; 
+    }
     else if (nme.equals("boolean"))
     { return "false"; }
     else if (nme.equals("double"))
@@ -2996,7 +3037,14 @@ public class Type extends ModelElement
       
     if (values == null) // so not enumerated
     { if (nme.equals("String"))
-      { return "\"\""; }
+      { if (isFixedSize && fixedSize != null) 
+        { int fs = Expression.convertInteger("" + fixedSize); 
+          String ini = AuxMath.nCopiesOfString(" ", fs); 
+          return "\"" + ini + "\""; 
+        } 
+        return "\"\""; 
+      }
+
       if (nme.equals("boolean"))
       { return "false"; }
       if (nme.equals("int") || nme.equals("long"))
@@ -3023,13 +3071,23 @@ public class Type extends ModelElement
   { if (values == null) // so not enumerated
     { String nme = getName();
       if (nme.equals("String"))
-      { return "\"\""; }
+      { if (isFixedSize && fixedSize != null) 
+        { int fs = Expression.convertInteger("" + fixedSize); 
+          String ini = AuxMath.nCopiesOfString(" ", fs); 
+          return "\"" + ini + "\""; 
+        } 
+        return "\"\""; 
+      }
+
       if (nme.equals("boolean"))
       { return "false"; }
+
       if (nme.equals("int") || nme.equals("long"))
       { return "0"; }
+
       if (nme.equals("double"))
       { return "0.0"; }
+
       if (nme.equals("Set"))
       { if (elementType != null) 
         { return "new HashSet<" + elementType.typeWrapperJava7() + ">()"; }
@@ -3890,7 +3948,7 @@ public class Type extends ModelElement
     { return "Class"; } 
 
     if (nme.equals("OclDate"))
-    { return "Date"; } 
+    { return "OclDate"; } 
 
     String jex = (String) exceptions2java.get(nme); 
     if (jex != null) 
@@ -3979,7 +4037,7 @@ public class Type extends ModelElement
     { return "Class"; } 
 
     if (nme.equals("OclDate"))
-    { return "Date"; } 
+    { return "OclDate"; } 
 
     String jex = (String) exceptions2java.get(nme); 
     if (jex != null) 
@@ -4066,7 +4124,7 @@ public class Type extends ModelElement
     { return "Object"; } 
 
     if (nme.equals("OclDate"))
-    { return "Date"; } 
+    { return "OclDate"; } 
 
     if (nme.equals("OclType"))
     { return "Class"; } 
@@ -4125,7 +4183,7 @@ public class Type extends ModelElement
     { return "Class"; } 
 
     if (nme.equals("OclDate"))
-    { return "Date"; } 
+    { return "OclDate"; } 
 
     if (typ.entity != null) 
     { return typ.entity.getCompleteName(); } 
@@ -4192,7 +4250,7 @@ public class Type extends ModelElement
     { return "Class"; } 
 
     if (nme.equals("OclDate"))
-    { return "Date"; } 
+    { return "Date"; } // OclDate 
 
     String jex = (String) exceptions2java.get(nme); 
     if (jex != null) 
@@ -4318,7 +4376,7 @@ public class Type extends ModelElement
     if (nme.equals("OclType"))
     { return "Class"; } 
     if (nme.equals("OclDate"))
-    { return "Date"; } 
+    { return "OclDate"; } 
  
     if (values != null) { return "Integer"; } 
     return nme; 
@@ -4383,7 +4441,7 @@ public class Type extends ModelElement
     if (nme.equals("OclType"))
     { return "Class"; } 
     if (nme.equals("OclDate"))
-    { return "Date"; } 
+    { return "Date"; } // OclDate
  
     return nme; 
   } // For enumerations, would be better to represent as Java enums. 
