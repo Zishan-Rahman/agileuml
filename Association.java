@@ -33,6 +33,8 @@ public class Association extends ModelElement
   private Vector constraints = new Vector(); // those that involve this association
   private Attribute qualifier = null; // non-null for qualified associations
   private boolean instanceScope = true; 
+
+  private Expression initialExpression = null; 
  
   public Association(Entity e1, Entity e2, int c1,
                      int c2, String r1, String r2)
@@ -120,6 +122,9 @@ public class Association extends ModelElement
     role1 = r1;
     role2 = r2;
   }
+
+  public void setInitialExpression(Expression init)
+  { initialExpression = init; } 
 
   public void setType(Type t) { } 
 
@@ -703,6 +708,7 @@ public class Association extends ModelElement
     { qual = "final ";
       initialiser = ""; 
     }
+
     if (role2 != null)  // attribute of entity1
     { if (entity1.isAbstract())
       { out.print("  protected " + qual); } 
@@ -711,6 +717,12 @@ public class Association extends ModelElement
 
       if (qualifier != null)
       { out.println("java.util.HashMap " + role2 + " = new java.util.HashMap();"); } 
+      else if (card2 == ONE && entity2 != null && 
+               initialExpression != null)
+      { java.util.HashMap env = new java.util.HashMap(); 
+        out.println(entity2.getName() + " " + role2 + " = " + 
+                    initialExpression + ";"); 
+      }
       else if (card2 == ONE && entity2 != null)
       { out.println(entity2.getName() + " " + role2 + ";"); }
       else if (entity2 != null)
@@ -718,8 +730,8 @@ public class Association extends ModelElement
                     role2 + initialiser + "; // of " +
                     entity2.getName());
       }
-	  else 
-	  { out.println("Object " + role2 + "; // Undefined class type"); }
+      else 
+      { out.println("Object " + role2 + "; // Undefined class type"); }
     }
   }  // not valid for a..b a > 0. Should be array then?
 
@@ -745,6 +757,11 @@ public class Association extends ModelElement
 
       if (qualifier != null)
       { out.println("java.util.HashMap " + role2 + " = new java.util.HashMap();"); } 
+      else if (card2 == ONE && initialExpression != null)
+      { java.util.HashMap env = new java.util.HashMap(); 
+        out.println(entity2.getName() + " " + role2 + " = " + 
+                    initialExpression + ";"); 
+      }
       else if (card2 == ONE)
       { out.println(entity2.getName() + " " + role2 + ";"); }
       else if (ordered)
@@ -767,10 +784,10 @@ public class Association extends ModelElement
     String initialiser = ""; 
     String reltype = e2name; 
 	
-	if (card2 == ONE)
-	{ initialiser = " = null"; 
-	  reltype = e2name; 
-	}
+    if (card2 == ONE)
+    { initialiser = " = null"; 
+      reltype = e2name; 
+    }
     else if (ordered)
     { initialiser = " = new ArrayList<" + e2name + ">()"; 
       reltype = "ArrayList<" + e2name + ">"; 
@@ -802,6 +819,11 @@ public class Association extends ModelElement
       { out.println("java.util.HashMap<String, " + reltype + "> " + role2 + 
                             " = new java.util.HashMap<String, " + reltype + ">();"); 
       } 
+      else if (card2 == ONE && initialExpression != null)
+      { java.util.HashMap env = new java.util.HashMap(); 
+        out.println(entity2.getName() + " " + role2 + " = " + 
+                    initialExpression + ";"); 
+      }
       else if (card2 == ONE)
       { out.println(entity2.getName() + " " + role2 + ";"); }
       else 
@@ -5801,9 +5823,11 @@ String qual = "";
     String opp = ""; 
     if (role1 != null && role1.length() > 0)
     { opp = " oppositeOf " + role1; } 
+    else if (initialExpression != null)
+    { opp = " := " + initialExpression; } 
 	
-	if (isQualified())
-	{ return "    reference " + role2 + mult + " qualified " + ord + agg + ": " + entity2 + opp + ";"; }
+    if (isQualified())
+    { return "    reference " + role2 + mult + " qualified " + ord + agg + ": " + entity2 + opp + ";"; }
 
     return "    reference " + role2 + mult + " " + ord + agg + ": " + entity2 + opp + ";";  
   } 
@@ -5843,6 +5867,36 @@ String qual = "";
     { res = res + " ordered=\"false\""; }
 
     out.println(res + "/>");  
+  } // ordering? 
+
+  public void saveAsPlantUML(PrintWriter out)
+  { String c1 = ""; 
+
+    if (card1 == ONE) 
+    { c1 = "1"; } 
+    else if (card1 == ZEROONE) 
+    { c1 = "0..1"; }
+    else if (card1 == MANY)
+    { c1 = "*"; }
+
+    String c2 = ""; 
+
+    if (card2 == ONE) 
+    { c2 = "1"; } 
+    else if (card2 == ZEROONE) 
+    { c2 = "0..1"; }
+    else if (card2 == MANY)
+    { c2 = "*"; }
+ 
+    String arrow = " --> "; 
+    if (aggregation)
+    { arrow = " *--> "; } 
+
+    if (ordered)
+    { c2 = c2 + " {ordered}"; }
+
+    String res = " " + entity1 + " \"" + c1 + "\"" + arrow + " \"" + c2 + "\" " + entity2 + " : " + role2; 
+    out.println(res + "\n");  
   } // ordering? 
 
   public String xmiSaveModel(String domain) 

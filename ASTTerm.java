@@ -554,15 +554,32 @@ public abstract class ASTTerm
       ASTTerm.metafeatures.put(lit,mfs); 
     } 
 
-    JOptionPane.showMessageDialog(null, 
-      "Looking up: " + str + " of: " + lit + 
-              " in: " + ASTTerm.metafeatures,   "",
-              JOptionPane.INFORMATION_MESSAGE);
+    // JOptionPane.showMessageDialog(null, 
+    //   "Looking up: " + str + " of: " + lit + 
+    //           " in: " + ASTTerm.metafeatures,   "",
+    //           JOptionPane.INFORMATION_MESSAGE);
 
     // System.out.println("*** " + lit + 
     //                    " gets tagged values: " + 
     //                    mfs); 
 
+    if (mfs instanceof Vector)
+    { Vector stereotypes = (Vector) mfs; 
+      for (int x = 0; x < stereotypes.size(); x++) 
+      { String stereo = (String) stereotypes.get(x); 
+        if (stereo.startsWith(str + "=")) // or " ="
+        { int indx = stereo.indexOf("="); 
+          return stereo.substring(indx + 1); 
+        } 
+      }
+    }  
+
+    return null; 
+  } 
+
+  public static String getTaggedValue(String lit, String str) 
+  { Object mfs = ASTTerm.metafeatures.get(lit); 
+     
     if (mfs instanceof Vector)
     { Vector stereotypes = (Vector) mfs; 
       for (int x = 0; x < stereotypes.size(); x++) 
@@ -940,7 +957,13 @@ public abstract class ASTTerm
 
 
   public boolean hasType(String str)
-  { if ("character".equalsIgnoreCase(str))
+  { String alit = literalForm(); 
+
+    /* JOptionPane.showMessageDialog(null, 
+         "=== Testing " + alit + " has type " + str,   "",
+                 JOptionPane.INFORMATION_MESSAGE); */  
+           
+    if ("character".equalsIgnoreCase(str))
     { return isCharacter(); } 
     if ("integer".equalsIgnoreCase(str) || 
         "int".equals(str))
@@ -978,6 +1001,15 @@ public abstract class ASTTerm
     { return isDate(); } 
     if ("Process".equals(str))
     { return isProcess(); } 
+
+    if ("Entity".equals(str) || 
+        "Class".equals(str))
+    { if (metafeatures != null) 
+      { Vector vv = (Vector) metafeatures.get(alit); 
+        if (vv != null && vv.contains(str))
+        { return true; }
+      }
+    }  
 
     String typ = ASTTerm.getType(this);
     if (typ == null) 
@@ -4768,9 +4800,24 @@ public abstract class ASTTerm
     } 
 
     String v = var.literalForm(); 
+    String elit = expr.literalForm(); 
 
-    if (v.equals(expr.literalForm()))
+    if (v.equals(elit) ||
+        (v + "^{1}").equals(elit) || 
+        (v + "^{1.0}").equals(elit))
     { res.add(1); 
+      return res; 
+    } 
+
+    if ((v + "^{2}").equals(elit) || 
+        (v + "^{2.0}").equals(elit))
+    { res.add(2); 
+      return res; 
+    } 
+
+    if ((v + "^{3}").equals(elit) || 
+        (v + "^{3.0}").equals(elit))
+    { res.add(3); 
       return res; 
     } 
 
@@ -4845,8 +4892,8 @@ public abstract class ASTTerm
           ASTTerm pow = (ASTTerm) subterms.get(3); 
           String powlit = pow.literalForm(); 
 
-          if (AuxMath.isNumeric(powlit))
-          { double powd = Double.parseDouble(powlit); 
+          if (AuxMath.isGeneralNumeric(powlit))
+          { double powd = AuxMath.parseGeneralNumeric(powlit); 
             if (v.equals(arg.literalForm()))
             { res.add(powd);  
               return res;
@@ -5563,6 +5610,20 @@ public abstract class ASTTerm
         return "0"; 
       }  
 
+      if ("factor2Expression".equals(ct.tag))
+      { if (subterms.size() == 4 && 
+            "^{".equals(subterms.get(1) + ""))
+        { // expr^{power}
+          ASTTerm tt = (ASTTerm) subterms.get(0); 
+          ASTTerm power = (ASTTerm) subterms.get(2); 
+          String powlit = power.literalForm(); 
+
+          String coef1 = ASTTerm.constantTerms(vars, tt); 
+          if ("0".equals(coef1))
+          { return "0"; } 
+          return "(" + coef1 + ")^{" + powlit + "}"; 
+        } 
+      }           
 
       if ("factorExpression".equals(ct.tag))
       { if (subterms.size() == 2)
@@ -9287,12 +9348,12 @@ public abstract class ASTTerm
           String dd2cnst = 
              ASTTerm.constantTerms(dd2vars,expr0);
 
-          JOptionPane.showMessageDialog(null, 
+          /* JOptionPane.showMessageDialog(null, 
            ">>> Coeffiecient of square of : " + vdiff + " in " + expr0 +  
            " = " + dd2coef2 + " Of " + vdiff + " = " + dd2coef1 + 
            " Constant: " + dd2cnst, 
            "", 
-           JOptionPane.INFORMATION_MESSAGE); 
+           JOptionPane.INFORMATION_MESSAGE); */ 
 
           String quadf1 = 
               AuxMath.quadraticFormula1(dd2coef2, dd2coef1, 

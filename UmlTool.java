@@ -363,6 +363,13 @@ public void findPlugins()
       "Creates UML/OCL from AST produced by Antlr Python parser, in output/ast.txt");
     fileMenu.add(fromPython);
 
+    JMenuItem fromPascal = 
+      new JMenuItem("From Pascal AST",openIcon);
+    fromPascal.addActionListener(this);
+    fromPascal.setToolTipText(
+      "Creates UML/OCL from AST produced by Antlr pascal parser, in output/ast.txt");
+    fileMenu.add(fromPascal);
+
     JMenuItem fromSQL = 
       new JMenuItem("From SQL AST",openIcon);
     fromSQL.addActionListener(this);
@@ -451,6 +458,10 @@ public void findPlugins()
     JMenuItem saveUSEMI = new JMenuItem("Save as USE"); 
     saveUSEMI.addActionListener(this); 
     saveMenu.add(saveUSEMI); 
+
+    JMenuItem saveplantMI = new JMenuItem("Save as PlantUML"); 
+    saveplantMI.addActionListener(this); 
+    saveMenu.add(saveplantMI); 
 
 
     JMenuItem saveCSVMI = new JMenuItem("Save as CSV"); 
@@ -1157,12 +1168,14 @@ public void findPlugins()
       new JMenuItem("CGBE"); 
     cgbe.addActionListener(this);
     cgbe.setToolTipText(
-      "Learns CSTL from output/typeExamples.txt, expressionExamples, statementExamples, declarationExamples, paired text example files. Needs configuration.txt, output/mmCGBE.txt, output/forwardCGBE.txt");
+      "Learns CSTL from output/typeExamples.txt, expressionExamples, statementExamples, declarationExamples, paired source-target text example files. Needs configuration.txt, output/mmCGBE.txt, output/forwardCGBE.txt");
     synthMenu.add(cgbe);
 
     JMenuItem ltbeFromText = 
       new JMenuItem("LTBE from text"); 
     ltbeFromText.addActionListener(this);
+    ltbeFromText.setToolTipText(
+      "Learns CSTL from source-target paired text example files. Needs ANTLR parsers for source & target languages");
     synthMenu.add(ltbeFromText);
 
     JMenuItem ltbeFromASTs = 
@@ -1699,6 +1712,10 @@ public void findPlugins()
       { ucdArea.saveUSEDataToFile("mm.use"); 
         thisLabel.setText("Model saved to output/mm.use"); 
       } 
+      else if (label.equals("Save as PlantUML"))
+      { ucdArea.savePlantUMLToFile("mm.plantuml"); 
+        thisLabel.setText("Model saved to output/mm.plantuml"); 
+      } 
       else if (label.equals("Save as CSV"))
       { ucdArea.saveCSV(); } 
       else if (label.equals("Map TL to CSTL"))
@@ -1771,6 +1788,10 @@ public void findPlugins()
       }
       else if (label.equals("From Python AST")) 
       { ucdArea.loadFromPython();
+        saved = true; 
+      }
+      else if (label.equals("From Pascal AST")) 
+      { ucdArea.loadFromPascal();
         saved = true; 
       }
       else if (label.equals("From SQL AST")) 

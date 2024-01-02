@@ -7317,16 +7317,18 @@ public class UCDArea extends JPanel
   private void reconstructAssociation(String ename1,
                  String ename2, int xs, int ys, int xe,
                  int ye, int c1, int c2, String role2,
-                 String role1, Vector stereotypes, Vector wpoints)
+                 String role1, Vector stereotypes, Vector wpoints, Expression initExpr)
   { Entity e1 =
       (Entity) ModelElement.lookupByName(ename1,entities);
     Entity e2 =
       (Entity) ModelElement.lookupByName(ename2,entities);
+
     if (e1 == null || e2 == null)
     { System.out.println("!! Error in data, no entities " +
                          e1 + " " + e2);
       return;
     }
+
     if ("null".equals(role1))
     { role1 = null; }
 
@@ -7369,6 +7371,7 @@ public class UCDArea extends JPanel
       ast.unsetQualifier(); 
       ast.setQualifier(qatt);   
     }          
+
     if (stereotypes.contains("associationClass"))
     { int acind = stereotypes.indexOf("associationClass"); 
       if (acind + 1 < stereotypes.size())
@@ -7387,8 +7390,12 @@ public class UCDArea extends JPanel
           } 
         } 
       } 
+
       System.out.println(">> Reconstructed association class: " + acent + " " + sline); 
     }             
+
+    if (initExpr != null) 
+    { ast.setInitialExpression(initExpr); } 
 
     associations.add(ast);
     e1.addAssociation(ast);
@@ -12873,7 +12880,7 @@ public void produceCUI(PrintWriter out)
       out.close(); 
     } 
     catch (IOException e) 
-    { System.out.println("!!! Error saving data"); } 
+    { System.err.println("!!! Error saving data"); } 
 
     for (int i = 0; i < useCases.size(); i++)
     { Object obj = useCases.get(i); 
@@ -12912,7 +12919,7 @@ public void produceCUI(PrintWriter out)
       out.close(); 
     } 
     catch (IOException e) 
-    { System.out.println("Error saving data"); } 
+    { System.err.println("!! Error saving data"); } 
   } 
 
 
@@ -12956,7 +12963,7 @@ public void produceCUI(PrintWriter out)
         out.close(); 
       }
       catch (IOException e) 
-      { System.out.println("Error saving data"); } 
+      { System.err.println("!! Error saving data"); } 
     }
   }
 
@@ -12995,7 +13002,7 @@ public void produceCUI(PrintWriter out)
       out.close(); 
     }
     catch (IOException e) 
-    { System.out.println("Error saving data"); } 
+    { System.err.println("!! Error saving data"); } 
   }
 
   public void saveEMFToFile()
@@ -13014,7 +13021,7 @@ public void produceCUI(PrintWriter out)
         out.close(); 
       }
       catch (IOException e) 
-      { System.out.println("Error saving EMF"); } 
+      { System.err.println("!! Error saving EMF"); } 
     }
   }
 
@@ -13034,7 +13041,7 @@ public void produceCUI(PrintWriter out)
         out.close(); 
       }
       catch (IOException e) 
-      { System.out.println("Error saving KM3"); } 
+      { System.err.println("!! Error saving KM3"); } 
     }
   }
 
@@ -13054,7 +13061,7 @@ public void produceCUI(PrintWriter out)
         out.close(); 
       }
       catch (IOException e) 
-      { System.out.println("Error saving KM3"); } 
+      { System.err.println("!! Error saving KM3"); } 
     }
   }
 
@@ -13075,7 +13082,7 @@ public void produceCUI(PrintWriter out)
         out.close(); 
       }
       catch (IOException e) 
-      { System.out.println("Error saving Ecore"); } 
+      { System.err.println("!! Error saving Ecore"); } 
     }
   }
 
@@ -13097,7 +13104,7 @@ public void produceCUI(PrintWriter out)
       out.close(); 
     }
     catch (IOException e) 
-    { System.out.println("Error saving model"); } 
+    { System.err.println("!! Error saving model"); } 
   }
    
     
@@ -13136,7 +13143,7 @@ public void produceCUI(PrintWriter out)
         out.close(); 
       }
       catch (IOException e) 
-      { System.out.println("Error saving model"); } 
+      { System.err.println("!! Error saving model"); } 
     }
   }
 
@@ -13169,7 +13176,43 @@ public void produceCUI(PrintWriter out)
       out.close(); 
     }
     catch (IOException e) 
-    { System.out.println("Error saving data"); } 
+    { System.err.println("!! Error saving data"); } 
+  }
+
+  public void savePlantUMLToFile(String f)
+  { File file = new File("output/" + f);
+    // Vector locals = new Vector(); 
+
+    try
+    { PrintWriter out =
+          new PrintWriter(
+            new BufferedWriter(new FileWriter(file)));
+      out.println("@startuml"); 
+
+      for (int p = 0; p < entities.size(); p++) 
+      { Entity ent = (Entity) entities.get(p); 
+        out.println(ent.saveAsPlantUML()); 
+        // locals.addAll(ent.getInvariants()); 
+      } 
+
+      for (int i = 0; i < associations.size(); i++) 
+      { Association ast = (Association) associations.get(i); 
+        ast.saveAsPlantUML(out); 
+      } 
+
+      /* if (locals.size() > 0)
+      { out.println("constraints\n\n"); } 
+
+      for (int q = 0; q < locals.size(); q++)
+      { Constraint cc = (Constraint) locals.get(q); 
+        out.println(cc.saveAsUSEData()); 
+      } */ 
+
+      out.println("@enduml"); 
+      out.close(); 
+    }
+    catch (IOException e) 
+    { System.err.println("!! Error saving data"); } 
   }
 
 
@@ -15892,7 +15935,7 @@ public void produceCUI(PrintWriter out)
         (PreAssociation) preassociations.get(i);
       reconstructAssociation(p.e1name,p.e2name,p.xs,p.ys,
                              p.xe,p.ye,p.card1,p.card2,
-                             p.role2,p.role1,p.stereotypes, p.wpoints);
+                             p.role2,p.role1,p.stereotypes, p.wpoints, p.initialExpression);
     }
 
     for (int j = 0; j < preentities.size(); j++)
@@ -16143,7 +16186,7 @@ public void produceCUI(PrintWriter out)
         (PreAssociation) preassociations.get(i);
       reconstructAssociation(p.e1name,p.e2name,p.xs,p.ys,
                              p.xe,p.ye,p.card1,p.card2,
-                             p.role2,p.role1,p.stereotypes, p.wpoints);
+                             p.role2,p.role1,p.stereotypes, p.wpoints, p.initialExpression);
     }
 
     for (int j = 0; j < preentities.size(); j++)
@@ -17849,7 +17892,7 @@ public void produceCUI(PrintWriter out)
         reconstructAssociation(pa.e1name,pa.e2name,xs,ys,
                     xe,ye,pa.card1,pa.card2,
                     pa.role2, pa.role1, pa.stereotypes, 
-                    new Vector());
+                    new Vector(), pa.initialExpression);
       } 
     } 
 
@@ -18019,7 +18062,7 @@ public void produceCUI(PrintWriter out)
 
           reconstructAssociation(pa.e1name,pa.e2name,xs,ys,
                              xe,ye,pa.card1,pa.card2,
-                             pa.role2, pa.role1, pa.stereotypes, new Vector());
+                             pa.role2, pa.role1, pa.stereotypes, new Vector(), pa.initialExpression);
         } 
       } 
     } 
@@ -27440,6 +27483,12 @@ public void produceCUI(PrintWriter out)
     String sourcestring = ""; 
     int noflines = 0; 
 
+    File oclfile = new File("libraries/oclfile.km3"); 
+    if (oclfile.exists())
+    { loadKM3FromFile(oclfile); }
+    else 
+    { System.err.println("! Warning: no file libraries/oclfile.km3"); } 
+
     while (!eof)
     { try { s = br.readLine(); }
       catch (IOException _ex)
@@ -27508,11 +27557,63 @@ public void produceCUI(PrintWriter out)
 
     // set all classes concrete
 
+    System.out.println(">> Metainformation: " + ASTTerm.metafeatures); 
+
     for (int i = 0; i < entities.size(); i++) 
     { Entity ent = (Entity) entities.get(i); 
       ent.removeStereotype("abstract"); 
       ent.setAbstract(false); 
     } 
+
+    java.util.Set keys = ASTTerm.metafeatures.keySet(); 
+    Vector kvect = new Vector(); 
+    kvect.addAll(keys); 
+    for (int i = 0; i < kvect.size(); i++) 
+    { String ky = (String) kvect.get(i); 
+      Object val = ASTTerm.metafeatures.get(ky); 
+      if (val instanceof Vector && 
+          Expression.isDecimalInteger(ky))
+      { Vector vals = (Vector) val; 
+        // First is the argument list
+        // Second is the code
+
+        if (vals.size() == 2)
+        { String args = (String) vals.get(0); 
+          String code = (String) vals.get(1); 
+          
+          Compiler2 comp = new Compiler2(); 
+          comp.nospacelexicalanalysis(code); 
+          Statement stat = comp.parseStatement(entities,types); 
+
+          if (args.indexOf(",") < 0) 
+          { String argtype = 
+              ASTTerm.getTaggedValue(args, "typName"); 
+            if (argtype != null) 
+            { System.out.println(">>> Additional operation of class " + argtype); 
+              System.out.println(); 
+              System.out.println("  operation with_op" + ky + 
+                           "()"); 
+              System.out.println("  pre: true post: true"); 
+              System.out.println("  activity: " + stat + ";");
+
+              BehaviouralFeature bf = 
+                new BehaviouralFeature("with_op" + ky, 
+                      new Vector(), false, null); 
+              bf.setActivity(stat);
+              bf.setPost(new BasicExpression(true)); 
+ 
+              Entity ent = 
+                (Entity) ModelElement.lookupByName(
+                                        argtype,entities); 
+              if (ent != null) 
+              { ent.addOperation(bf); 
+                bf.setOwner(ent); 
+              }  
+            } 
+          }  
+        } 
+      }
+    }  
 
     repaint(); 
   }
