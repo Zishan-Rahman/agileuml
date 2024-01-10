@@ -3,7 +3,7 @@ import java.util.List;
 import java.io.*; 
 
 /******************************
-* Copyright (c) 2003--2023 Kevin Lano
+* Copyright (c) 2003--2024 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -6597,10 +6597,17 @@ public class BSystemTypes extends BComponent
   }
 
   public static String generateUnionOpJava7()
-  { String res = "  public static <T> HashSet<T> union(HashSet<T> a, Collection<T> b)\n" +
+  { String res = "  public static <T> HashSet<T> union(HashSet<Object> a, Collection<T> b)\n" +
       "  { HashSet<T> res = new HashSet<T>(); \n" +
-      "    res.addAll(a); res.addAll(b);\n" +
-      "    return res; }\n\n" + 
+      "    for (Object x : a)\n" +
+      "    { try \n" +
+      "      { T y = (T) x; \n" +
+      "        res.add(y); \n" +
+      "      } catch (Exception _e) { }\n" + 
+      "    }\n" +
+      "    res.addAll(b);\n" +
+      "    return res;\n" + 
+      "  }\n\n" + 
       "  public static <T> TreeSet<T> union(TreeSet<T> a, Collection<T> b)\n" +
       "  { TreeSet<T> res = new TreeSet<T>(); \n" +
       "    res.addAll(a); res.addAll(b);\n" +
@@ -10799,7 +10806,7 @@ public class BSystemTypes extends BComponent
 
 
 	res = res + 
-	  "  public static <D,R> HashMap<D,R> restrictMap(Map<D,R> m1, Set<D> ks) \n" +
+	  "  public static <D,R> HashMap<D,R> restrictMap(Map<D,R> m1, Collection<D> ks) \n" +
       "  { Set<D> keys = new HashSet<D>();\n" +
       "    keys.addAll(m1.keySet());\n" +
       "    HashMap<D,R> res = new HashMap<D,R>();\n" +
@@ -10812,7 +10819,7 @@ public class BSystemTypes extends BComponent
       "  }\n\n"; 
  
       res = res + 
-      "  public static <D,R> HashMap<D,R> antirestrictMap(Map<D,R> m1, Set<D> ks) \n" +
+      "  public static <D,R> HashMap<D,R> antirestrictMap(Map<D,R> m1, Collection<D> ks) \n" +
       "  { Set<D> keys = new HashSet<D>();\n" +
       "    keys.addAll(m1.keySet());\n" +
       "    HashMap<D,R> res = new HashMap<D,R>();\n" +
