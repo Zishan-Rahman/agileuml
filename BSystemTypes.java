@@ -8260,12 +8260,22 @@ public class BSystemTypes extends BComponent
   }
 
   public static String generateSortByOpJava7()
-  { String res = "  public static <T> ArrayList<T> sortedBy(final ArrayList<T> a, ArrayList<? extends Comparable> f)\n" + 
+  { String res = "  public static <T> ArrayList<T> sortedBy(final ArrayList<T> a, ArrayList<?> f)\n" + 
       "  { int i = a.size()-1;\n" + 
-      "    java.util.Map<T,Comparable> f_map = new java.util.HashMap<T,Comparable>();\n" + 
-      "    for (int j = 0; j < a.size(); j++)\n" + 
-      "    { f_map.put(a.get(j), (Comparable) f.get(j)); }\n" + 
-      "    return mergeSort(a,f_map,0,i);\n" +  
+      "    if (i < 0) { return a; } \n" +
+      "    if (f.get(i) instanceof Comparable)\n" +
+      "    { java.util.Map<T,Comparable> f_map = new java.util.HashMap<T,Comparable>();\n" +
+      "      for (int j = 0; j < a.size(); j++)\n" +
+      "      { f_map.put(a.get(j), (Comparable) f.get(j)); }\n" +
+      "      return mergeSort(a,f_map,0,i);\n" +
+      "    } \n" +
+      "    if (f.get(i) instanceof List)\n" + 
+      "    { java.util.Map<T,List> list_map = new java.util.HashMap<T,List>();\n" +
+      "      for (int j = 0; j < a.size(); j++)\n" +
+      "      { list_map.put(a.get(j), (List) f.get(j)); }\n" +
+      "      return mergeSortSequence(a, list_map, 0, i);\n" +
+      "    } \n" +
+      "    return a;\n" + 
       "  }\n\n" +  
       "  static <T> ArrayList<T> mergeSort(final ArrayList<T> a, java.util.Map<T,Comparable> f, int ind1, int ind2)\n" + 
       "  { ArrayList<T> res = new ArrayList<T>();\n" +  
@@ -8319,6 +8329,61 @@ public class BSystemTypes extends BComponent
       "    } \n" + 
       "    return res;\n" +  
       "  }\n"; 
+
+    res = res + 
+      "  static <T> ArrayList<T> mergeSortSequence(final ArrayList<T> a, java.util.Map<T,List> f, int ind1, int ind2)\n" + 
+      "  { ArrayList<T> res = new ArrayList<T>();\n" +  
+      "    if (ind1 > ind2)\n" +  
+      "    { return res; }\n" +  
+      "    if (ind1 == ind2)\n" + 
+      "    { res.add(a.get(ind1));\n" +  
+      "      return res;\n" +  
+      "    }\n" +  
+      "    if (ind2 == ind1 + 1)\n" + 
+      "    { List e1 = (List) f.get(a.get(ind1)); \n" + 
+      "      List e2 = (List) f.get(a.get(ind2));\n" +  
+      "      if (Ocl.sequenceCompare(e1,e2) < 0) // e1 < e2\n" + 
+      "      { res.add(a.get(ind1)); res.add(a.get(ind2)); return res; }\n" + 
+      "      else \n" + 
+      "      { res.add(a.get(ind2)); res.add(a.get(ind1)); return res; }\n" + 
+      "    }\n" + 
+      "    int mid = (ind1 + ind2)/2;\n" +  
+      "    ArrayList<T> a1;\n" +  
+      "    ArrayList<T> a2;\n" + 
+      "    if (mid == ind1)\n" + 
+      "    { a1 = new ArrayList<T>();\n" +  
+      "      a1.add(a.get(ind1));\n" +  
+      "      a2 = mergeSortSequence(a,f,mid+1,ind2);\n" +  
+      "    }\n" +  
+      "    else\n" +  
+      "    { a1 = mergeSortSequence(a,f,ind1,mid-1);\n" +   
+      "      a2 = mergeSortSequence(a,f,mid,ind2);\n" + 
+      "    }\n" + 
+      "    int i = 0;\n" +  
+      "    int j = 0;\n" +  
+      "    while (i < a1.size() && j < a2.size())\n" + 
+      "    { List e1 = (List) f.get(a1.get(i)); \n" + 
+      "      List e2 = (List) f.get(a2.get(j));\n" +  
+      "      if (Ocl.sequenceCompare(e1,e2) < 0) // e1 < e2\n" + 
+      "      { res.add(a1.get(i));\n" + 
+      "        i++; // get next e1\n" + 
+      "      } \n" + 
+      "      else \n" + 
+      "      { res.add(a2.get(j));\n" +  
+      "        j++; \n" + 
+      "      } \n" + 
+      "    } \n" + 
+      "    if (i == a1.size())\n" + 
+      "    { for (int k = j; k < a2.size(); k++)\n" +  
+      "      { res.add(a2.get(k)); } \n" + 
+      "    } \n" + 
+      "    else \n" + 
+      "    { for (int k = i; k < a1.size(); k++) \n" + 
+      "      { res.add(a1.get(k)); } \n" + 
+      "    } \n" + 
+      "    return res;\n" +  
+      "  }\n"; 
+
     return res; 
   }
 
@@ -8958,9 +9023,9 @@ public class BSystemTypes extends BComponent
 
   public static String charactersOpJava7()
   { String res = 
-      "  public static List<String> characters(String str)\n" + 
+      "  public static ArrayList<String> characters(String str)\n" + 
       "  { char[] _chars = str.toCharArray();\n" +  
-      "    List<String> _res = new ArrayList<String>();\n" +  
+      "    ArrayList<String> _res = new ArrayList<String>();\n" +  
       "    for (int i = 0; i < _chars.length; i++)\n" +  
       "    { _res.add(\"\" + _chars[i]); }\n" +  
       "    return _res;\n" + 
@@ -10078,8 +10143,8 @@ public class BSystemTypes extends BComponent
   }
 
   public static String generateAsSequenceOpJava7()
-  { String res = "    public static <T> List<T> asSequence(Collection<T> c)\n" +
-    "    { List res = new ArrayList<T>();\n" +
+  { String res = "    public static <T> ArrayList<T> asSequence(Collection<T> c)\n" +
+    "    { ArrayList res = new ArrayList<T>();\n" +
     "      res.addAll(c);\n" +
     "      return res;\n" +
     "    }\n\n";
@@ -10276,7 +10341,9 @@ public class BSystemTypes extends BComponent
       "    { return 0; }\n" + 
       "    String trm = str.trim();\n" + 
       "    while (trm.length() > 0 && trm.charAt(0) == '0')\n" +
-      "    { trm = trm.substring(1); }\n" + 
+      "    { trm = trm.substring(1); }\n" +
+      "    if (trm.indexOf(\".\") > 0)\n" +
+      "    { trm = trm.substring(0,trm.indexOf(\".\")); }\n" +  
       "    try { int x = Integer.parseInt(trm.trim());\n" + 
       "          return x; }\n" + 
       "    catch (Exception _e) { return 0; }\n" + 
@@ -10289,6 +10356,8 @@ public class BSystemTypes extends BComponent
       "    String trm = str.trim();\n" + 
       "    while (trm.length() > 0 && trm.charAt(0) == '0')\n" +
       "    { trm = trm.substring(1); }\n" + 
+      "    if (trm.indexOf(\".\") > 0)\n" +
+      "    { trm = trm.substring(0,trm.indexOf(\".\")); }\n" + 
       "    try { int x = Integer.decode(trm).intValue();\n" + 
       "      return x; \n" +
       "    }\n" +
