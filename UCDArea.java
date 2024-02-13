@@ -22509,8 +22509,8 @@ public void produceCUI(PrintWriter out)
 	
       try
       { PrintWriter cout = new PrintWriter(
-                              new BufferedWriter(
-                                new FileWriter("output/tl.cstl")));
+                       new BufferedWriter(
+                     new FileWriter("output/tl.cstl")));
 
         for (int i = 0; i < extraRules.size(); i++) 
         { String xrule = (String) extraRules.get(i);
@@ -22547,7 +22547,8 @@ public void produceCUI(PrintWriter out)
 
   public void cgbeOCL2Program(String config)
   { PreProcessModels.preprocess(config); 
-    // Writes output/out.txt
+    // Writes output/out.txt to set up the 
+    // paired example instances
 
     loadFromFile("mmCGBE.txt");
     // Loads the CGBE metamodel
@@ -22591,14 +22592,14 @@ public void produceCUI(PrintWriter out)
 
     System.out.println();
     String slang = 
-      JOptionPane.showInputDialog("Enter source language name (of Antlr parser): ");
+      JOptionPane.showInputDialog("Enter source language name (of ANTLR parser): ");
     if (slang == null) 
     { return; } 
     sourceLanguage = slang; 
 
     System.out.println();
     String tlang = 
-      JOptionPane.showInputDialog("Enter target language name (of Antlr parser): ");
+      JOptionPane.showInputDialog("Enter target language name (of ANTLR parser): ");
     if (tlang == null) 
     { return; } 
     targetLanguage = tlang; 
@@ -22711,6 +22712,11 @@ public void produceCUI(PrintWriter out)
       }
     }  
 
+    if (srcasts.size() != trgasts.size())
+    { System.err.println("!! ERROR: different numbers of source and target examples: " + srcasts.size() + " /= " + trgasts.size()); 
+      return; 
+    } 
+
     File sfile = new File("output/sourceasts.txt");
     File tfile = new File("output/targetasts.txt");
 
@@ -22718,22 +22724,29 @@ public void produceCUI(PrintWriter out)
     { PrintWriter sout =
           new PrintWriter(
             new BufferedWriter(new FileWriter(sfile)));
-      for (int i = 0; i < srcasts.size(); i++) 
-      { String srcast = (String) srcasts.get(i);
-        sout.println(srcast); 
-      }  
-      sout.close(); 
-    }
-    catch (Exception _ex) { } 
-
-    try
-    { PrintWriter tout =
+      PrintWriter tout =
           new PrintWriter(
             new BufferedWriter(new FileWriter(tfile)));
-      for (int i = 0; i < trgasts.size(); i++) 
-      { String trgast = (String) trgasts.get(i);
+      
+      for (int i = 0; i < srcasts.size(); i++) 
+      { String srcast = (String) srcasts.get(i);
+        sout.println(srcast);
+        String trgast = (String) trgasts.get(i);
         tout.println(trgast); 
+
+        Compiler2 comp = new Compiler2();
+        ASTTerm sast = comp.parseGeneralAST(srcast);
+        if (sast != null) 
+        { Vector subterms = sast.allNestedSubterms(); 
+          for (int j = 0; j < subterms.size(); j++) 
+          { ASTTerm subsrc = (ASTTerm) subterms.get(j); 
+            sout.println("" + subsrc); 
+            tout.println(trgast); 
+          } 
+        } 
       }  
+
+      sout.close(); 
       tout.close(); 
     }
     catch (Exception _ex) { } 
@@ -22850,6 +22863,9 @@ public void produceCUI(PrintWriter out)
 
     ASTTerm.entitiesFromASTs(targetasts,"$T",entities);   
 
+    /* One class for each tag in the source grammar 
+       examples and for each arity encountered. */ 
+
     File file = new File("output/mm.km3");
     try
     { PrintWriter out =
@@ -22865,6 +22881,9 @@ public void produceCUI(PrintWriter out)
     tlspecification = new ModelMatching(ems);
 
     System.out.println("***>> TL initial specification: " + tlspecification); 
+
+    /* sourcetag_arity |--> targettag  
+       for the example pairs */ 
 
     File tlfile = new File("output/forward.tl");
     try

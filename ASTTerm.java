@@ -169,6 +169,33 @@ public abstract class ASTTerm
 
   public abstract String getTag(); 
 
+  public boolean hasNestedTag(String tg)
+  { java.util.Set alltags = allTagsIn(); 
+    if (alltags.contains(tg))
+    { return true; } 
+    return false; 
+  }  
+
+  public boolean hasNestedTags(Vector tgs)
+  { java.util.Set alltags = allTagsIn(); 
+    for (int i = 0; i < tgs.size(); i++) 
+    { String tg = (String) tgs.get(i); 
+      if (alltags.contains(tg))
+      { } 
+      else 
+      { return false; } 
+    } 
+    return true;  
+  }  
+
+  public boolean hasExactNestedTags(Vector tgs)
+  { java.util.Set alltags = allTagsIn(); 
+    if (tgs.containsAll(alltags) && 
+        alltags.containsAll(tgs))
+    { return true; } 
+    return false;   
+  }  
+
   public abstract String literalForm();
 
   public abstract String literalFormSpaces();
@@ -260,10 +287,32 @@ public abstract class ASTTerm
 
     return alltags; 
   } 
+
+  public static Vector allTagSetsAtIndex(int index, ASTTerm[] sasts)
+  { // tags for each i'th term of sasts
+
+    Vector alltags = new Vector(); 
+
+    Vector res = new Vector(); 
+    for (int i = 0; i < sasts.length; i++) 
+    { ASTTerm trm = (ASTTerm) sasts[i];
+      ASTTerm termi = (ASTTerm) trm.getTerm(index);  
+      java.util.Set tagi = termi.allTagsIn(); 
+      if (tagi != null)
+      { if (alltags.contains(tagi)) { } 
+        else 
+        { alltags.add(tagi); } 
+      } 
+    } 
+
+    return alltags; 
+  } 
     
   public abstract Vector allNestedTagsArities(); 
 
   public abstract Vector allTagsArities(); 
+
+  public abstract java.util.Set allTagsIn(); 
 
   public static Vector rulesFromTagsArities(Vector tagsarities)
   { // For each (tag,n) : tagsarities
@@ -1636,6 +1685,19 @@ public abstract class ASTTerm
     return true; 
   }   
 
+  public static boolean allSymbolOrBasicTerms(ASTTerm[] trees)
+  { if (trees.length == 0) 
+    { return false; }
+    for (int i = 0; i < trees.length; i++) 
+    { ASTTerm tx = trees[i]; 
+      if (tx instanceof ASTSymbolTerm) { } 
+      else if (tx instanceof ASTBasicTerm) { } 
+      else 
+      { return false; } 
+    } 
+    return true; 
+  }   
+
   public static boolean allNestedSymbolTerms(ASTTerm[] trees)
   { // All either symbols or nested symbols
 
@@ -1658,6 +1720,8 @@ public abstract class ASTTerm
   }   
 
   public abstract boolean isNestedSymbolTerm(); 
+
+  public abstract Vector allNestedSubterms(); 
   
   public static boolean recursivelyNestedEqual(
       ASTTerm[] strees, ASTTerm[] ttrees)
@@ -1734,6 +1798,26 @@ public abstract class ASTTerm
     } 
  
     return AuxMath.isFunctional(sattvalues,tattvalues); 
+  } 
+
+  public static boolean allSingletonTrees(Vector strees)
+  { for (int i = 0; i < strees.size(); i++) 
+    { ASTTerm sterm = (ASTTerm) strees.get(i); 
+      if (sterm == null || sterm.arity() != 1) 
+      { return false; } 
+    } 
+
+    return true; 
+  } 
+
+  public static boolean allSingletonTrees(ASTTerm[] strees)
+  { for (int i = 0; i < strees.length; i++) 
+    { ASTTerm sterm = strees[i]; 
+      if (sterm == null || sterm.arity() != 1) 
+      { return false; } 
+    } 
+
+    return true; 
   } 
 
   public static boolean functionalNestedSymbolMapping(ASTTerm[] strees, ASTTerm[] ttrees)
@@ -2048,6 +2132,26 @@ public abstract class ASTTerm
     return true; 
   } 
 
+  public static boolean alwaysNestedSymbolTerm(int ind, 
+                                          ASTTerm[] trees)
+  { if (trees == null || trees.length == 0) 
+    { return false; }
+    
+    for (int i = 1; i < trees.length; i++) 
+    { ASTTerm tx = trees[i]; 
+      if (tx == null || ind >= tx.arity()) 
+      { return false; } 
+      ASTTerm tsx = tx.getTerm(ind); 
+      if (tsx == null) 
+      { return false; }
+      if (tsx.isNestedSymbolTerm()) { } 
+      else 
+      { return false; }  
+    } 
+      
+    return true; 
+  } 
+
   public static boolean allCompositeSameLength(
                                    ASTTerm[] trees)
   { if (trees == null || trees.length == 0) 
@@ -2117,6 +2221,35 @@ public abstract class ASTTerm
 
     ASTTerm tsx = trm.getTerm(ind); 
     if (val.equals(tsx.getTag()))
+    { return true; } 
+    return false; 
+  } 
+
+  public static boolean hasNestedTags(ASTTerm trm, int ind, 
+                                      Vector tags) 
+  { if (trm == null) 
+    { return false; } 
+
+    if (ind >= trm.arity())
+    { return false; } 
+
+    ASTTerm tsx = trm.getTerm(ind); 
+    if (tsx != null && tsx.hasNestedTags(tags))
+    { return true; } 
+    return false; 
+  } 
+ 
+  public static boolean hasExactNestedTags(
+                                      ASTTerm trm, int ind, 
+                                      Vector tags) 
+  { if (trm == null) 
+    { return false; } 
+
+    if (ind >= trm.arity())
+    { return false; } 
+
+    ASTTerm tsx = trm.getTerm(ind); 
+    if (tsx != null && tsx.hasExactNestedTags(tags))
     { return true; } 
     return false; 
   } 
@@ -2338,6 +2471,37 @@ public abstract class ASTTerm
       } 
 
       // System.out.println(" " + p + " subterm is constant"); 
+
+      return true; 
+    } 
+
+    public static boolean constantTerms(ASTTerm[] trms, int p)
+    { // The p subterms of all trms are the same 
+
+      if (trms.length == 0) 
+      { return false; } 
+   
+      if (trms.length == 1) 
+      { return true; } 
+
+      ASTTerm t0 = trms[0]; 
+      if (t0.arity() <= p) 
+      { return false; } 
+
+      ASTTerm subtermp = t0.getTerm(p);
+ 
+      String lit = subtermp.literalForm(); 
+      
+      for (int i = 1; i < trms.length; i++) 
+      { ASTTerm t = trms[i]; 
+        ASTTerm subterm = t.getTerm(p);
+ 
+        if (subterm != null && 
+            subterm.literalForm().equals(lit))
+        { } 
+        else 
+        { return false; } 
+      } 
 
       return true; 
     } 
@@ -3801,7 +3965,7 @@ public abstract class ASTTerm
   public static AttributeMatching 
     compositeSource2TargetTrees(
       Entity sent, ASTTerm[] xs, ASTTerm[] ys, 
-      ModelSpecification mod)
+      ModelSpecification mod, Vector tms)
   { // Is there an index j of each xs[i] = (tag1 p1 ... pn) 
     // each pj = ys[i]  
     // or pj ~ ys[i]?
@@ -3809,49 +3973,114 @@ public abstract class ASTTerm
     // 
     // result = null indicates failure. 
 
+    JOptionPane.showInputDialog(">>>> compositeSource2TargetTrees " + xs[0] + " ---> " + ys[0]); 
+
     AttributeMatching res = null; 
 
-    if (ys.length > 1 && xs.length == ys.length)
-    { ASTTerm s0 = xs[0]; 
-      int xarity = s0.arity(); 
+    if (ys.length <= 1) 
+    { return res; }
 
-      for (int j = 0; j < xarity; j++) 
-      { Vector jvect = new Vector(); 
-        ASTTerm[] jterms = 
+    if (xs.length != ys.length)
+    { return res; } 
+
+    // if (ys.length > 1 && xs.length == ys.length)
+    ASTTerm s0 = xs[0]; 
+    int xarity = s0.arity(); 
+
+    for (int j = 0; j < xarity; j++) 
+    { Vector jvect = new Vector(); 
+      ASTTerm[] jterms = 
           ASTTerm.subterms(xs,j,jvect); 
-        boolean jmatch = true; 
+      boolean jmatch = true; 
     
-        for (int i = 0; i < xs.length && jmatch; i++)
-        { ASTTerm xx = jterms[i]; 
-          ASTTerm yy = ys[i]; 
+      for (int i = 0; i < xs.length && jmatch; i++)
+      { ASTTerm xx = jterms[i]; 
+        ASTTerm yy = ys[i]; 
 
-          System.out.println(">>>> Comparing " + (j+1) + "th source subterm " + xx + " to " + yy); 
+        /* JOptionPane.showInputDialog(">>>> Comparing " + (j+1) + "th source subterm " + xx + " to " + yy); */ 
 
-          if (xx.equals(yy) || 
-              mod.correspondingTrees(xx,yy)) 
-          { System.out.println(">>-- Corresponding terms: " + xx + " " + yy); } 
-          else 
-          { jmatch = false; } 
-        }
+        // String xxlit = xx.literalForm(); 
+        // String yylit = yy.literalForm(); 
 
-        if (jmatch) 
-        { System.out.println(">> match from " + (j+1) + 
-                             " source subterms to target"); 
-          BasicExpression sexpr = 
-            BasicExpression.newASTBasicExpression(s0);
+        if (xx.equals(yy) || 
+            mod.correspondingTrees(xx,yy)) 
+        { System.out.println(">>-- Corresponding terms: " + xx + " " + yy); } 
+        else 
+        { jmatch = false; } 
+      }
+
+      if (jmatch) 
+      { /* JOptionPane.showInputDialog(">> match from " + (j+1) + 
+                    " source subterms to target " + ys[0]); */  
+        BasicExpression sexpr = 
+            BasicExpression.newASTBasicExpression(s0, xs);
           
-          ASTTerm targ0 = ys[0]; 
-          BasicExpression texpr = new BasicExpression(targ0);
-          Vector newpars = new Vector(); 
-          newpars.add(new BasicExpression("_" + (j+1))); 
-          texpr.setParameters(newpars); 
+        ASTTerm targ0 = ys[0]; 
+        BasicExpression texpr = new BasicExpression(targ0);
+        Vector newpars = new Vector(); 
+        newpars.add(new BasicExpression("_" + (j+1))); 
+        texpr.setParameters(newpars); 
  
-          AttributeMatching amx = 
+        AttributeMatching amx = 
             new AttributeMatching(sexpr, texpr);
-          return amx;   
-        } 
-      } // try next j
+        return amx;   
+      } 
+    } // try next j
+  
+    /* JOptionPane.showInputDialog("!! No match found from " + xs[0] + 
+                      " to " + ys[0] + " " + 
+                      ASTTerm.allSingletonTrees(xs)); */  
+          
+    // Try to unwrap the xs subterms. 
+    for (int j = 0; j < xarity; j++) 
+    { Vector jvect = new Vector(); 
+      ASTTerm[] jterms = 
+          ASTTerm.subterms(xs,j,jvect); 
+
+      if (ASTTerm.allSingletonTrees(jterms))
+      { Vector srcJValues1 = new Vector(); 
+        ASTTerm[] sourceJValues1 = 
+            ASTTerm.subterms( 
+                      jterms,0,srcJValues1);
+        AttributeMatching amsub =  
+             ASTTerm.compositeSource2TargetTrees(
+               sent, sourceJValues1, ys, mod, tms); 
+
+        if (amsub != null) 
+        { JOptionPane.showInputDialog(">> match from " + 
+              (j+1) +   
+              " source subterm 1 to target " + amsub); 
+          BasicExpression sexpr = 
+            BasicExpression.newASTBasicExpression(s0, xs);
+
+          // If one subterm position is always the same, 
+          // set it as a constant in sexpr. 
+
+          // ASTTerm targ0 = ys[0]; 
+          // BasicExpression texpr = new BasicExpression(targ0);
+          // Vector newpars = new Vector(); 
+          // newpars.add(new BasicExpression("_" + (j+1))); 
+          // texpr.setParameters(newpars); 
+
+          String fid = 
+             Identifier.nextIdentifier("singleElement");
+          TypeMatching tmnew = new TypeMatching(fid);
+          tmnew.addValueMap(amsub);     
+          tms.add(tmnew);
+          BasicExpression svar = 
+            new BasicExpression("_" + (j+1));       
+          BasicExpression fapp = 
+            new BasicExpression(fid); 
+          fapp.setUmlKind(Expression.FUNCTION);
+          fapp.addParameter(svar);
+
+          AttributeMatching amx = 
+            new AttributeMatching(sexpr, fapp);
+          return amx; 
+        }
+      } 
     } 
+
     return null; 
   }
 

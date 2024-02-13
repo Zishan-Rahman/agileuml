@@ -21,6 +21,8 @@ public class CGCondition
   boolean isMatches = false; 
      // compare variable to stereotype
   boolean isWith = false; 
+  boolean isNested = false; 
+
 
   public CGCondition()
   { } 
@@ -56,9 +58,12 @@ public class CGCondition
     String stereo = ""; 
     String var = ""; 
     boolean pos = true; 
+    boolean nestedCondition = false; 
 
     if (expr instanceof BinaryExpression) 
     { BinaryExpression ee = (BinaryExpression) expr; 
+
+      String oper = ee.getOperator(); 
 
       Vector vars = ee.metavariables(); 
       if (vars.size() > 0) 
@@ -68,8 +73,12 @@ public class CGCondition
       else 
       { var = "_1"; } 
  
-      if ("/=".equals(ee.getOperator()))
+      if ("/=".equals(oper))
       { pos = false; } 
+      else if ("isNested".equals(oper))
+      { nestedCondition = true; } 
+      // otherwise assumed to be "="
+
 
       stereo = ee.getRight() + ""; 
     }
@@ -77,8 +86,10 @@ public class CGCondition
     if (rulevars.contains(var))
     { CGCondition res = new CGCondition(stereo,var);
       res.setPositive(pos); 
+      res.setIsNested(nestedCondition); 
       return res; 
     } 
+
     return null;  
   } 
 
@@ -135,6 +146,9 @@ public class CGCondition
   public void setIsWith(boolean w)
   { isWith = w; } 
 
+  public void setIsNested(boolean w)
+  { isNested = w; } 
+
   public String toString()
   { String res = variable;
 
@@ -148,6 +162,8 @@ public class CGCondition
     { res = res + " matches"; }  
     else if (isWith)
     { res = res + " with"; }  
+    else if (isNested)
+    { res = res + " isNested"; }  
  
     if (positive) { } 
     else  
@@ -297,7 +313,7 @@ public class CGCondition
 
     // _i`f with _j  uses _j as the parameter _$ in f::
 
-    if (isSubstitute || isMatches) 
+    if (isSubstitute || isMatches || isNested) 
     { return; } 
 
     String stereo = new String(stereotype); 
@@ -495,10 +511,10 @@ public class CGCondition
           else // No ruleset, set ast`mffeat=stereo
           { ASTTerm.setTaggedValue(ast, mffeat, stereo); 
             
-            JOptionPane.showMessageDialog(null,
+          /*  JOptionPane.showMessageDialog(null,
               "Executed action " + ast + "`" + mffeat + 
               " = " + stereo + " Tagged values = " + ASTTerm.metafeatures, 
-              "", JOptionPane.INFORMATION_MESSAGE);  
+              "", JOptionPane.INFORMATION_MESSAGE); */   
             // repl = stereo; 
           }  
     
@@ -1415,6 +1431,15 @@ public class CGCondition
         return false; 
       } 
 
+      if (isNested)
+      { // check that term is nested on stereo
+        Vector tgs = new Vector(); 
+        tgs.add(stereo); 
+        if (a.hasNestedTags(tgs))
+        { return true; } 
+        return false; 
+      } 
+
       Vector stereosOfVar = 
         (Vector) ASTTerm.metafeatures.get(repl); 
 
@@ -1445,6 +1470,15 @@ public class CGCondition
       return false; 
     } 
       
+    if (isNested)
+    { // check that term is nested on stereo
+      Vector tgs = new Vector(); 
+      tgs.add(stereo); 
+      if (a.hasNestedTags(tgs))
+      { return true; } 
+      return false; 
+    } 
+
     // if ("integer".equalsIgnoreCase(stereotype))
     // { if (a.isInteger()) 
     //   { return positive; } 

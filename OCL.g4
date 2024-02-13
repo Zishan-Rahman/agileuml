@@ -5,7 +5,7 @@
 * Arrow operators ->op are used consistently for any OCL 
 * operator, not just collection operators. 
 * 
-* Copyright (c) 2003--2023 Kevin Lano
+* Copyright (c) 2003--2024 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -16,22 +16,24 @@
 grammar OCL;	
 	
 specification
-  : 'package' ID '{' classifier* '}' EOF
+  : 'package' identifier '{' classifier* '}' EOF
   ;
 
 classifier
     : classDefinition
     | interfaceDefinition
     | usecaseDefinition
+    | datatypeDefinition
     | enumeration
     ;
 
 interfaceDefinition
-    :	'interface' ID ('extends' ID)? '{' classBody? '}'
+    :	'interface' identifier ('extends' identifier)? '{' classBody? '}'
     ; 
 
 classDefinition
-    :	'class' ID ('extends' ID)? ('implements' idList)? '{' classBody? '}'
+    :	'class' identifier ('extends' identifier)? 
+     ('implements' idList)? '{' classBody? '}'
     ; 
 
 classBody
@@ -46,15 +48,15 @@ classBodyElement
     ; 
 
 attributeDefinition 
-    :  'attribute' ID ('identity' | 'derived')? ':' type ';' 
-    | 'static' 'attribute' ID ':' type ';'
+    :  'attribute' identifier ('identity' | 'derived')? ':' type ';' 
+    | 'static' 'attribute' identifier ':' type ';'
     ; 
 
 operationDefinition
-      : ('static')? 'operation' ID 
+      : ('static')? 'operation' identifier 
         '(' parameterDeclarations? ')' ':' type 
         'pre:' expression 'post:' expression 
-        ('activity:' statement)? ';'
+        ('activity:' statementList)? ';'
       ;
 
 parameterDeclarations
@@ -62,16 +64,16 @@ parameterDeclarations
       ;
 
 parameterDeclaration
-      : ID ':' type
+      : identifier ':' type
       ;
 
 idList
-     : (ID ',')* ID
+     : (identifier ',')* identifier
      ; 
 
 usecaseDefinition
-      : 'usecase' ID (':' type)? '{' usecaseBody? '}' 
-      | 'usecase' ID '(' parameterDeclarations ')' (':' type)? '{' usecaseBody? '}'
+      : 'usecase' identifier (':' type)? '{' usecaseBody? '}' 
+      | 'usecase' identifier '(' parameterDeclarations ')' (':' type)? '{' usecaseBody? '}'
       ;
 
 usecaseBody
@@ -79,11 +81,11 @@ usecaseBody
       ; 
 
 usecaseBodyElement
-      : 'parameter' ID ':' type ';' 
+      : 'parameter' identifier ':' type ';' 
       | 'precondition' expression ';' 
-      | 'extends' ID ';' 
-      | 'extendedBy' ID ';' 
-      | 'activity:' statement ';' 
+      | 'extends' identifier ';' 
+      | 'extendedBy' identifier ';' 
+      | 'activity:' statementList ';' 
       | '::' expression 
       | stereotype
       ;
@@ -93,17 +95,25 @@ invariant
       ; 
 
 stereotype
-      : 'stereotype' ID ';'  
-      | 'stereotype' ID '=' STRING_LITERAL ';'  
-      | 'stereotype' ID '=' ID ';' 
+      : 'stereotype' identifier ';'  
+      | 'stereotype' identifier '=' STRING_LITERAL ';'  
+      | 'stereotype' identifier '=' identifier ';' 
       ;
 
+datatypeDefinition
+      : 'datatype' identifier '=' type
+      ; 
+
 enumeration 
-      : 'enumeration' ID '{' enumerationLiteral+ '}'
+      : 'enumeration' identifier '{' enumerationLiterals '}'
       ;  
 
+enumerationLiterals
+      : enumerationLiteral (';' enumerationLiteral)*
+      ;
+
 enumerationLiteral
-      : 'literal' ID
+      : 'literal' identifier
       ;
 
 type
@@ -111,6 +121,7 @@ type
     | 'Set' '(' type ')'  
     | 'Bag' '(' type ')' 
     | 'OrderedSet' '(' type ')' 
+    | 'Ref' '(' type ')'  
     | 'Map' '(' type ',' type ')' 
     | 'Function' '(' type ',' type ')' 
     | ID
@@ -149,23 +160,23 @@ conditionalExpression
     ; 
 
 lambdaExpression 
-    : 'lambda' ID ':' type 'in' expression
+    : 'lambda' identifier ':' type 'in' expression
     ; 
 
 // A let is just an application of a lambda:
 
 letExpression
-    : 'let' ID ':' type '=' expression 'in' expression
+    : 'let' identifier ':' type '=' expression 'in' expression
     ; 
 
 logicalExpression
-    : logicalExpression '=>' logicalExpression  
-    | logicalExpression 'implies' logicalExpression  
+    : 'not' logicalExpression  
+    | logicalExpression 'and' logicalExpression  
+    | logicalExpression '&' logicalExpression 
     | logicalExpression 'or' logicalExpression  
     | logicalExpression 'xor' logicalExpression  
-    | logicalExpression '&' logicalExpression 
-    | logicalExpression 'and' logicalExpression  
-    | 'not' logicalExpression  
+    | logicalExpression '=>' logicalExpression  
+    | logicalExpression 'implies' logicalExpression  
     | equalityExpression
     ; 
 
@@ -184,7 +195,7 @@ additiveExpression
     ; 
 
 factorExpression 
-    : factorExpression ('*' | '/' | 'mod' | 'div') 
+    : factor2Expression ('*' | '/' | 'mod' | 'div') 
                                    factorExpression
     | factor2Expression
     ; 
@@ -195,7 +206,9 @@ factorExpression
 
 factor2Expression
   : '-' factor2Expression 
-  | '+' factor2Expression  
+  | '+' factor2Expression 
+  | '?' factor2Expression
+  | '!' factor2Expression 
   | factor2Expression '->size()' 
   | factor2Expression '->copy()'  
   | factor2Expression ('->isEmpty()' | 
@@ -242,6 +255,7 @@ factor2Expression
    | factor2Expression '->toInteger()'  
    | factor2Expression '->toReal()' 
    | factor2Expression '->toBoolean()' 
+   | factor2Expression '->display()' 
    | factor2Expression '->toUpperCase()'  
    | factor2Expression '->toLowerCase()' 
    | factor2Expression ('->unionAll()' | '->intersectAll()' |
@@ -253,7 +267,7 @@ factor2Expression
             | '->excluding' | '->includesAll'  
             | '->symmetricDifference' 
             | '->excludesAll' | '->prepend' | '->append'  
-            | '->count' | '->apply') 
+            | '->count' | '->apply' ) 
                                    '(' expression ')' 
    | factor2Expression ('->hasMatch' | '->isMatch' |
                        '->firstMatch' | '->indexOf' | 
@@ -309,10 +323,13 @@ statement
    | 'for' ID ':' expression 'do' statement 
    | 'return' expression 
    | basicExpression ':=' expression 
-   | statement ';' statement  
    | 'execute' expression 
    | 'call' basicExpression 
-   | '(' statement ')'
+   | '(' statementList ')'
+   ; 
+
+statementList
+   : statement (';' statement)*  
    ;  
 
 nlpscript 

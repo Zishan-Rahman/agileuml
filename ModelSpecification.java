@@ -5668,6 +5668,8 @@ public class ModelSpecification
     // (Entity sent) have the same tag 
     // and arity and non-constant terms (variables _i in CSTL).
 
+    // JOptionPane.showInputDialog("*** Calling composedTreeFunction for " + VectorUtil.allToVector(sattvalueMap.values()) + " ---> " + tvalues); 
+
     Attribute var_1 = 
         new Attribute("_1", new Type("OclAny",null),
                    ModelElement.INTERNAL);
@@ -5742,7 +5744,7 @@ public class ModelSpecification
         return amx;   
       } // Actually tag:: _* |-->_* for each source tag
       else if (ASTTerm.allSymbolTerms(sattvalues) && 
-               ASTTerm.allSymbolTerms(targetValues) &&
+               ASTTerm.allSymbolOrBasicTerms(targetValues) &&
                ASTTerm.functionalSymbolMapping(
                             sattvalues,targetValues))
       { String fid = 
@@ -5787,7 +5789,7 @@ public class ModelSpecification
           new AttributeMatching(var1expr, fexpr);
         return amx;   
       } 
-      else if (ASTTerm.allSymbolTerms(targetValues) && 
+      else if (ASTTerm.allSymbolOrBasicTerms(targetValues) && 
                ASTTerm.allNestedSymbolTerms(sattvalues) &&
                ASTTerm.functionalSymbolMapping(
                                 sattvalues,targetValues))
@@ -5814,7 +5816,7 @@ public class ModelSpecification
       } 
       else if (ASTTerm.sameTag(targetValues) && 
          ASTTerm.singletonTrees(sent, sattvalues,
-                                targetValues,this)) 
+                                targetValues, this)) 
       { ASTTerm targ0 = targetValues[0]; 
         BasicExpression targexpr = new BasicExpression(targ0);
         Vector newpars = new Vector(); 
@@ -5868,7 +5870,7 @@ public class ModelSpecification
                ASTTerm.allCompositeSameLength(sattvalues)) 
       { AttributeMatching amsub = 
           ASTTerm.compositeSource2TargetTrees(sent, 
-                       sattvalues,targetValues,this); 
+                       sattvalues,targetValues,this,tms); 
         if (amsub != null) 
         { System.out.println(">> Mapping from subterm of source: " + amsub);
           return amsub; 
@@ -5975,7 +5977,7 @@ public class ModelSpecification
               if (ASTTerm.hasNullTerm(srcJValues))
               { break; } 
 
-              System.out.println(">->->> Comparing source term " + (sindex+1) + " values " + srcJValues + " to target term " + (tindex+1) + " values " + trgJValues); 
+              // JOptionPane.showInputDialog(">->->> Comparing source term " + (sindex+1) + " values " + srcJValues + " to target term " + (tindex+1) + " values " + trgJValues); 
 
               int k = tindex+1; 
                 
@@ -5987,7 +5989,8 @@ public class ModelSpecification
                 sfoundvars.add("_" + (sindex + 1));  
                 foundsource = true; 
               } 
-              else if (ASTTerm.allSymbolTerms(sourceJValues) &&
+              else if (ASTTerm.allSymbolTerms(
+                                         sourceJValues) &&
                 ASTTerm.recursivelyNestedEqual(
                    sourceJValues,
                    targetJValues))
@@ -6013,7 +6016,7 @@ public class ModelSpecification
                    (sindex + 1) + " to target " + k);
                 AttributeMatching amsub = 
                   ASTTerm.compositeSource2TargetTrees(sent, 
-                       sourceJValues,targetJValues,this); 
+                       sourceJValues,targetJValues,this,tms); 
                 if (amsub != null) 
                 { System.out.println(">>-- Discovered mapping from subterm of source " + amsub);
                   String fid = 
@@ -6069,6 +6072,34 @@ public class ModelSpecification
                            tatt,sourceatts,newSMap,     
                            targetJValues, trgJValues, 
                            tms, locams); 
+
+                  // JOptionPane.showInputDialog("Nested mapping for source term " + (sindex+1) + " to target " + (tindex+1) + ": " + amjx);
+                  if (amjx == null && 
+                      ASTTerm.allSingletonTrees(sourceJValues))
+                  { // try again with the elements 
+
+                    Vector srcJValues1 = new Vector(); 
+                    ASTTerm[] sourceJValues1 = 
+                      ASTTerm.subterms( 
+                         sourceJValues,0,srcJValues1);
+
+                    // if (ASTTerm.hasNullTerm(srcJValues1))
+                    // { break; } 
+
+                    java.util.Map newSMap1 = 
+                         new java.util.HashMap(); 
+                    newSMap1.putAll(sattvalueMap);
+                    newSMap1.put(satt, sourceJValues1);
+                    Vector locams1 = new Vector(); 
+                    amjx = 
+                       composedTreeFunction(sent,
+                           tatt,sourceatts,newSMap1,     
+                           targetJValues, trgJValues, 
+                           tms, locams1); 
+                   
+                   // JOptionPane.showInputDialog("Nested mapping for source terms " + srcJValues1 + " to target terms " + trgJValues + ": " + amjx);
+                  } 
+
                   if (amjx != null) 
                   { System.out.println(">>-->> Found nested mapping for source term " + (sindex+1) + " to target " + (tindex+1) + ": " + amjx);
                     System.out.println(">>-->> " + amjx + " is vacuous: " + amjx.isVacuous() + " Is basic: " + amjx.isBasic());
@@ -6152,6 +6183,33 @@ public class ModelSpecification
                      tatt,sourceatts,sattvalueMap,     
                      targetJValues, trgJValues, 
                      tms, localams); 
+
+              if (amjw == null && 
+                  ASTTerm.allSingletonTrees(sattvalues))
+              { // try again with the elements 
+
+                Vector srcJValues1 = new Vector(); 
+                ASTTerm[] sourceJValues1 = 
+                   ASTTerm.subterms( 
+                         sattvalues,0,srcJValues1);
+
+                    // if (ASTTerm.hasNullTerm(srcJValues1))
+                    // { break; } 
+
+                java.util.Map newSMap1 = 
+                         new java.util.HashMap(); 
+                newSMap1.putAll(sattvalueMap);
+                newSMap1.put(satt, sourceJValues1);
+                Vector locams1 = new Vector(); 
+                amjw = 
+                  composedTreeFunction(sent,
+                           tatt, sourceatts, newSMap1,     
+                           targetJValues, trgJValues, 
+                           tms, locams1); 
+                   
+                 // JOptionPane.showInputDialog(">>> Nested mapping for complete source terms " + srcJValues1 + " to target " + (tindex + 1) + " terms " + trgJValues + ": " + amjw);
+              } 
+
               if (amjw != null) 
               { System.out.println(">>> Found mapping of complete source term to target term " + (tindex+1) + ": " + amjw); 
                 foundsource = true; 
@@ -6264,8 +6322,9 @@ public class ModelSpecification
       }  
       else if (ASTTerm.sameTag(targetValues) && 
          ASTTerm.sameArityTrees(sattvalues,targetValues))
-      { Vector localams = new Vector(); 
-        System.out.println(">> Checking direct correspondence of subterms of trees of varying arity: " + sattvalues[0] + " ---> " + targetValues[0]); 
+      { Vector localams = new Vector();
+ 
+        JOptionPane.showInputDialog(">> Checking direct correspondence of subterms of trees of varying arity: " + sattvalues[0] + " ---> " + targetValues[0]); 
         System.out.println();           
 
         AttributeMatching amts = 
@@ -6278,7 +6337,7 @@ public class ModelSpecification
           return amts; 
         } 
 
-        System.out.println(">++> Checking tree-tree mapping with indirect correspondence of subterms: " + sattvalues[0] + " ---> " + targetValues[0]); 
+        JOptionPane.showInputDialog(">++> Checking tree-tree mapping with indirect correspondence of subterms: " + sattvalues[0] + " ---> " + targetValues[0]); 
         System.out.println();           
 
         amts = treeSequenceMapping2(satt, sent, tatt, 
@@ -6295,7 +6354,8 @@ public class ModelSpecification
          ASTTerm.sameNonSymbolArity(sattvalues,targetValues))
       { Vector localams = new Vector(); 
         
-        System.out.println(">**> Checking tree-2-tree mapping with symbol deletion/replacement: " + sattvalues[0] + " ---> " + targetValues[0]); 
+        JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with symbol deletion/replacement: " + sattvalues[0] + " ---> " + targetValues[0]); 
+
         System.out.println();           
 
         AttributeMatching amts = 
@@ -6313,7 +6373,7 @@ public class ModelSpecification
          ASTTerm.lowerNonSymbolArity(sattvalues,targetValues))
       { Vector localams = new Vector(); 
         
-        System.out.println(">**> Checking tree-2-tree mapping with selection/filtering: " + sattvalues[0] + " ---> " + targetValues[0]); 
+        JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with selection/filtering: " + sattvalues[0] + " ---> " + targetValues[0]); 
         System.out.println();           
 
         AttributeMatching amts = 
@@ -6334,7 +6394,7 @@ public class ModelSpecification
                     sattvalues,targetValues,this))
       { Vector localams = new Vector(); 
         
-        System.out.println(">**> Checking tree-2-tree mapping with concatenation: " + sattvalues[0] + " ---> " + targetValues[0]); 
+        JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with concatenation: " + sattvalues[0] + " ---> " + targetValues[0]); 
 
         AttributeMatching amts = 
           ASTTerm.concatenationTreeMapping(
@@ -6356,7 +6416,7 @@ public class ModelSpecification
               sattvalues,targetValues,this))
         { Vector localams = new Vector(); 
         
-          System.out.println(">**> Checking tree-2-tree mapping with suffixes: " + sattvalues[0] + " ---> " + targetValues[0]); 
+          JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with suffixes: " + sattvalues[0] + " ---> " + targetValues[0]); 
 
           AttributeMatching amts = 
             ASTTerm.suffixTreeMapping(
@@ -6376,7 +6436,7 @@ public class ModelSpecification
                     sattvalues,targetValues,this))
         { Vector localams = new Vector(); 
         
-          System.out.println(">**> Checking tree-2-tree mapping with suffix function: " + sattvalues[0] + " ---> " + targetValues[0]); 
+          JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with suffix function: " + sattvalues[0] + " ---> " + targetValues[0]); 
 
           AttributeMatching amts = 
             ASTTerm.suffixTreeFunctionMapping(
@@ -6394,7 +6454,7 @@ public class ModelSpecification
                     sattvalues,targetValues,this))
         { Vector localams = new Vector(); 
         
-          System.out.println(">**> Checking tree-2-tree mapping with prefix function: " + sattvalues[0] + " ---> " + targetValues[0]); 
+          JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with prefix function: " + sattvalues[0] + " ---> " + targetValues[0]); 
 
           AttributeMatching amts = 
             ASTTerm.prefixTreeFunctionMapping(
@@ -6412,7 +6472,7 @@ public class ModelSpecification
                     sattvalues,targetValues,this))
         { Vector localams = new Vector(); 
         
-          System.out.println(">&&> Checking tree-2-sequence mapping: " + sattvalues[0] + " ---> " + targetValues[0]); 
+          JOptionPane.showInputDialog(">&&> Checking tree-2-sequence mapping: " + sattvalues[0] + " ---> " + targetValues[0]); 
 
           AttributeMatching amts = 
             ASTTerm.tree2SequenceMap(
@@ -7188,6 +7248,9 @@ public class ModelSpecification
   { // Look for conditions on sent::ast attribute which 
     // partition the sobjs-->tobjs pairs that satisfy 
     // mappings. 
+    // Conditions: (i) based on symbol at i'th position
+    // (ii) based on tag at i'th position
+    // (iii) based on tags within terms at i'th position
 
     Vector res = new Vector(); 
     Vector ams = new Vector(); 
@@ -7254,9 +7317,12 @@ public class ModelSpecification
         java.util.Set distinctVals = new java.util.HashSet();
         distinctVals.addAll(svals); 
 
+        boolean allValuesHaveMapping = true; 
+
         if (distinctVals.size() > 1)
         { Vector dvals = new Vector(); 
           dvals.addAll(distinctVals); 
+
           for (int j = 0; j < dvals.size(); j++) 
           { String dval = (String) dvals.get(j); 
             Expression condv = 
@@ -7298,20 +7364,31 @@ public class ModelSpecification
                       tms,ams);
              
             System.out.println(">>> New candidate attribute matching: " + cexpr); 
-    
-
             System.out.println(); 
+       
             if (cexpr != null) 
             { emx.addAttributeMapping(cexpr); 
               res.add(emx); 
-              foundConditionalMatching = true;
-
-              JOptionPane.showMessageDialog(null, 
-                "*** New candidate attribute matching " + 
-                cexpr + " for " + emx + 
-                " with condition " + condv,   "",
-                JOptionPane.INFORMATION_MESSAGE); 
             } 
+            else // try to subdivide the svalues,tvalues
+            { Vector subres = 
+                conditionalSubTreeMappings(sent,tent,svalues, 
+                                           tvalues,tms); 
+              if (subres != null && subres.size() > 0)
+              { res.addAll(subres); } 
+              else  
+              { allValuesHaveMapping = false; }
+            } 
+          }
+
+          if (allValuesHaveMapping)
+          { foundConditionalMatching = true;
+            /* JOptionPane.showMessageDialog(null, 
+                "*** Found conditional matching " + 
+                res,   "",
+                JOptionPane.INFORMATION_MESSAGE); */  
+            
+            return res; 
           }
         }    
       } 
@@ -7320,9 +7397,9 @@ public class ModelSpecification
     if (!foundConditionalMatching)
     { // instead, try conditions based on the tag of i'th term
 
-      JOptionPane.showMessageDialog(null, 
+      /* JOptionPane.showMessageDialog(null, 
               "*** Could not find conditional matching for " + sobjs + " ---> " + tobjs,   "",
-              JOptionPane.INFORMATION_MESSAGE); 
+              JOptionPane.INFORMATION_MESSAGE); */ 
 
       for (int i = 0; i < sarity; i++) 
       { if (ASTTerm.alwaysSymbol(i,srcasts))
@@ -7333,6 +7410,237 @@ public class ModelSpecification
 
         if (svals.size() > 1)
         { // try splitting on this basis
+
+          boolean completeMapping = true; 
+
+          Expression _i = 
+            BasicExpression.newVariableBasicExpression("_" + 
+                                                     (i+1)); 
+          Vector dvals = new Vector(); 
+          dvals.addAll(svals); 
+          for (int j = 0; j < dvals.size(); j++) 
+          { String dval = (String) dvals.get(j); 
+            Expression condv = 
+              new BinaryExpression("=", _i, 
+                    new BasicExpression(dval)); 
+            EntityMatching emx = 
+              new EntityMatching(sent,tent); 
+            emx.setCondition(condv); 
+
+            System.out.println(">>> New candidate Entity matching: " + emx + " for condition " + condv); 
+
+            Vector svalues = new Vector(); 
+            Vector tvalues = new Vector(); 
+
+            for (int k = 0; k < nobjs; k++) 
+            { if (ASTTerm.hasTagValue(srcasts[k],i,dval))
+              { svalues.add(srcasts[k]); 
+                tvalues.add(trgasts[k]); 
+              } 
+            } 
+              
+            int en = svalues.size();
+            if (en < 2) 
+            { continue; } // next value 
+ 
+            ASTTerm[] sattvalues = new ASTTerm[en]; 
+            ASTTerm[] tattvalues = new ASTTerm[en]; 
+            
+            for (int k = 0; k < en; k++) 
+            { sattvalues[k] = (ASTTerm) svalues.get(k);
+              tattvalues[k] = (ASTTerm) tvalues.get(k); 
+            }
+
+            sattvalueMap.put(sast,sattvalues); 
+
+            AttributeMatching cexpr = 
+              composedTreeFunction(sent,tast,sourceattributes,
+                      sattvalueMap,tattvalues,tvalues,
+                      tms,ams);
+           
+            if (cexpr != null) 
+            { emx.addAttributeMapping(cexpr); 
+              res.add(emx); 
+            } 
+            else 
+            { completeMapping = false; }
+          }
+
+          if (completeMapping) 
+          { return res; } 
+        }    
+      } 
+    } 
+
+    if (!foundConditionalMatching)
+    { // instead, try conditions based on tags in i'th term
+
+      /* JOptionPane.showMessageDialog(null, 
+              "*** Could not find conditional matching for " + sobjs + " ---> " + tobjs,   "",
+              JOptionPane.INFORMATION_MESSAGE); */ 
+
+      for (int i = 0; i < sarity; i++) 
+      { if (ASTTerm.alwaysNestedSymbolTerm(i,srcasts))
+        { 
+          Vector svals = ASTTerm.allTagSetsAtIndex(i,srcasts); 
+          System.out.println(">> Tag sets at index " + i + ": " + svals);
+         /* JOptionPane.showMessageDialog(null, 
+              "*** Tag sets " + svals + " at index " + i,  
+              "",
+              JOptionPane.INFORMATION_MESSAGE); */ 
+
+          if (svals.size() > 1)
+          { // try splitting on this basis
+
+            boolean completeMapping = true; 
+
+            Expression _i = 
+              BasicExpression.newVariableBasicExpression("_" + 
+                                                     (i+1)); 
+            Vector dvals = new Vector(); 
+            dvals.addAll(svals); 
+            for (int j = 0; j < dvals.size(); j++) 
+            { java.util.Set dval = 
+                     (java.util.Set) dvals.get(j);
+              Vector tagsAtj = new Vector(); 
+              tagsAtj.addAll(dval); 
+              String tag1 = (String) tagsAtj.get(0);  
+              Expression condv = 
+                new BinaryExpression("isNested", _i, 
+                    new BasicExpression(tag1));
+              for (int k = 1; k < tagsAtj.size(); k++) 
+              { String tagk = (String) tagsAtj.get(k); 
+                condv =
+                  new BinaryExpression("&", condv, 
+                    new BinaryExpression("isNested", _i, 
+                      new BasicExpression(tagk)));
+              }
+              EntityMatching emx = 
+                new EntityMatching(sent,tent); 
+              emx.setCondition(condv); 
+
+              System.out.println(">>> New candidate Entity matching: " + emx + " for condition " + condv); 
+           /*   JOptionPane.showMessageDialog(null, 
+                "*** New candidate Entity matching: " + emx + " for condition " + condv,  
+                "",
+                JOptionPane.INFORMATION_MESSAGE); */ 
+
+              Vector svalues = new Vector(); 
+              Vector tvalues = new Vector(); 
+
+              for (int k = 0; k < nobjs; k++) 
+              { if (ASTTerm.hasExactNestedTags(
+                                 srcasts[k],i,tagsAtj))
+                { svalues.add(srcasts[k]); 
+                  tvalues.add(trgasts[k]); 
+                } 
+              } 
+              
+              int en = svalues.size();
+              if (en < 2) 
+              { continue; } // next value 
+ 
+              ASTTerm[] sattvalues = new ASTTerm[en]; 
+              ASTTerm[] tattvalues = new ASTTerm[en]; 
+            
+              for (int k = 0; k < en; k++) 
+              { sattvalues[k] = (ASTTerm) svalues.get(k);
+                tattvalues[k] = (ASTTerm) tvalues.get(k); 
+              }
+
+              sattvalueMap.put(sast,sattvalues); 
+
+              AttributeMatching cexpr = 
+                composedTreeFunction(sent,tast,
+                                     sourceattributes,
+                      sattvalueMap,tattvalues,tvalues,
+                      tms,ams);
+           
+              if (cexpr != null) 
+              { emx.addAttributeMapping(cexpr); 
+                res.add(emx); 
+              } 
+              else 
+              { completeMapping = false; }
+            }
+
+            if (completeMapping) 
+            { return res; } 
+          }
+        }    
+      } 
+    } 
+
+    return res;  
+  } 
+
+  public Vector conditionalSubTreeMappings(
+      Entity sent, Entity tent, Vector sobjs, Vector tobjs,
+      Vector tms) 
+  { // Look for conditions on sent::ast attribute which 
+    // partition the sobjs-->tobjs pairs that satisfy 
+    // mappings. 
+
+    Vector res = new Vector(); 
+    Vector ams = new Vector(); 
+
+    int nobjs = sobjs.size(); 
+	
+    if (nobjs != tobjs.size())
+    { System.err.println("!! Non-matching source/target objects: " + sobjs + " " + tobjs); 
+      return res; 
+    }
+
+    
+    Attribute sast = sent.getDefinedAttribute("ast"); 
+    Attribute tast = tent.getDefinedAttribute("ast"); 
+
+    if (sast == null || tast == null) 
+    { return res; } 
+
+    Vector sourceattributes = new Vector(); 
+    sourceattributes.add(sast); 
+
+    // Source trees should all have same tag & same arity
+    // Look for term position i which is always a symbol. 
+    // conditions are  _i = v  for the values v that occur.
+
+    ASTTerm[] srcasts = new ASTTerm[nobjs]; 
+    ASTTerm[] trgasts = new ASTTerm[nobjs]; 
+
+    for (int i = 0; i < nobjs; i++) 
+    { ASTTerm trm = (ASTTerm) sobjs.get(i); 
+      srcasts[i] = trm;
+      ASTTerm ttrm = (ASTTerm) tobjs.get(i); 
+      trgasts[i] = ttrm; 
+    } 
+
+    if (ASTTerm.sameTagSameArity(srcasts))
+    { } 
+    else 
+    { return res; }
+
+    java.util.Map sattvalueMap = new java.util.HashMap(); 
+
+    int sarity = srcasts[0].arity();
+ 
+    boolean foundConditionalMatching = false; 
+
+
+    if (!foundConditionalMatching)
+    { // instead, try conditions based on the tag of i'th term
+
+      for (int i = 0; i < sarity; i++) 
+      { if (ASTTerm.alwaysSymbol(i,srcasts))
+        { continue; } 
+
+        Vector svals = ASTTerm.allTagsAtIndex(i,srcasts); 
+        System.out.println(">> Tag values at index " + i + ": " + svals);
+
+        if (svals.size() > 1)
+        { // try splitting on this basis
+
+          boolean completeMapping = true; 
 
           Expression _i = 
             BasicExpression.newVariableBasicExpression("_" + 
@@ -7379,19 +7687,16 @@ public class ModelSpecification
                       sattvalueMap,tattvalues,tvalues,
                       tms,ams);
              
-            System.out.println(">>> New candidate attribute matching: " + cexpr); 
-    
-            JOptionPane.showMessageDialog(null, 
-              "*** New candidate attribute matching " + cexpr + " for " + emx + " with condition " + condv,   "",
-              JOptionPane.INFORMATION_MESSAGE); 
-
-            System.out.println(); 
             if (cexpr != null) 
             { emx.addAttributeMapping(cexpr); 
               res.add(emx); 
-              foundConditionalMatching = true;
             } 
+            else 
+            { completeMapping = false; } 
           }
+
+          if (completeMapping) 
+          { return res; } 
         }    
       } 
     } 

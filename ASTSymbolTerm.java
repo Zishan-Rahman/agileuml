@@ -1,5 +1,5 @@
 /******************************
-* Copyright (c) 2003--2023 Kevin Lano
+* Copyright (c) 2003--2024 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -90,6 +90,9 @@ public class ASTSymbolTerm extends ASTTerm
 
   public boolean isNestedSymbolTerm() 
   { return true; } 
+
+  public Vector allNestedSubterms()
+  { return new Vector(); }  
 
   public String cg(CGSpec cgs)
   { return symbol; } 
@@ -227,6 +230,9 @@ public class ASTSymbolTerm extends ASTTerm
 
   public Vector allTagsArities()
   { return new Vector(); } 
+
+  public java.util.Set allTagsIn()
+  { return new java.util.HashSet(); } 
 
   public ASTTerm removeOuterTag()
   { return null; }  
