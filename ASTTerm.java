@@ -2174,6 +2174,28 @@ public abstract class ASTTerm
     return true; 
   } 
 
+  public static boolean allNonSymbolSameLength(
+                                   ASTTerm[] trees)
+  { if (trees == null || trees.length == 0) 
+    { return false; }
+
+    if (trees[0] == null) 
+    { return false; } 
+
+    int len0 = trees[0].arity(); 
+
+    if (len0 < 1) 
+    { return false; } 
+    
+    for (int i = 1; i < trees.length; i++) 
+    { ASTTerm tx = trees[i]; 
+      if (tx == null || tx.arity() != len0) 
+      { return false; } 
+    } 
+      
+    return true; 
+  } 
+
 
   /* Used by ModelSpecification::conditionalTreeMappings */ 
 
@@ -3964,16 +3986,17 @@ public abstract class ASTTerm
 
   public static AttributeMatching 
     compositeSource2TargetTrees(
-      Entity sent, ASTTerm[] xs, ASTTerm[] ys, 
+      Entity sent, Attribute satt, 
+      Attribute tatt, ASTTerm[] xs, ASTTerm[] ys, 
       ModelSpecification mod, Vector tms)
   { // Is there an index j of each xs[i] = (tag1 p1 ... pn) 
     // each pj = ys[i]  
     // or pj ~ ys[i]?
-    // The nested mapping is then  _j |-->_1
+    // The nested mapping is then  _j |-->ys[0]
     // 
     // result = null indicates failure. 
 
-    JOptionPane.showInputDialog(">>>> compositeSource2TargetTrees " + xs[0] + " ---> " + ys[0]); 
+    // JOptionPane.showInputDialog(">>>> compositeSource2TargetTrees " + xs[0] + " ---> " + ys[0]); 
 
     AttributeMatching res = null; 
 
@@ -3985,7 +4008,7 @@ public abstract class ASTTerm
 
     // if (ys.length > 1 && xs.length == ys.length)
     ASTTerm s0 = xs[0]; 
-    int xarity = s0.arity(); 
+    int xarity = s0.arity(); // put the longest one first
 
     for (int j = 0; j < xarity; j++) 
     { Vector jvect = new Vector(); 
@@ -4030,27 +4053,119 @@ public abstract class ASTTerm
     /* JOptionPane.showInputDialog("!! No match found from " + xs[0] + 
                       " to " + ys[0] + " " + 
                       ASTTerm.allSingletonTrees(xs)); */  
+
+    Vector sourceatts = new Vector(); 
+    sourceatts.add(satt); 
           
+    Vector trgJValues = new Vector(); 
+    for (int k = 0; k < ys.length; k++) 
+    { trgJValues.add(ys[k]); } 
+
+    // Try to find tree mapping from some source to entire target
+
+    for (int j = 0; j < xarity; j++) 
+    { Vector jvect = new Vector(); 
+      ASTTerm[] jterms = 
+          ASTTerm.subterms(xs,j,jvect); 
+
+      BasicExpression sexpr = 
+        BasicExpression.newASTBasicExpression(
+                           xs[0], xs); // jterms
+      BasicExpression svar = 
+            new BasicExpression("_" + (j+1));       
+
+      java.util.HashMap sattvalueMap = new java.util.HashMap(); 
+      sattvalueMap.put(satt, jterms); 
+      Vector ams = new Vector(); 
+
+      AttributeMatching amsub =  
+          /* ASTTerm.compositeSource2TargetTrees(
+               sent, sourceJValues1, ys, mod, tms); */ 
+        mod.composedTreeFunction(sent,tatt,sourceatts,
+              sattvalueMap, ys, trgJValues, tms, ams); 
+     
+      if (amsub != null)     
+      {   
+        String fid = 
+             Identifier.nextIdentifier("subSourceF");
+        TypeMatching tmnew = new TypeMatching(fid);
+        tmnew.addValueMap(amsub);     
+        tms.add(tmnew);
+
+        /* JOptionPane.showInputDialog(">> " + fid + 
+              " match from " + 
+              (j+1) +   
+              " source subterms " + jvect + 
+              " to target: " + amsub); */ 
+        
+        BasicExpression fapp = 
+            new BasicExpression(fid); 
+        fapp.setUmlKind(Expression.FUNCTION);
+        fapp.addParameter(svar);
+        /* ASTTerm targ0 = ys[0]; 
+        BasicExpression texpr = new BasicExpression(targ0);
+        Vector newpars = new Vector(); 
+        newpars.add(new BasicExpression("_" + (j+1))); 
+        texpr.setParameters(newpars); */ 
+ 
+        AttributeMatching amx = 
+            new AttributeMatching(sexpr, fapp);
+        return amx;   
+      } 
+    }
+
+    /* JOptionPane.showInputDialog("!! No match found from " + xs[0] + 
+                      " to " + ys[0] + " " + 
+                      ASTTerm.allSingletonTrees(xs)); */ 
+
     // Try to unwrap the xs subterms. 
     for (int j = 0; j < xarity; j++) 
     { Vector jvect = new Vector(); 
       ASTTerm[] jterms = 
           ASTTerm.subterms(xs,j,jvect); 
 
-      if (ASTTerm.allSingletonTrees(jterms))
-      { Vector srcJValues1 = new Vector(); 
-        ASTTerm[] sourceJValues1 = 
+    /*  JOptionPane.showInputDialog(">> Trying to find match from " + 
+          (j+1) +   
+          " nested source subterms " + jvect + 
+          " to target: " + trgJValues); */ 
+
+      Vector srcJValues1 = jvect; 
+      ASTTerm[] sourceJValues1 = jterms;  
+            // ASTTerm.subterms( 
+            //          jterms,0,srcJValues1);
+
+      ASTTerm[] subterms = sourceJValues1; 
+        // Vector subtermsVector = srcJValues1; 
+
+        // Unwrap until they are not all singletons. 
+      int nestingDepth = 1; 
+
+      while (ASTTerm.allSingletonTrees(subterms))
+      { srcJValues1 = new Vector();
+        sourceJValues1 = 
             ASTTerm.subterms( 
-                      jterms,0,srcJValues1);
+                      subterms,0,srcJValues1);
+        subterms = sourceJValues1;
+        nestingDepth++; 
+      }
+
+      java.util.HashMap sattvalueMap = new java.util.HashMap(); 
+      sattvalueMap.put(satt,sourceJValues1); 
+      Vector ams = new Vector(); 
+
+      /* JOptionPane.showInputDialog("?? composedTreeFunction from " + 
+          (j+1) +   
+          " nested source subterms " + srcJValues1 + 
+          " to target: " + trgJValues); */ 
+
         AttributeMatching amsub =  
-             ASTTerm.compositeSource2TargetTrees(
-               sent, sourceJValues1, ys, mod, tms); 
+          /* ASTTerm.compositeSource2TargetTrees(
+               sent, sourceJValues1, ys, mod, tms); */ 
+          mod.composedTreeFunction(sent,tatt,sourceatts,
+                 sattvalueMap, ys, trgJValues, tms, ams); 
 
         if (amsub != null) 
-        { JOptionPane.showInputDialog(">> match from " + 
-              (j+1) +   
-              " source subterm 1 to target " + amsub); 
-          BasicExpression sexpr = 
+        { BasicExpression sexpr = 
             BasicExpression.newASTBasicExpression(s0, xs);
 
           // If one subterm position is always the same, 
@@ -4069,17 +4184,39 @@ public abstract class ASTTerm
           tms.add(tmnew);
           BasicExpression svar = 
             new BasicExpression("_" + (j+1));       
+          BasicExpression var1expr = new BasicExpression("_1"); 
           BasicExpression fapp = 
             new BasicExpression(fid); 
           fapp.setUmlKind(Expression.FUNCTION);
-          fapp.addParameter(svar);
+          fapp.addParameter(var1expr);
+
+          /* JOptionPane.showInputDialog(">> " + fid + 
+              " match from " + 
+              (j+1) +   
+              " source subterm depth " + nestingDepth + " to target " + amsub); */ 
+          
+          
+          String tim = 
+             Identifier.nextIdentifier("singleElementF");
+          BasicExpression timexpr = 
+            new BasicExpression(tim); 
+          timexpr.setUmlKind(Expression.FUNCTION);
+          timexpr.addParameter(svar);
+
+          AttributeMatching amjx1 = 
+            new AttributeMatching(var1expr, 
+                                  fapp); 
+          TypeMatching tmnew1 = 
+                new TypeMatching(tim);
+          tmnew1.addValueMap(amjx1);     
+          tms.add(tmnew1);
 
           AttributeMatching amx = 
-            new AttributeMatching(sexpr, fapp);
+            new AttributeMatching(sexpr, timexpr);
           return amx; 
-        }
-      } 
-    } 
+        } // It is actually sexpr |-->_(j+1)`tim where 
+      }   // tim:: _1 |-->_1`fid
+     
 
     return null; 
   }

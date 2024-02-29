@@ -5865,17 +5865,19 @@ public class ModelSpecification
           new AttributeMatching(sexpr, texpr);
         return amx;   
       } // sexpr.data:: sexpr.parameters |--> texpr
-      else if (ASTTerm.sameTag(targetValues) && 
+      /* else if (ASTTerm.sameTag(targetValues) && 
                ASTTerm.sameTag(sattvalues) && 
                ASTTerm.allCompositeSameLength(sattvalues)) 
       { AttributeMatching amsub = 
           ASTTerm.compositeSource2TargetTrees(sent, 
-                       sattvalues,targetValues,this,tms); 
+                       satt, tatt,
+                       sattvalues,targetValues,this,tms);
+ 
         if (amsub != null) 
         { System.out.println(">> Mapping from subterm of source: " + amsub);
           return amsub; 
         } 
-      } // sexpr.data:: sexpr.parameters |--> texpr
+      } */ // sexpr.data:: sexpr.parameters |--> texpr
     } 
 
     System.out.println(">>> Checking composite tree functions for target " + tatt); 
@@ -5914,6 +5916,7 @@ public class ModelSpecification
         } // sattbe.data:: sattbe.parameters |--> addtag
       }
       
+      /* Test 1 */
       if (ASTTerm.sameTagSameArity(targetValues))
       { // More than 1 subterm (ttag trm1 trm2 ...)
         // Look for matches of (stag trms...) term-by-term
@@ -5977,7 +5980,15 @@ public class ModelSpecification
               if (ASTTerm.hasNullTerm(srcJValues))
               { break; } 
 
-              // JOptionPane.showInputDialog(">->->> Comparing source term " + (sindex+1) + " values " + srcJValues + " to target term " + (tindex+1) + " values " + trgJValues); 
+              if (ASTTerm.functionalTermMapping(srcJValues,                    
+                                                  trgJValues))
+              { System.out.println(">>-->> Functional mapping " + srcJValues + " to " + trgJValues);
+                System.out.println();
+              } 
+              else 
+              { continue; } // try next sindex  
+
+              /* JOptionPane.showInputDialog(">-> Strategy 1 >->> Comparing source term " + (sindex+1) + " values " + srcJValues + " to target term " + (tindex+1) + " values " + trgJValues); */ 
 
               int k = tindex+1; 
                 
@@ -6010,15 +6021,18 @@ public class ModelSpecification
               } 
               else if ( 
                  ASTTerm.sameTag(sourceJValues) && 
-                 ASTTerm.allCompositeSameLength(
+                 ASTTerm.allNonSymbolSameLength(
                                  sourceJValues)) 
-              { System.out.println(">> Checking for mapping from subterm of source " + 
-                   (sindex + 1) + " to target " + k);
+              { /* JOptionPane.showInputDialog("*** Checking compositeSource2TargetTrees " + 
+                   srcJValues + " to target " + trgJValues); */ 
+
                 AttributeMatching amsub = 
                   ASTTerm.compositeSource2TargetTrees(sent, 
+                       satt, tatt, 
                        sourceJValues,targetJValues,this,tms); 
+
                 if (amsub != null) 
-                { System.out.println(">>-- Discovered mapping from subterm of source " + amsub);
+                { /* JOptionPane.showInputDialog(">>-- Discovered mapping from subterm of source " + amsub); */ 
                   String fid = 
                     Identifier.nextIdentifier("subruleset");
                   TypeMatching tmnew = new TypeMatching(fid);
@@ -6074,8 +6088,10 @@ public class ModelSpecification
                            tms, locams); 
 
                   // JOptionPane.showInputDialog("Nested mapping for source term " + (sindex+1) + " to target " + (tindex+1) + ": " + amjx);
+
                   if (amjx == null && 
-                      ASTTerm.allSingletonTrees(sourceJValues))
+                      ASTTerm.allSingletonTrees(
+                                       sourceJValues))
                   { // try again with the elements 
 
                     Vector srcJValues1 = new Vector(); 
@@ -6090,18 +6106,40 @@ public class ModelSpecification
                          new java.util.HashMap(); 
                     newSMap1.putAll(sattvalueMap);
                     newSMap1.put(satt, sourceJValues1);
-                    Vector locams1 = new Vector(); 
-                    amjx = 
+                    locams = new Vector(); 
+
+                    AttributeMatching amjx1 = 
                        composedTreeFunction(sent,
                            tatt,sourceatts,newSMap1,     
                            targetJValues, trgJValues, 
-                           tms, locams1); 
+                           tms, locams); 
                    
-                   // JOptionPane.showInputDialog("Nested mapping for source terms " + srcJValues1 + " to target terms " + trgJValues + ": " + amjx);
-                  } 
+                   if (amjx1 != null)
+                   { // JOptionPane.showInputDialog("$$$ Nested mapping for source terms " + srcJValues1 + " to target terms " + trgJValues + ": " + amjx1);
+
+                    // create new TypeMatching for this 
+                    // mapping, tim, and return _1 |-->_1`tim
+
+                      String tim = 
+                         Identifier.nextIdentifier(
+                                "singleElementxruleset");
+                      TypeMatching tmnew1 = 
+                          new TypeMatching(tim);
+                      tmnew1.addValueMap(amjx1);     
+                      tms.add(tmnew1);
+
+                      BasicExpression tapp = 
+                        new BasicExpression(tim); 
+                      tapp.setUmlKind(Expression.FUNCTION);
+                      tapp.addParameter(var1expr);
+
+                      amjx = 
+                        new AttributeMatching(var1expr, tapp);
+                    }
+                  }  
 
                   if (amjx != null) 
-                  { System.out.println(">>-->> Found nested mapping for source term " + (sindex+1) + " to target " + (tindex+1) + ": " + amjx);
+                  { /* JOptionPane.showInputDialog(">>-->> Found nested mapping for source term " + (sindex+1) + " to target " + (tindex+1) + ": " + amjx); */ 
                     System.out.println(">>-->> " + amjx + " is vacuous: " + amjx.isVacuous() + " Is basic: " + amjx.isBasic());
                     System.out.println(">>-->> Auxiliary maps: " + tms); 
 
@@ -6141,8 +6179,8 @@ public class ModelSpecification
                       // Also the other locams 
                       tms.add(tmnew);
 
-                      System.out.println(">>-->> Found nested mapping for source term _" + (sindex+1) + "`" + fid + " |--> " + "_" + (tindex+1));
-                      System.out.println(">> With maps " + locams); 
+                      // JOptionPane.showInputDialog(">>-->> Found nested mapping for source term _" + (sindex+1) + "`" + fid + " |--> " + "_" + (tindex+1));
+                      // JOptionPane.showInputDialog(">> " + srcJValues + " With maps " + locams); 
                       System.out.println(); 
 
                       srcexpr =
@@ -6184,7 +6222,7 @@ public class ModelSpecification
                      targetJValues, trgJValues, 
                      tms, localams); 
 
-              if (amjw == null && 
+              /* if (amjw == null && 
                   ASTTerm.allSingletonTrees(sattvalues))
               { // try again with the elements 
 
@@ -6208,7 +6246,7 @@ public class ModelSpecification
                            tms, locams1); 
                    
                  // JOptionPane.showInputDialog(">>> Nested mapping for complete source terms " + srcJValues1 + " to target " + (tindex + 1) + " terms " + trgJValues + ": " + amjw);
-              } 
+              } */ 
 
               if (amjw != null) 
               { System.out.println(">>> Found mapping of complete source term to target term " + (tindex+1) + ": " + amjw); 
@@ -6322,10 +6360,11 @@ public class ModelSpecification
       }  
       else if (ASTTerm.sameTag(targetValues) && 
          ASTTerm.sameArityTrees(sattvalues,targetValues))
-      { Vector localams = new Vector();
+      { /* Test 2 */ 
+        Vector localams = new Vector();
  
-        JOptionPane.showInputDialog(">> Checking direct correspondence of subterms of trees of varying arity: " + sattvalues[0] + " ---> " + targetValues[0]); 
-        System.out.println();           
+        /* JOptionPane.showInputDialog(">> Checking direct correspondence of subterms of trees of varying arity: " + sattvalues[0] + " ---> " + targetValues[0]); 
+        System.out.println();           */ 
 
         AttributeMatching amts = 
           treeSequenceMapping(sent,sattvalues,
@@ -6337,8 +6376,8 @@ public class ModelSpecification
           return amts; 
         } 
 
-        JOptionPane.showInputDialog(">++> Checking tree-tree mapping with indirect correspondence of subterms: " + sattvalues[0] + " ---> " + targetValues[0]); 
-        System.out.println();           
+        /* JOptionPane.showInputDialog(">++> Checking tree-tree mapping with indirect correspondence of subterms: " + sattvalues[0] + " ---> " + targetValues[0]); 
+        System.out.println();         */   
 
         amts = treeSequenceMapping2(satt, sent, tatt, 
                  sourceatts, sattvalues, targetValues, 
@@ -6352,9 +6391,10 @@ public class ModelSpecification
       }
       else if (ASTTerm.sameTag(targetValues) && 
          ASTTerm.sameNonSymbolArity(sattvalues,targetValues))
-      { Vector localams = new Vector(); 
+      { /* Test 3 */
+        Vector localams = new Vector(); 
         
-        JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with symbol deletion/replacement: " + sattvalues[0] + " ---> " + targetValues[0]); 
+        /* JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with symbol deletion/replacement: " + sattvalues[0] + " ---> " + targetValues[0]); */ 
 
         System.out.println();           
 
@@ -6371,10 +6411,12 @@ public class ModelSpecification
       }
       else if (ASTTerm.sameTag(targetValues) && 
          ASTTerm.lowerNonSymbolArity(sattvalues,targetValues))
-      { Vector localams = new Vector(); 
+      { /* Test 4 */ 
+
+        Vector localams = new Vector(); 
         
-        JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with selection/filtering: " + sattvalues[0] + " ---> " + targetValues[0]); 
-        System.out.println();           
+      /*  JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with selection/filtering: " + sattvalues[0] + " ---> " + targetValues[0]); 
+        System.out.println();   */         
 
         AttributeMatching amts = 
           treeSequenceMapping4(satt, sent, tatt, 
@@ -6392,9 +6434,11 @@ public class ModelSpecification
           ASTTerm.sameTag(targetValues) && 
           ASTTerm.treeconcatenations(
                     sattvalues,targetValues,this))
-      { Vector localams = new Vector(); 
+      { /* Test 5 */ 
+
+        Vector localams = new Vector(); 
         
-        JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with concatenation: " + sattvalues[0] + " ---> " + targetValues[0]); 
+      /*  JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with concatenation: " + sattvalues[0] + " ---> " + targetValues[0]); */ 
 
         AttributeMatching amts = 
           ASTTerm.concatenationTreeMapping(
@@ -6412,11 +6456,13 @@ public class ModelSpecification
       
       if (ASTTerm.sameTagSameArity(sattvalues) &&
           ASTTerm.sameTag(targetValues))
-      { if (ASTTerm.treesuffixes(
+      { /* Test 6 */ 
+
+        if (ASTTerm.treesuffixes(
               sattvalues,targetValues,this))
         { Vector localams = new Vector(); 
         
-          JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with suffixes: " + sattvalues[0] + " ---> " + targetValues[0]); 
+          /* JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with suffixes: " + sattvalues[0] + " ---> " + targetValues[0]); */ 
 
           AttributeMatching amts = 
             ASTTerm.suffixTreeMapping(
@@ -6436,7 +6482,7 @@ public class ModelSpecification
                     sattvalues,targetValues,this))
         { Vector localams = new Vector(); 
         
-          JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with suffix function: " + sattvalues[0] + " ---> " + targetValues[0]); 
+          /* JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with suffix function: " + sattvalues[0] + " ---> " + targetValues[0]); */ 
 
           AttributeMatching amts = 
             ASTTerm.suffixTreeFunctionMapping(
@@ -6454,7 +6500,7 @@ public class ModelSpecification
                     sattvalues,targetValues,this))
         { Vector localams = new Vector(); 
         
-          JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with prefix function: " + sattvalues[0] + " ---> " + targetValues[0]); 
+          /* JOptionPane.showInputDialog(">**> Checking tree-2-tree mapping with prefix function: " + sattvalues[0] + " ---> " + targetValues[0]); */ 
 
           AttributeMatching amts = 
             ASTTerm.prefixTreeFunctionMapping(
@@ -6472,7 +6518,7 @@ public class ModelSpecification
                     sattvalues,targetValues,this))
         { Vector localams = new Vector(); 
         
-          JOptionPane.showInputDialog(">&&> Checking tree-2-sequence mapping: " + sattvalues[0] + " ---> " + targetValues[0]); 
+          /* JOptionPane.showInputDialog(">&&> Checking tree-2-sequence mapping: " + sattvalues[0] + " ---> " + targetValues[0]); */  
 
           AttributeMatching amts = 
             ASTTerm.tree2SequenceMap(
@@ -6484,6 +6530,20 @@ public class ModelSpecification
             return amts; 
           } 
         } // All the tree-sequence cases
+      } // All tests exhausted. 
+
+      if (ASTTerm.sameTag(targetValues) && 
+          ASTTerm.sameTag(sattvalues) && 
+          ASTTerm.allCompositeSameLength(sattvalues)) 
+      { AttributeMatching amsub = 
+          ASTTerm.compositeSource2TargetTrees(sent, 
+                       satt, tatt,
+                       sattvalues,targetValues,this,tms);
+ 
+        if (amsub != null) 
+        { System.out.println(">> Mapping from subterm of source: " + amsub);
+          return amsub; 
+        } 
       } 
     } 
 
@@ -6642,16 +6702,18 @@ public class ModelSpecification
     AttributeMatching amjx = 
        composedTreeFunction(sent,
                      tatt,sourceatts,newSMap,     
-                     targetJValues, tTreeTerms, tms, ams); 
+                     targetJValues, tTreeTerms, tms, ams);
+ 
     if (amjx != null) 
-    { System.out.println(">treesequence2>--- List function mapping: " + amjx); 
+    { // JOptionPane.showInputDialog(">treesequence2>--- List function mapping: " + amjx); 
+
       String fid = 
           Identifier.nextIdentifier("seq2subruleset");
       TypeMatching tmnew = new TypeMatching(fid);
 
-      String pid = 
-          Identifier.nextIdentifier("seq2ruleset");
-      TypeMatching tmpid = new TypeMatching(pid);
+      // String pid = 
+      //     Identifier.nextIdentifier("seq2ruleset");
+      // TypeMatching tmpid = new TypeMatching(pid);
 
       Vector ssTerms = new Vector(); 
       Vector deletedSymbols = new Vector(); 
@@ -6697,7 +6759,9 @@ public class ModelSpecification
             } 
           }
         } 
-      } 
+      } // also allow two+ symbols to be replaced by one
+        // replacements may have duplicates, 
+        // frequency(rs) == frequency(ds1) + frequency(ds2) 
 
       deletedSymbols.removeAll(ttTerms); 
       deletedSymbols.removeAll(replacedSymbols); 
@@ -6722,21 +6786,22 @@ public class ModelSpecification
       tmnew.addValueMapping(slhs, rrhs); 
       tmnew.addValueMapping("_0", "_0");    
 
-
-      BasicExpression fexpr = new BasicExpression(fid); 
-      fexpr.setUmlKind(Expression.FUNCTION);
-      fexpr.addParameter(new BasicExpression("_*"));
       BasicExpression srcstar = new BasicExpression("_*");
+      BasicExpression src1var = new BasicExpression("_1");
 
-      BasicExpression pexpr = new BasicExpression(pid); 
+      /* BasicExpression pexpr = new BasicExpression(pid); 
       pexpr.setUmlKind(Expression.FUNCTION);
       pexpr.addParameter(new BasicExpression("_*"));
+
+      BasicExpression pvar1expr = new BasicExpression(pid); 
+      pvar1expr.setUmlKind(Expression.FUNCTION);
+      pvar1expr.addParameter(new BasicExpression("_1")); */ 
       
       // if (tmnew.isVacuous())
       // { return new AttributeMatching(srcstar,srcstar); } 
 
-      tmpid.addValueMapping("_*", "_*`" + fid);    
-      tms.add(tmpid); 
+      // tmpid.addValueMapping("_*", "_*`" + fid);    
+      // tms.add(tmpid); 
       tms.add(tmnew); 
 
       // No: Separate rulesets for the items and the list: 
@@ -6745,12 +6810,18 @@ public class ModelSpecification
       //
       // seq2subrulesetID:: (tmnew)
 
+      BasicExpression fexpr = new BasicExpression(fid); 
+      fexpr.setUmlKind(Expression.FUNCTION);
+      fexpr.addParameter(new BasicExpression("_*"));
+
       AttributeMatching amres = 
-        new AttributeMatching(srcstar, pexpr); 
+        // new AttributeMatching(srcstar, pexpr);
+        // new AttributeMatching(src1var, pvar1expr);
+        new AttributeMatching(srcstar, fexpr);   
       return amres; 
     } 
     return amjx; 
-  } // No. Same style as seq3: amres is _1 |-->_1`fid
+  } // Same style as seq3: amres is _1 |-->_1`fid
     // fid:: _* |-->_*`gid and gid is tmnew            
 
   private boolean isConsistentReplacement(String ds, 
@@ -6780,7 +6851,8 @@ public class ModelSpecification
       } 
       else 
       { return false; }  
-    } 
+    } // but could be >= if ds1, ds2 both replaced by rs
+
     return true; 
   } 
 
@@ -6876,8 +6948,9 @@ public class ModelSpecification
             }  
           } 
         }
-      } 
+      } // as above, >= if ds1, ds2 both replaced by rs
     } 
+
     deletedSymbols.removeAll(ttTerms); 
     deletedSymbols.removeAll(replacedSymbols); 
     System.out.println(">>-- Deleted symbols: " + deletedSymbols); 
@@ -7102,8 +7175,9 @@ public class ModelSpecification
             }  
           } 
         }
-      } 
+      } // >= if ds1, ds2 both replaced by rs
     } 
+
     deletedSymbols.removeAll(ttTerms); 
     deletedSymbols.removeAll(replacedSymbols); 
     System.out.println(">>-- Deleted symbols: " + deletedSymbols); 
@@ -7300,7 +7374,8 @@ public class ModelSpecification
     boolean foundConditionalMatching = false; 
 
     for (int i = 0; i < sarity; i++) 
-    { if (ASTTerm.alwaysSymbol(i,srcasts) || 
+    { if (ASTTerm.alwaysSymbol(i,srcasts)
+          || 
           ASTTerm.alwaysBasic(i,srcasts))
       { System.out.println(">> Source term " + i + " is always a symbol/basic term"); 
         Vector svals = ASTTerm.symbolValues(i,srcasts); 
@@ -7774,9 +7849,9 @@ public class ModelSpecification
     } 
 
     System.out.println(">>> Target tag_arity values: " + ttagvalues); 
-    JOptionPane.showMessageDialog(null, 
+    /* JOptionPane.showMessageDialog(null, 
          "Target tag_arity values: " + ttagvalues,   "",
-         JOptionPane.INFORMATION_MESSAGE);
+         JOptionPane.INFORMATION_MESSAGE); */ 
 
     if (ttagvalues.size() <= 1)
     { return res; } 
