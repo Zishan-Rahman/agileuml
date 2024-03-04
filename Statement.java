@@ -193,6 +193,82 @@ abstract class Statement implements Cloneable
     return res;
   } // Other cases, for all other forms of statement. 
 
+  public abstract Map energyUse(Map uses, 
+                                Vector rUses, Vector oUses);
+
+  public static boolean endsWithSelfCall(
+            BehaviouralFeature bf, String nme, Statement st)
+  { if (st == null) 
+    { return false; }
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+      Vector stats = sq.getStatements(); 
+      Statement stat = (Statement) stats.get(stats.size()-1); 
+      return Statement.endsWithSelfCall(bf,nme,stat);
+    } 
+
+    if (st instanceof InvocationStatement)
+    { InvocationStatement invok = 
+        (InvocationStatement) st;
+      
+      Expression expr = invok.getCallExp();
+ 
+      if (expr != null && expr.isSelfCall(bf))
+      { return true; } 
+
+      return false; 
+    } 
+
+    if (st instanceof ReturnStatement)
+    { ReturnStatement retstat = (ReturnStatement) st; 
+      
+      Expression expr = retstat.getReturnValue();
+ 
+      if (expr != null && expr.isSelfCall(bf))
+      { return true; } 
+      return false; 
+    } 
+
+    if (st instanceof ConditionalStatement) 
+    { ConditionalStatement cs = (ConditionalStatement) st; 
+      if (Statement.endsWithSelfCall(bf,nme,cs.ifPart()))
+      { return Statement.endsWithSelfCall(
+                                 bf,nme,cs.elsePart()); 
+      } 
+      return false; 
+    } 
+
+    if (st instanceof WhileStatement) 
+    { return false; } 
+    // Nested loops cannot be handled within a recursion. 
+
+    if (st instanceof TryStatement) 
+    { TryStatement ts = (TryStatement) st; 
+
+      if (Statement.endsWithSelfCall(bf,nme,ts.getBody())) 
+      { Vector stats = ts.getClauses(); 
+        for (int i = 0; i < stats.size(); i++) 
+        { if (stats.get(i) instanceof Statement)
+          { Statement stat = (Statement) stats.get(i); 
+            if (Statement.endsWithSelfCall(bf,nme,stat)) { } 
+            else 
+            { return false; } 
+          }
+          else 
+          { return false; } 
+        }  
+      }
+      else 
+      { return false; }  
+      if (ts.getEndStatement() == null) { return false; } 
+      return Statement.endsWithSelfCall(
+                               bf,nme,ts.getEndStatement()); 
+    } 
+
+    return false;
+  } // Other cases, for all other forms of statement. 
+
   public static boolean endsWithReturn(Statement st)
   { if (st == null) 
     { return false; }
@@ -216,6 +292,7 @@ abstract class Statement implements Cloneable
 
     if (st instanceof WhileStatement) 
     { return false; } 
+    // Nested loops cannot be handled within a recursion. 
 
     if (st instanceof TryStatement) 
     { TryStatement ts = (TryStatement) st; 
@@ -237,6 +314,161 @@ abstract class Statement implements Cloneable
       { return false; }  
       if (ts.getEndStatement() == null) { return false; } 
       return Statement.endsWithReturn(ts.getEndStatement()); 
+    } 
+
+    return false;
+  } // Other cases, for all other forms of statement. 
+
+  public static boolean endsWithContinue(Statement st)
+  { if (st == null) 
+    { return false; }
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+      Vector stats = sq.getStatements(); 
+      Statement stat = (Statement) stats.get(stats.size()-1); 
+      return Statement.endsWithContinue(stat);
+    } 
+    
+    if (st instanceof ContinueStatement)
+    { return true; } 
+
+    if (st instanceof ConditionalStatement) 
+    { ConditionalStatement cs = (ConditionalStatement) st; 
+      if (Statement.endsWithContinue(cs.ifPart()))
+      { return Statement.endsWithContinue(cs.elsePart()); } 
+      return false; 
+    } 
+
+    if (st instanceof WhileStatement) 
+    { return false; } 
+    // Nested loops cannot be handled within a recursion. 
+
+    if (st instanceof TryStatement) 
+    { TryStatement ts = (TryStatement) st; 
+
+      if (Statement.endsWithContinue(ts.getBody())) 
+      { Vector stats = ts.getClauses(); 
+        for (int i = 0; i < stats.size(); i++) 
+        { if (stats.get(i) instanceof Statement)
+          { Statement stat = (Statement) stats.get(i); 
+            if (Statement.endsWithContinue(stat)) { } 
+            else 
+            { return false; } 
+          }
+          else 
+          { return false; } 
+        }  
+      }
+      else 
+      { return false; }  
+      if (ts.getEndStatement() == null) { return false; } 
+      return Statement.endsWithContinue(ts.getEndStatement()); 
+    } 
+
+    return false;
+  } // Other cases, for all other forms of statement. 
+
+  public static boolean endsWithBreak(Statement st)
+  { if (st == null) 
+    { return false; }
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+      Vector stats = sq.getStatements(); 
+      Statement stat = (Statement) stats.get(stats.size()-1); 
+      return Statement.endsWithBreak(stat);
+    } 
+    
+    if (st instanceof BreakStatement)
+    { return true; } 
+
+    if (st instanceof ConditionalStatement) 
+    { ConditionalStatement cs = (ConditionalStatement) st; 
+      if (Statement.endsWithBreak(cs.ifPart()))
+      { return Statement.endsWithBreak(cs.elsePart()); } 
+      return false; 
+    } 
+
+    if (st instanceof WhileStatement) 
+    { return false; } 
+    // Nested loops cannot be handled within a recursion. 
+
+    if (st instanceof TryStatement) 
+    { TryStatement ts = (TryStatement) st; 
+
+      if (Statement.endsWithBreak(ts.getBody())) 
+      { Vector stats = ts.getClauses(); 
+        for (int i = 0; i < stats.size(); i++) 
+        { if (stats.get(i) instanceof Statement)
+          { Statement stat = (Statement) stats.get(i); 
+            if (Statement.endsWithBreak(stat)) { } 
+            else 
+            { return false; } 
+          }
+          else 
+          { return false; } 
+        }  
+      }
+      else 
+      { return false; }  
+      if (ts.getEndStatement() == null) { return false; } 
+      return Statement.endsWithBreak(ts.getEndStatement()); 
+    } 
+
+    return false;
+  } // Other cases, for all other forms of statement. 
+
+  public static boolean endsWithExit(Statement st)
+  { if (st == null) 
+    { return false; }
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+      Vector stats = sq.getStatements(); 
+      Statement stat = (Statement) stats.get(stats.size()-1); 
+      return Statement.endsWithExit(stat);
+    } 
+    
+    if (st instanceof InvocationStatement)
+    { String called = 
+        ((InvocationStatement) st).calledOperation(); 
+      if ("exit".equals(called))
+      { return true; }
+      return false; 
+    }  
+
+    if (st instanceof ConditionalStatement) 
+    { ConditionalStatement cs = (ConditionalStatement) st; 
+      if (Statement.endsWithExit(cs.ifPart()))
+      { return Statement.endsWithExit(cs.elsePart()); } 
+      return false; 
+    } 
+
+    if (st instanceof WhileStatement) 
+    { return false; } 
+    // Nested loops cannot be handled within a recursion. 
+
+    if (st instanceof TryStatement) 
+    { TryStatement ts = (TryStatement) st; 
+
+      if (Statement.endsWithExit(ts.getBody())) 
+      { Vector stats = ts.getClauses(); 
+        for (int i = 0; i < stats.size(); i++) 
+        { if (stats.get(i) instanceof Statement)
+          { Statement stat = (Statement) stats.get(i); 
+            if (Statement.endsWithExit(stat)) { } 
+            else 
+            { return false; } 
+          }
+          else 
+          { return false; } 
+        }  
+      }
+      else 
+      { return false; }  
+      if (ts.getEndStatement() == null) { return false; } 
+      return Statement.endsWithExit(ts.getEndStatement()); 
     } 
 
     return false;
@@ -905,7 +1137,34 @@ abstract class Statement implements Cloneable
 
     Vector vect = new Vector(); 
     if (branch.get(0) instanceof Vector)
-    { vect = (Vector) branch.get(0); }  
+    { vect = (Vector) branch.get(0);
+
+      if (vect.get(0) instanceof Vector)
+      { vect = (Vector) vect.get(0); 
+        System.out.println("+++ REPLACING code: " + vect);
+
+        if (vect.size() == 4 && 
+            "if".equals(vect.get(0) + ""))      
+        { Expression tst = (Expression) vect.get(1);
+          Vector sts = (Vector) vect.get(2); 
+          Statement cde = 
+            Statement.replaceSelfCallByContinue(
+                                      nme,sts,asgns);
+          Statement elsePart = (Statement) vect.get(3); 
+  
+          Statement newelse = 
+            SequenceStatement.combineSequenceStatements(
+                            elsePart,new BreakStatement()); 
+          ConditionalStatement cs = 
+            new ConditionalStatement(tst,
+                cde, 
+                newelse);
+          SequenceStatement res = new SequenceStatement(); 
+          res.addStatement(cs); 
+          return res;
+        } 
+      } 
+    }  
     else 
     { vect.addAll(branch); } 
 
@@ -929,6 +1188,8 @@ abstract class Statement implements Cloneable
            BehaviouralFeature bf, String nme, Statement st)
   { // self.nme(exprs) replaced by pars := exprs; continue
     // Likewise for return self.nme(exprs)
+    // Any branch that does not terminate in nme call/return
+    // or exit/return is ended by break. 
 
     if (st == null) 
     { return st; }
@@ -941,7 +1202,7 @@ abstract class Statement implements Cloneable
       Expression expr = invok.getCallExp();
  
       // if ((expr + "").startsWith("self." + nme + "("))
-      if (expr != null && expr.isSelfCall(nme))
+      if (expr != null && expr.isSelfCall(bf))
       { Statement passigns = 
              bf.parameterAssignments(expr);
         if (passigns == null) 
@@ -949,7 +1210,7 @@ abstract class Statement implements Cloneable
         else if (passigns instanceof SequenceStatement)
         { ((SequenceStatement) passigns).addStatement(res); 
           return passigns; 
-        }  
+        } // passigns.setBrackets(true) 
       }
       return st; 
     } 
@@ -961,7 +1222,7 @@ abstract class Statement implements Cloneable
       Expression expr = retstat.getReturnValue();
  
       // if ((expr + "").startsWith("self." + nme + "("))
-      if (expr != null && expr.isSelfCall(nme))
+      if (expr != null && expr.isSelfCall(bf))
       { Statement passigns = 
              bf.parameterAssignments(expr);
         if (passigns == null) 
@@ -986,7 +1247,23 @@ abstract class Statement implements Cloneable
         if (newstat != null) 
         { res.add(newstat); } 
       } 
-      return new SequenceStatement(res);
+
+      // if res does not end with return, continue or exit, 
+      // add a break statement: 
+
+      SequenceStatement newss = new SequenceStatement(res);
+
+      if (Statement.endsWithReturn(newss) || 
+          Statement.endsWithContinue(newss) ||
+          Statement.endsWithSelfCall(bf,nme,st) ||  
+          Statement.endsWithBreak(newss) || 
+          Statement.endsWithExit(newss)) { } 
+      else 
+      { BreakStatement bs = new BreakStatement(); 
+        newss.addStatement(bs); 
+      } 
+
+      return newss;
     } 
     
     if (st instanceof ConditionalStatement) 
@@ -1886,6 +2163,14 @@ class ReturnStatement extends Statement
     value.findClones(clones,cloneDefs,rule,op); 
   }
 
+  public Map energyUse(Map uses, 
+                                Vector rUses, Vector oUses)
+  { if (value == null) 
+    { return uses; } 
+    value.energyUse(uses, rUses, oUses); 
+    return uses; 
+  }  
+
   public void findMagicNumbers(java.util.Map mgns, String rule, String op)
   { if (value == null) 
     { return; }
@@ -2405,6 +2690,9 @@ class BreakStatement extends Statement
                          String op, String rule)
   { return; } 
 
+  public Map energyUse(Map uses, 
+                                Vector rUses, Vector oUses)
+  { return uses; }  
 }
 
 class ContinueStatement extends Statement
@@ -2584,6 +2872,11 @@ class ContinueStatement extends Statement
                          java.util.Map cloneDefs,
                          String op, String rule)
   { return; } 
+
+  public Map energyUse(Map uses, 
+                                Vector rUses, Vector oUses)
+  { return uses; }  
+
 }
 
 
@@ -2809,6 +3102,9 @@ class InvocationStatement extends Statement
   public void setCallExp(Expression e)
   { callExp = e; } 
 
+  public String calledOperation()
+  { return action; } 
+
   public void setAssignsTo(String atype, String avar)
   { assignsType = atype; 
     assignsTo = avar; 
@@ -2846,10 +3142,16 @@ class InvocationStatement extends Statement
     clones.put(val,used); */ 
   }
 
-public void findClones(java.util.Map clones, 
+  public void findClones(java.util.Map clones, 
                        java.util.Map cloneDefs,
                        String rule, String op)
   { } 
+
+  public Map energyUse(Map uses, 
+                                Vector rUses, Vector oUses)
+  { callExp.energyUse(uses, rUses, oUses);  
+    return uses; 
+  }  
 
   public void findMagicNumbers(java.util.Map mgns, String rule, String op)
   { String val = callExp + ""; 
@@ -3585,6 +3887,12 @@ class ImplicitInvocationStatement extends Statement
     callExp.findClones(clones,cloneDefs,rule,op); 
   }
 
+  public Map energyUse(Map uses, 
+                                Vector rUses, Vector oUses)
+  { callExp.energyUse(uses, rUses, oUses); 
+    return uses; 
+  }  
+
   public void findMagicNumbers(java.util.Map mgns, String rule, String op)
   { callExp.findMagicNumbers(mgns, this + "", op); } 
 
@@ -4182,6 +4490,14 @@ class WhileStatement extends Statement
     } 
     body.findClones(clones,cdefs,rule,op); 
   }
+
+  public Map energyUse(Map uses, Vector rUses, Vector aUses)
+  { if (loopRange != null) 
+    { loopRange.energyUse(uses,rUses,aUses); }  
+    body.energyUse(uses,rUses,aUses);
+
+    return uses; 
+  } // red if nested loops. Amber for a while loop.
 
   public void findMagicNumbers(java.util.Map mgns, String rule, String op)
   { if (loopRange != null) 
@@ -5727,6 +6043,12 @@ class CreationStatement extends Statement
     return res; 
   } 
 
+  public Map energyUse(Map uses, Vector rUses, Vector aUses)
+  { if (initialExpression != null) 
+    { initialExpression.energyUse(uses, rUses, aUses); } 
+    return uses; 
+  } 
+
 
   /* public CreationStatement(Attribute vbl, Type typ)
   { createsInstanceOf = typ.getName();
@@ -5743,6 +6065,17 @@ class CreationStatement extends Statement
     elementType = vbl.getElementType(); 
     assignsTo = vbl.getName();
     variable = vbl;  
+  }
+
+  public CreationStatement(Attribute vbl, Attribute val)
+  { Type typ = vbl.getType(); 
+    createsInstanceOf = typ.getName();
+    instanceType = typ; 
+    elementType = vbl.getElementType(); 
+    assignsTo = vbl.getName();
+    variable = vbl;  
+    initialExpression = new BasicExpression(val); 
+    initialValue = initialExpression + ""; 
   }
 
   public CreationStatement(BasicExpression vbl)
@@ -7068,6 +7401,15 @@ class SequenceStatement extends Statement
 
   } 
 
+  public Map energyUse(Map uses, Vector rUses, Vector aUses)
+  { for (int i = 0; i < statements.size(); i++) 
+    { Statement stat = (Statement) statements.get(i); 
+      stat.energyUse(uses, rUses, aUses); 
+    }
+
+    return uses; 
+  } 
+    
   public void findMagicNumbers(java.util.Map mgns, String rule, String op)
   { for (int i = 0; i < statements.size(); i++) 
     { Statement stat = (Statement) statements.get(i); 
@@ -8467,6 +8809,12 @@ class ErrorStatement extends Statement
     return new ErrorStatement(null); 
   } 
 
+  public Map energyUse(Map uses, Vector rUses, Vector aUses)
+  { if (thrownObject != null) 
+    { thrownObject.energyUse(uses, rUses, aUses); } 
+    return uses; 
+  } 
+
   public Statement removeSlicedParameters(BehaviouralFeature bf, Vector fpars)
   { if (thrownObject != null) 
     { Expression tobj = 
@@ -8777,6 +9125,14 @@ class AssertStatement extends Statement
 
   public Object clone() 
   { return new AssertStatement(condition,message); } 
+
+  public Map energyUse(Map uses, Vector rUses, Vector aUses)
+  { if (condition != null) 
+    { condition.energyUse(uses, rUses, aUses); } 
+    if (message != null)
+    { message.energyUse(uses, rUses, aUses); } 
+    return uses; 
+  } 
 
   public Statement dereference(BasicExpression var) 
   { Expression newcond = condition; 
@@ -9207,6 +9563,12 @@ class CatchStatement extends Statement
     { action.findMagicNumbers(mgns, this + "", op); }
   } 
 
+  public Map energyUse(Map uses, Vector rUses, Vector aUses)
+  { if (action != null) 
+    { action.energyUse(uses, rUses, aUses); } 
+    return uses; 
+  } 
+
   public Statement addContainerReference(BasicExpression ref,
                                          String var,
                                          Vector excls) 
@@ -9630,6 +9992,22 @@ class TryStatement extends Statement
     if (endStatement != null) 
     { endStatement.findClones(clones,cdefs,rule,op); } 
   } 
+
+  public Map energyUse(Map uses, Vector rUses, Vector aUses)
+  { if (body != null) 
+    { body.energyUse(uses, rUses, aUses); } 
+    
+    for (int i = 0; i < catchClauses.size(); i++) 
+    { Statement stat = (Statement) catchClauses.get(i); 
+      stat.energyUse(uses, rUses, aUses); 
+    }
+
+    if (endStatement != null)
+    { endStatement.energyUse(uses, rUses, aUses); } 
+
+    return uses; 
+  } 
+
 
   public void findMagicNumbers(java.util.Map mgns, String rule, String op)
   { if (body != null) 
@@ -11420,6 +11798,14 @@ class AssignStatement extends Statement
     rhs.findClones(clones,cdefs,rule,op); 
   }
 
+  public Map energyUse(Map uses, 
+                                Vector rUses, Vector oUses)
+  { lhs.energyUse(uses, rUses, oUses); 
+    rhs.energyUse(uses, rUses, oUses);
+    return uses; 
+  }  
+
+
   public void findMagicNumbers(java.util.Map mgns, String rule, String op)
   { lhs.findMagicNumbers(mgns, "" + this, op);
     rhs.findMagicNumbers(mgns, "" + this, op); 
@@ -12518,6 +12904,17 @@ class ConditionalStatement extends Statement
     return new ConditionalStatement(testc, ifc, elsec); 
   }  
 
+  public Map energyUse(Map uses, 
+                                Vector rUses, Vector oUses)
+  { test.energyUse(uses, rUses, oUses); 
+    ifPart.energyUse(uses, rUses, oUses);
+
+    if (elsePart != null) 
+    { elsePart.energyUse(uses, rUses, oUses); } 
+ 
+    return uses; 
+  } // if s->includes(x) then skip else s := s->including(x)
+
   public void findClones(java.util.Map clones, String rule, String op)
   { if (test.syntacticComplexity() >= UCDArea.CLONE_LIMIT)
     { /* String val = test + ""; 
@@ -13102,6 +13499,10 @@ class FinalStatement extends Statement
                          String rule, String op)
   { body.findClones(clones,cdefs,rule,op); } 
 
+  public Map energyUse(Map uses, Vector rUses, Vector aUses)
+  { body.energyUse(uses, rUses, aUses);  
+    return uses; 
+  } 
 
   public void findMagicNumbers(java.util.Map mgns, String rule, String op)
   { body.findMagicNumbers(mgns,this + "",op); } 

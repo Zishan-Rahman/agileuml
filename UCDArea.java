@@ -3302,6 +3302,74 @@ public class UCDArea extends JPanel
     out.println("*** Estimated maintainability correction cost = " + lowcost + " minutes (" + (lowcost/60.0) + " hours)"); 
   }
 
+  public void energyAnalysis()
+  { java.util.Map clnes = new java.util.HashMap(); 
+    energyAnalysis(clnes); 
+  } 
+
+  public Map energyAnalysis(java.util.Map clones)
+  { Map res = new Map(); 
+
+    int redFlags = 0; 
+    int amberFlags = 0; 
+
+    for (int j = 0; j < entities.size(); j++) 
+    { Entity ent = (Entity) entities.get(j); 
+      if (ent.isDerived()) { continue; } 
+
+      if (ent.isComponent() || ent.isExternal())
+      { continue; } 
+
+      Map scores = ent.energyAnalysis(); 
+      redFlags = redFlags + (int) scores.get("red"); 
+      amberFlags = 
+        amberFlags + (int) scores.get("amber"); 
+
+      Map cg = ent.getCallGraph(); 
+      if (cg.size() > 0) 
+      { // out.println("*** Call graph of entity " + 
+        //             ent.getName() + " is: " + cg); 
+        res = Map.union(res,cg); 
+      }  
+    } 
+
+    // compute transitive closure of this
+
+    Map tc = new Map(); 
+    tc.elements = Map.transitiveClosure(res.elements);
+    // out.println(">>> Transitive closure of operations call graph is: " + tc);  
+
+    Vector selfcalls = tc.getSelfMaps(); 
+    // System.out.println("!! Warning: Recursive operations: " + selfcalls);
+  
+    int selfcallsn = selfcalls.size();  
+ 
+    if (selfcallsn > 0) 
+    { System.err.println("!!! Red flag: " + selfcallsn + " recursive dependencies"); 
+      System.err.println("!!! Use Replace recursion by iteration (for tail recursions) to reduce energy cost\nOr make operation <<cached>>"); 
+      redFlags = redFlags + selfcallsn; 
+    }
+
+    java.util.Set lastfound = new java.util.HashSet(); 
+    int n = res.maxPathLength(lastfound); 
+
+    System.out.println(">> Maximum call chain length is " + n); 
+    System.out.println(">> Operations in maximum chain are " + lastfound); 
+
+    if (n >= 5) 
+    { System.err.println("!! Amber warning: long sequence of calls"); 
+      System.err.println("!! Try inline expansion of the end operation(s): replace call by definition"); 
+      amberFlags = amberFlags + (n - 4); 
+    }
+
+    System.out.println(">> Red flag score: " + redFlags); 
+    System.out.println(">> Amber flag score: " + amberFlags); 
+
+
+    return res;  
+  }
+
+
   public Map displayCallGraph(PrintWriter out, java.util.Map clones)
   { Map res = new Map(); 
 
@@ -6660,13 +6728,15 @@ public class UCDArea extends JPanel
     Statement effect = null; 
  
     if (stat == null) 
-    { bf.addStereotype("noRecursion"); 
+    { System.err.println("!!! Activity must be non-null to apply this refactoring"); 
+      bf.addStereotype("noRecursion"); 
       effect = 
           bf.generateDesign(ent,entities,types); 
     } 
     else 
     { 
-      effect = bf.selfCalls2Loops(stat); 
+      effect = bf.replaceRecursionByIteration(stat); 
+      // effect = bf.selfCalls2Loops(stat); 
     } 
 
     if (effect == null)
