@@ -305,6 +305,10 @@ public class UCDArea extends JPanel
 
     randomModel();
 
+    typeCheck(); 
+
+    typeInference(); 
+
     long index = (new Date()).getTime(); 
 
     try
@@ -321,6 +325,7 @@ public class UCDArea extends JPanel
     Vector vs = new Vector();
     vs.add("cginterface.cstl"); 
     vs.add("jwrap.cstl"); 
+    vs.add("defInitValue.cstl"); 
      
     CGSpec spec = loadCSTL(file,vs); 
 
@@ -11501,6 +11506,23 @@ public void produceCUI(PrintWriter out)
     out.println("    { s.add(new Boolean(x));"); 
     out.println("      return s; }\n"); 
 
+    out.println(); 
+    out.println("    public static <T> TreeSet<T> addSet(TreeSet<T> s, T x)"); 
+    out.println("    { if (x != null) { s.add(x); }"); 
+    out.println("      return s; }\n"); 
+    out.println("    public static TreeSet<Integer> addSet(TreeSet<Integer> s, int x)"); 
+    out.println("    { s.add(new Integer(x));"); 
+    out.println("      return s; }\n"); 
+    out.println("    public static TreeSet<Double> addSet(TreeSet<Double> s, double x)"); 
+    out.println("    { s.add(new Double(x));"); 
+    out.println("      return s; }\n"); 
+    out.println("    public static TreeSet<Long> addSet(TreeSet<Long> s, long x)"); 
+    out.println("    { s.add(new Long(x));"); 
+    out.println("      return s; }\n"); 
+    out.println("    public static TreeSet<Boolean> addSet(TreeSet<Boolean> s, boolean x)"); 
+    out.println("    { s.add(new Boolean(x));"); 
+    out.println("      return s; }\n"); 
+
     out.println("    public static <T> ArrayList<T> addSequence(ArrayList<T> s, T x)"); 
     out.println("    { if (x != null) { s.add(x); }"); 
     out.println("      return s; }\n"); 
@@ -13520,7 +13542,7 @@ public void produceCUI(PrintWriter out)
     return res; 
   } 
 
-  private void saveBasicTypes(PrintWriter out) 
+  public static void saveBasicTypes(PrintWriter out) 
   { out.println("Integer : PrimitiveType"); 
     out.println("Integer.name = \"int\""); 
     out.println("Integer.typeId = \"-5\""); 
@@ -13573,7 +13595,7 @@ public void produceCUI(PrintWriter out)
   { Vector locals = new Vector(); 
     Vector realentities = new Vector(); 
 
-    saveBasicTypes(out); 
+    UCDArea.saveBasicTypes(out); 
 
     for (int i = 0; i < visuals.size(); i++)
     { VisualData vd = (VisualData) visuals.get(i); 
