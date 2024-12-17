@@ -67,6 +67,10 @@ FloatBuffer |-->Sequence(double)
 DoubleBuffer |-->Sequence(double)
 
 Stream |-->Sequence
+IntStream |-->Sequence(int)
+LongStream |-->Sequence(long)
+DoubleStream |-->Sequence(double)
+
 JsonArray |-->Sequence
 JSONArray |-->Sequence
 Multiset |-->Sequence
@@ -103,6 +107,13 @@ StringBuilder |-->String
 CharSequence |-->String
 Character |-->String
 InetAddress |-->String
+
+AtomicBoolean |-->boolean
+AtomicInteger |-->int
+AtomicLong |-->long
+AtomicIntegerArray |-->Sequence
+AtomicLongArray |-->Sequence
+AtomicReferenceArray |-->Sequence
 
 File |-->OclFile
 FileDescriptor |-->OclFile
@@ -173,6 +184,7 @@ ListIterator |-->OclIterator
 StringTokenizer |-->OclIterator
 Enumeration |-->OclIterator
 Cursor |-->OclIterator
+Spliterator |-->OclIterator
 
 Pattern |-->OclRegex
 FileFilter |-->OclRegex
@@ -248,10 +260,13 @@ ThreadGroup |-->OclProcessGroup
 Predicate _1 |-->Function(_1,boolean)
 Function _1 |-->Function_1
 Comparator _1 |-->Function(_1,(_1,boolean))
+AtomicReference _1 |-->_1
+Consumer _1 |-->Function(_1, void)
 
 Collection _1 |-->Sequence_1`collectionParameters
 Iterable _1 |-->Sequence_1`collectionParameters
-Class _1 |-->OclType
+AtomicReferenceArray _1 |-->Sequence_1`collectionParameters
+Class _1 |-->OclType 
 
 Map _1 |-->Map_1`collectionParameters
 HashMap _1 |-->Map_1`collectionParameters
@@ -402,7 +417,7 @@ _1 [ ] |-->Sequence(long)<when> _1 long
 _1 [ ] |-->Sequence(double)<when> _1 double
 _1 [ ] |-->Sequence(String)<when> _1 String
 _1 [ ] |-->Sequence(_1`type)
-_1 |-->_1`type
+_1 |-->_66
 
 
 enumDeclaration::
@@ -458,6 +473,7 @@ _1 _2 _3 _4 |-->
 _1 _2 _3 |-->
 _1 _2 |-->
 _1 |-->
+_* |-->
 
 
 typeDeclaration::
@@ -713,6 +729,7 @@ _1 [ ] |-->Sequence(
 _1 |-->_1`typQualifierLeft<when> _1 variableDeclarator
 _1 |-->_1`typQualifierLeft<when> _1 variableDeclaratorId
 _1 |-->
+_* |-->
 
 typQualifierRight::
 _1 [ ] |-->)
@@ -720,7 +737,22 @@ _1 [ ] [ ] |-->))
 _1 |-->_1`typQualifierRight<when> _1 variableDeclarator
 _1 |-->_1`typQualifierRight<when> _1 variableDeclaratorId
 _1 |-->
+_* |-->
 
+
+extractElementType::
+_1 [ ] [ ] |-->Sequence
+_1 [ ] |-->_1
+ArrayList _1 |-->_1`extractElementType
+HashMap _1 |-->_1`extractElementType
+< _1 , _2 > |-->_2
+< _1 > |-->_1
+
+_1 |-->_1`extractElementType<when> _1 variableDeclarator
+_1 |-->_1`extractElementType<when> _1 variableDeclaratorId
+String |-->String
+_1 |-->
+_* |-->
 
 
 lastFormalParameter::
@@ -758,12 +790,12 @@ instanceBlockInitialisation::
 
 
 fieldDeclaration::
-_1 _2 ; |-->  attribute _2`variableName : _2`typQualifierLeft_1_2`typQualifierRight_2`variableInitialValue;\n<action> _2`variableName _1
+_1 _2 ; |-->  attribute _2`variableName : _2`typQualifierLeft_1_2`typQualifierRight_2`variableInitialValue;\n<action> _2`variableName _1, _2`elemType _1`extractElementType
 
 
 localVariableDeclaration::
-_1 _2 _3 |-->_3`processVarDecs<action> _66 _2, _3`variableName _2
-_1 _2 |-->_2`processVarDecs<action> _66 _1, _2`variableName _1 
+_1 _2 _3 |-->_3`processVarDecs<action> _66 _2, _3`variableName _2, _3`elemType _2`extractElementType
+_1 _2 |-->_2`processVarDecs<action> _66 _1, _2`variableName _1,  _2`elemType _1`extractElementType 
 
 
 variableName::
@@ -790,8 +822,8 @@ _1 [ ] [ ] |-->_1
 
 
 variableDeclarator::
-_1 = _2 |-->    var _1 : _1`getOclType ; _2`preSideEffect_1 := _2`queryForm
-_1 |-->    var _1 : _1`getOclType
+_1 = _2 |-->    var _1 : _1`getOclType ; _2`preSideEffect_1 := _2`queryForm<action> _1 _1`getOclType
+_1 |-->    var _1 : _1`getOclType<action> _1 _1`getOclType
 
 
 initialisationValue::
@@ -916,11 +948,13 @@ _1 |-->_1
 
 mapMethodCallQueryForm::
 put ( _1 ) |-->->at(_1`first)
+putIfAbsent ( _1 ) |-->->at(_1`first)
 putAll ( _1 ) |-->
 removeAll ( _1 ) |-->
 retainAll ( _1 ) |-->
 remove ( _1 ) |-->->at(_1)
 get ( _1 ) |-->->at(_1)
+getOrDefault ( _1 ) |-->->at(_1`first)
 getProperty ( _1 ) |-->->at(_1)
 getString ( _1 ) |-->->at(_1)->toString()
 getJsonString ( _1 ) |-->->at(_1)->toString()
@@ -956,8 +990,53 @@ _1 ( _2 ) |-->._1(_2)
 _1 |-->._1
 
 
+mapMethodCallType::
+put ( _1 ) |-->OclAny
+putIfAbsent ( _1 ) |-->OclAny
+putAll ( _1 ) |-->void
+removeAll ( _1 ) |-->void
+retainAll ( _1 ) |-->void
+remove ( _1 ) |-->OclAny
+get ( _1 ) |-->OclAny
+getOrDefault ( _1 ) |-->OclAny
+getProperty ( _1 ) |-->OclAny
+getString ( _1 ) |-->String
+getJsonString ( _1 ) |-->String
+getInt ( _1 ) |-->int
+getBoolean ( _1 ) |-->boolean
+getLong ( _1 ) |-->long
+isNull ( _1 ) |-->boolean
+contains ( _1 ) |-->boolean
+containsAll ( _1 ) |-->boolean
+containsKey ( _1 ) |-->boolean
+containsValue ( _1 ) |-->boolean
+isEmpty ( ) |-->boolean
+clear ( ) |-->void
+clone ( ) |-->Map
+
+keys ( ) |-->OclIterator
+values ( ) |-->Sequence
+keySet ( ) |-->Set
+entrySet ( ) |-->Set
+elements ( ) |-->OclIterator
+
+getKey ( ) |-->OclAny
+getValue ( ) |-->OclAny
+
+firstKey ( ) |-->OclAny
+lastKey ( ) |-->OclAny
+headMap ( _1 ) |-->Map
+tailMap ( _1 ) |-->Map
+subMap ( _1 ) |-->Map
+ 
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
+_1 |-->OclAny
+
+
 mapMethodCallSideEffect::
 put ( _1 ) |-->->union(Map{_1`first |-> _1`last})
+putIfAbsent ( _1 ) |-->->union(Map{_1`first |-> _1`last})
 setProperty ( _1 ) |-->->union(Map{_1`first |-> _1`last})
 putAll ( _1 ) |-->->union(_1)
 removeAll ( _1 ) |--> - _1
@@ -975,6 +1054,7 @@ close ( ) |-->.closeFile()
 ready ( ) |-->.canRead()
 next ( ) |-->.getCurrent()
 nextInt ( ) |-->.getCurrent()->toInteger()
+nextLong ( ) |-->.getCurrent()->toLong()
 nextDouble ( ) |-->.getCurrent()->toReal()
 nextBoolean ( ) |-->.getCurrent()->toBoolean()
 readObject ( ) |-->.readObject()
@@ -990,7 +1070,6 @@ _1 ( _2 ) |-->._1(_2)
 
 
 collectionMethodCallQueryForm::
-
 replaceAll ( _1 ) |-->_1`first->includes( _1`third )
 put ( _1 ) |-->->at(_1)
 removeAll ( _1 ) |-->->intersection(_1)->notEmpty()
@@ -1018,18 +1097,70 @@ _1 ( _2 ) |-->._1(_2)
 _1 _2 |-->_2
 
 
-streamMethodCallQueryForm::
+collectionMethodCallType::
+replaceAll ( _1 ) |-->boolean
+put ( _1 ) |-->OclAny
+removeAll ( _1 ) |-->boolean
+retainAll ( _1 ) |-->boolean
+add ( _1 ) |-->boolean
+addAll ( _1 ) |-->boolean
+push ( _1 ) |-->boolean
 
+removeElementAt ( _1 ) |-->Sequence
+removeElement ( _1 ) |-->Sequence
+remove ( ) |-->OclIterator
+remove ( _1 ) |-->boolean<when> _1 multiple
+remove ( _1 ) |-->OclAny<when> _1 integer
+remove ( _1 ) |-->boolean
+removeFirst ( ) |-->OclAny
+removeLast ( ) |-->OclAny
+set ( _1 ) |-->OclAny
+pop ( ) |-->OclAny
+take ( ) |-->OclAny
+poll ( ) |-->OclAny
+
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
+
+_1 _2 |-->_2`ocltype
+
+
+streamMethodCallQueryForm::
 empty ( ) |-->Sequence{}
 concat ( _1 ) |-->(_1`first)->union(_1`third)
 of ( _1 ) |-->Sequence{_1}
+range ( _1 ) |-->Integer.subrange(_1`first, _1`last-1)
+rangeClosed ( _1 )  |-->Integer.subrange(_1`first, _1`last)
+
+_1 ( ) |-->._1()
+_1 ( _2 ) |-->._1(_2)
+
+
+streamSupportQueryForm::
+doubleStream ( _1 ) |-->(_1`first).elements
+intStream ( _1 ) |-->(_1`first).elements
+longStream ( _1 ) |-->(_1`first).elements
+stream ( _1 ) |-->(_1`first).elements
+
+_1 ( ) |-->._1()
+_1 ( _2 ) |-->._1(_2)
+
+
+spliteratorsQueryForm::
+emptyDoubleSpliterator ( ) |-->OclIterator.newOclIterator_Sequence(Sequence{})
+emptyIntSpliterator ( ) |-->OclIterator.newOclIterator_Sequence(Sequence{})
+emptyLongSpliterator ( ) |-->OclIterator.newOclIterator_Sequence(Sequence{})
+emptySpliterator ( ) |-->OclIterator.newOclIterator_Sequence(Sequence{})
+
+iterator ( _1 ) |-->_1
+
+spliterator ( _1 ) |-->OclIterator.newOclIterator_Sequence(_1`first)
 
 _1 ( ) |-->._1()
 _1 ( _2 ) |-->._1(_2)
 
 
 collectionMethodCallSideEffect::
-
 pop ( ) |-->->front()
 take ( ) |-->->front()
 removeAll ( _1 ) |--> - _1
@@ -1066,6 +1197,8 @@ push ( _1 ) |-->->append(_1)
 offer ( _1 ) |-->->including(_1)
 
 remove ( ) |-->.remove()
+set ( _1 ) |-->.setAt(_1`first+1,_1`last)<when> _1 multiple
+set ( _1 ) |-->.setAt(_1+1, true)
 
 putChar ( _1 ) |-->.insertInto((_1`first)+1, MathLib.integer2bytes(_1`last,2))<when> _1 multiple
 putShort ( _1 ) |-->.insertInto((_1`first)+1, MathLib.integer2bytes(_1`last,2))<when> _1 multiple
@@ -1195,6 +1328,9 @@ _1 |-->._1
 
 dcolonObject::
 System . out |-->OclFile["System.out"]
+System . in |-->OclFile["System.in"]
+System . err |-->OclFile["System.err"]
+
 _1 |-->_1.new_1()
 
 
@@ -1222,12 +1358,16 @@ _1 ? _2 : _3 |-->if _1`queryForm then _2`queryForm else _3`queryForm endif
 ( short ) _1 |-->(_1`queryForm)->char2byte()<when> _1 String
 ( long ) _1 |-->(_1`queryForm)->char2byte()<when> _1 String
 
-( byte ) _1 |-->(_1 mod 128)
-( short ) _1 |-->(_1 mod 32768)
+( byte ) _1 |-->(_1`queryForm mod 128)
+( short ) _1 |-->(_1`queryForm mod 32768)
 
 ( _1 ) _2 |-->_2`queryForm->oclAsType(_1)
 
 _1 instanceof _2 |-->_1`queryForm->oclIsKindOf(_2)
+
+_1 :: parseInt |-->lambda _s : String in _s->toInteger()
+_1 :: parseLong |-->lambda _s : String in _s->toLong()
+_1 :: parseDouble |-->lambda _s : String in _s->toReal()
 
 _1 :: _2 |-->lambda _pars : OclAny in _1`dcolonObject._2(_pars)
 
@@ -1272,11 +1412,17 @@ _1 > > _2 |-->(_1`queryForm/(2->pow(_2`queryForm)))->oclAsType(long)
 
 _1 && _2 |-->_1`queryForm & _2`queryForm
 _1 || _2 |-->_1`queryForm or _2`queryForm
-_1 & _2 |-->MathLib.bitwiseAnd(_1`queryForm,_2`queryForm)<when> _1 integer
+
+_1 & _2 |-->MathLib.bitwiseAnd(_1`queryForm,_2`queryForm)<when> _1 int
+_1 & _2 |-->MathLib.bitwiseAnd(_1`queryForm,_2`queryForm)<when> _1 long
 _1 & _2 |-->_1`queryForm & _2`queryForm
-_1 | _2 |-->MathLib.bitwiseOr(_1`queryForm,_2`queryForm)<when> _1 integer 
+
+_1 | _2 |-->MathLib.bitwiseOr(_1`queryForm,_2`queryForm)<when> _1 int
+_1 | _2 |-->MathLib.bitwiseOr(_1`queryForm,_2`queryForm)<when> _1 long
 _1 | _2 |-->_1`queryForm or _2`queryForm 
-_1 ^ _2 |-->MathLib.bitwiseXor(_1`queryForm,_2`queryForm)<when> _1 integer
+
+_1 ^ _2 |-->MathLib.bitwiseXor(_1`queryForm,_2`queryForm)<when> _1 int
+_1 ^ _2 |-->MathLib.bitwiseXor(_1`queryForm,_2`queryForm)<when> _1 long
 _1 ^ _2 |-->_1`queryForm xor _2`queryForm 
 
 _1 = _2 |-->_1`queryForm
@@ -1286,6 +1432,12 @@ _1 . class |-->OclType["_1"]
 _1 . new _2 |-->_1`queryForm._2
 
 { _1 } |-->Sequence{_1}
+
+{ _1, _2 } |-->Sequence{_1,_2}
+{ _1, _2, _3 } |-->Sequence{_1,_2,_3}
+{ _1, _2, _3, _4 } |-->Sequence{_1,_2,_3,_4}
+{ _1, _2, _3, _4, _5 } |-->Sequence{_1,_2,_3,_4,_5}
+{ _1, _2, _3, _4, _5, _6 } |-->Sequence{_1,_2,_3,_4,_5,_6}
 
 { _1, _* } |-->Sequence{_1,_*}
 
@@ -1340,6 +1492,7 @@ Thread . MIN_PRIORITY |-->1
 Thread . NORM_PRIORITY |-->5
 Thread . _1 |-->OclProcess._1
 
+ThreadLocalRandom . _1 |-->MathLib
 
 Void . TYPE |-->OclType["void"]
 void . class |-->OclType["void"]
@@ -1453,16 +1606,25 @@ Collections . EMPTY_MAP |-->Map{}
 Collections . EMPTY_SET |-->Set{}
 
 Stream . _1 |-->_1`streamMethodCallQueryForm
+IntStream . _1 |-->_1`streamMethodCallQueryForm
+LongStream . _1 |-->_1`streamMethodCallQueryForm
+DoubleStream . _1 |-->_1`streamMethodCallQueryForm
+StreamSupport . _1 |-->_1`streamSupportQueryForm
+
+Spliterators . _1 |-->_1`spliteratorsQueryForm
 
 java.lang.reflect.Array . _1 |-->_1`arrayMethodCall
 
 Collections . _1 |-->_1`collectionMethodCallQueryForm
 
+_1 . _2 |-->(if _1`queryForm->keys()->contains(_2`keyvalue) then _1`queryForm_2`mapMethodCallQueryForm else _2`testdefault endif)<when> _1 Map, _2`methodName getOrDefault
+ 
 _1 . _2 |-->_1`queryForm_2`mapMethodCallQueryForm<when> _1 Map
 _1 . _2 |-->_1`queryForm_2`fileMethodCallQueryForm<when> _1 File
 _1 . _2 |-->_1`queryForm_2`dateMethodCallQueryForm<when> _1 Date
 
 _1 . _2 |-->_1`queryForm_2`methodCallQueryForm
+_1 . _2 . _3 |-->_1`queryForm_2`methodCallQueryForm_3`methodCallQueryForm
 
 
 new _1 |-->_1
@@ -1472,9 +1634,26 @@ _1 ( ) |-->_1()
 _1 ( _2 ) |-->_1(_2)
 
 _1 |-->_1`queryForm<when> _1 multiple
+_1 |-->_1`queryForm<when> _1 arrayInitializer
+_1 |-->_1`queryForm<when> _1 expression
 
-_1 |-->_1
+_0 |-->_0
 
+methodName::
+_1 ( ) |-->_1
+_1 ( _2 ) |-->_1
+
+_* |-->
+
+
+keyvalue::
+getOrDefault ( _1 ) |-->_1`first
+putIfAbsent ( _1 ) |-->_1`first
+_* |-->
+
+testdefault::
+getOrDefault ( _1 ) |-->_1`last
+_* |-->
 
 
 enumsetMethodCall::
@@ -1483,6 +1662,14 @@ range ( _1 ) |-->(_1`first->oclType()).allInstances()->select(_x | _x >= _1`firs
 copyOf ( _1 ) |-->(_1)->copy()
 complementOf ( _1 ) |-->((_1->any()->oclType()).allInstances() - _1)
 of ( _1 ) |-->Set{_1}
+
+
+enumsetMethodType::
+allOf ( _1 ) |-->Sequence(_1)
+range ( _1 ) |-->Sequence
+copyOf ( _1 ) |-->_1`ocltype
+complementOf ( _1 ) |-->Sequence
+of ( _1 ) |-->Set
 
 
 
@@ -1495,6 +1682,10 @@ shortValue ( ) |-->->oclAsType(int)
 byteValue ( ) |-->->oclAsType(int)
 longValue ( ) |-->->oclAsType(long)
 charValue ( ) |-->+""
+
+test ( _1 ) |-->->apply(_1)
+accept ( _1 ) |-->->apply(_1)
+apply ( _1 ) |-->->apply(_1)
 
 toString ( ) |-->+""
 compareTo ( _1 ) |-->->compareTo(_1)
@@ -1574,6 +1765,12 @@ flatMapToLong ( _1 ) |-->->concatenateAll( _x1 | (_1)->apply(_x1) )
 flatMapToDouble ( _1 ) |-->->concatenateAll( _x1 | (_1)->apply(_x1) )
 map ( _1 ) |-->->collect( _x1 | (_1)->apply(_x1) )
 stream ( ) |-->
+asDoubleStream ( ) |-->
+asLongStream ( ) |-->
+boxed ( ) |-->
+parallel ( ) |-->
+sequential ( ) |-->
+unordered ( ) |-->
 sum ( ) |-->->sum()
 max ( _1 ) |-->->max()
 min ( _1 ) |-->->min()
@@ -1584,6 +1781,7 @@ distinct ( ) |-->->asOrderedSet()
 
 allMatch ( _1 ) |-->->forAll( _x2 | (_1)->apply(_x2) )
 anyMatch ( _1 ) |-->->exists( _x2 | (_1)->apply(_x2) )
+forEach ( _1 ) |-->->forAll( _x2 | (_1)->apply(_x2) )
 noneMatch ( _1 ) |-->->forAll( _x2 | not((_1)->apply(_x2)) )
 sorted ( ) |-->->sort()
 sorted ( _1 ) |-->->sort()
@@ -1591,14 +1789,14 @@ limit ( _1 ) |-->.subrange(1,_1)
 skip ( _1 ) |-->.subrange(_1+1)
 reduce ( _1 ) |-->->iterate( _var; _acc : OclAny | _1->apply((_acc,_var)) )
 
-apply ( _1 ) |-->->apply(_1)
-
 add ( _1 ) |-->->excludes(_1)
 addAll ( _1 ) |-->->intersection(_1`last) /= _1`last
 push ( _1 ) |-->true
 
 size ( ) |-->->size()
 length ( ) |-->->size()
+estimateSize ( ) |-->->size()
+getExactSizeIfKnown ( ) |-->->size()
 capacity ( ) |-->->size()
 getFirst ( ) |-->->first()
 firstElement ( ) |-->->first()
@@ -1656,6 +1854,7 @@ listIterator ( _1 ) |-->.subrange(_1+1)->iterator()
 
 
 get ( _1 ) |-->->at(_1+1)
+getOrDefault ( _1 ) |-->->at(_1+1)
 elementAt ( _1 ) |-->->at(_1+1)
 charAt ( _1 ) |-->->at(_1+1)
 printStackTrace ( ) |-->.printStackTrace()
@@ -1666,11 +1865,17 @@ clone ( ) |-->->copy()
 isNaN ( ) |-->->oclIsInvalid()
 isInfinite ( ) |-->->abs() = Math_PINFINITY
 
+incrementAndGet ( ) |-->+1
+decrementAndGet ( ) |-->-1
+
 scheduledExecutionTime ( ) |-->.getDeadline()
+run ( ) |-->.run()
 
 Stream . _1 |-->_1`streamMethodCallQueryForm
 
 Collections . _1 |-->_1`collectionMethodCallQueryForm
+
+_1 . _2 |-->if _1`queryForm->keys()->contains(_2`keyvalue) then _1`queryForm_2`mapMethodCallQueryForm else _2`testdefault endif<when> _2`methodName getOrDefault
 
 _1 . _2 |-->_1_2`mapMethodCallQueryForm<when> _1 Map
 _1 . _2 |-->_1_2`fileMethodCallQueryForm<when> _1 File
@@ -1690,6 +1895,8 @@ _1 |-->_1
 
 arraysMethodCall::
 toString ( _1 ) |-->(_1 + "")
+deepToString ( _1 ) |-->(_1 + "")
+
 asList ( _1 ) |-->_1`arrayAsList
 binarySearch ( _1 ) |-->(_1`first->indexOf(_1`last) - 1)
 equals ( _1 ) |-->_1`first = _1`last
@@ -1697,12 +1904,17 @@ equals ( _1 ) |-->_1`first = _1`last
 copyOf ( _1 ) |-->_1`first.subrange(1,_1`third)
 copyOfRange ( _1 ) |-->_1`first.subrange(_1`third+1,_1`last)
 
-sort ( _1 ) |-->    _1`first := _1`first.subrange(1,_1`third)^(_1`first.subrange(_1`third+1,_1`last)->sort())^_1`first.subrange(_1`last+1,_1`first.size)<when>_1 multiple
+sort ( _1 ) |-->    _1`first := OclComparator.sortWith(_1`first, _1`last)<when> _1 3ary
+sort ( _1 ) |-->    _1`first := _1`first.subrange(1,_1`third)^(_1`first.subrange(_1`third+1,_1`last)->sort())^_1`first.subrange(_1`last+1,_1`first.size)<when>_1 5ary
 sort ( _1 ) |-->    _1 := _1->sort()
+
+parallelSort ( _1 ) |-->    _1`first := _1`first->sort()
+
 fill ( _1 ) |-->    _1`first := _1`first->collect(_1`last)
  
 _1 ( ) |-->_1()
 _1 ( _2 ) |-->_1(_2)
+
 
 
 bigIntegerMethodCall::
@@ -1740,6 +1952,16 @@ _1 ( ) |-->_1()
 _1 ( _2 ) |-->_1(_2)
 
 
+byteMethodType::
+decode ( _1 ) |-->int
+parseByte ( _1 ) |-->int
+toString ( _1 ) |-->String
+valueOf ( _1 ) |-->int
+
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
+
+
 characterMethodCall::
 toUpperCase ( _1 ) |-->(_1 + "")->toUpperCase()
 toLowerCase ( _1 ) |-->(_1 + "")->toLowerCase()
@@ -1758,18 +1980,46 @@ forDigit ( _1 ) |-->(_1`first + "")
 getNumericValue ( _1 ) |-->("" + _1`first)->toInteger()
 
 
+characterMethodType::
+toUpperCase ( _1 ) |-->String
+toLowerCase ( _1 ) |-->String
+isDigit ( _1 ) |-->boolean
+isLetter ( _1 ) |-->boolean
+isLetterOrDigit ( _1 ) |-->boolean
+isLowerCase ( _1 ) |-->boolean
+isUpperCase ( _1 ) |-->boolean
+isJavaIdentifierPart ( _1 ) |-->boolean
+isJavaIdentifierStart ( _1 ) |-->boolean
+isSpaceChar ( _1 ) |-->boolean
+isWhitespace ( _1 ) |-->boolean
+toString ( _1 ) |-->String
+digit ( _1 ) |-->int
+forDigit ( _1 ) |-->String
+getNumericValue ( _1 ) |-->int
+
+
 classMethodCall::
 forName ( _1 ) |-->OclType[_1`first]
 
 
+classMethodType::
+forName ( _1 ) |-->OclType
+
 
 calendarMethodCall::
- 
 getInstance ( _1 ) |-->OclDate.newOclDate(_1)
 getInstance ( ) |-->OclDate.newOclDate()
 
 _1 ( ) |-->_1()
 _1 ( _2 ) |-->_1(_2)
+
+
+calendarMethodType::
+getInstance ( _1 ) |-->OclDate
+getInstance ( ) |-->OclDate
+
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
 
 
 collectionsMethodCall::
@@ -1820,6 +2070,49 @@ _1 ( _2 ) |-->_1(_2)
 _1 _2 |-->_2
 
 
+collectionsMethodType::
+list ( _1 ) |-->Sequence
+singletonList ( _1 ) |-->Sequence(_1`ocltype)
+singletonMap ( _1 ) |-->Map
+singleton ( _1 ) |-->Set(_1`ocltype)
+min ( _1 ) |-->OclAny
+max ( _1 ) |-->OclAny
+enumeration ( _1 ) |-->OclIterator
+replaceAll ( _1 ) |-->boolean
+swap ( _1 ) |-->void
+rotate ( _1 ) |-->void  
+shuffle ( _1 ) |-->void
+reverse ( _1 ) |-->void
+sort ( _1 ) |-->void
+copy ( _1 ) |-->void
+fill ( _1 ) |-->void
+ 
+binarySearch ( _1 ) |-->int
+indexOfSubList ( _1 ) |-->int
+lastIndexOfSubList ( _1 ) |-->int
+nCopies ( _1 ) |-->Sequence
+
+synchronizedCollection ( _1 ) |-->_1`ocltype
+synchronizedList ( _1 ) |-->_1`ocltype
+synchronizedSet ( _1 ) |-->_1`ocltype
+synchronizedMap ( _1 ) |-->_1`ocltype
+synchronizedSortedSet ( _1 ) |-->_1`ocltype
+synchronizedSortedMap ( _1 ) |-->_1`ocltype
+
+unmodifiableCollection ( _1 ) |-->_1`ocltype
+unmodifiableList ( _1 ) |-->_1`ocltype
+unmodifiableSet ( _1 ) |-->_1`ocltype
+unmodifiableMap ( _1 ) |-->_1`ocltype
+immutableMap ( _1 ) |-->_1`ocltype
+unmodifiableSortedSet ( _1 ) |-->_1`ocltype
+unmodifiableSortedMap ( _1 ) |-->_1`ocltype
+
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
+
+_1 _2 |-->_2`ocltype
+
+
 doubleMethodCall::
 compare ( _1 ) |-->(_1`first)->compareTo(_1`last)
 isInfinite ( _1 ) |-->((_1) = Math_PINFINITY or (_1) = Math_NINFINITY)
@@ -1830,6 +2123,18 @@ valueOf ( _1 ) |-->(_1)->toReal()
 
 _1 ( ) |-->_1()
 _1 ( _2 ) |-->_1(_2)
+
+
+doubleMethodType::
+compare ( _1 ) |-->int
+isInfinite ( _1 ) |-->boolean
+isNaN ( _1 ) |-->boolean
+parseDouble ( _1 ) |-->double
+toString ( _1 ) |-->String
+valueOf ( _1 ) |-->double
+
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
 
 
 integerMethodCall::
@@ -1843,22 +2148,52 @@ toOctalString ( _1 ) |-->(MathLib.decimal2octal(_1) + "")
 rotateRight ( _1 ) |-->MathLib.bitwiseRotateRight(_1)
 rotateLeft ( _1 ) |-->MathLib.bitwiseRotateLeft(_1)
 
+_0 |-->_0
 
-_1 ( ) |-->_1()
-_1 ( _2 ) |-->_1(_2)
+
+integerMethodType::
+decode ( _1 ) |-->int
+parseInt ( _1 ) |-->int
+toString ( _1 ) |-->String
+valueOf ( _1 ) |-->int
+toBinaryString ( _1 ) |-->String
+toHexString ( _1 ) |-->String
+toOctalString ( _1 ) |-->String
+rotateRight ( _1 ) |-->int
+rotateLeft ( _1 ) |-->int
+
+
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
 
 
 longMethodCall::
 decode ( _1 ) |-->(_1)->toLong()
+parseLong ( _1 ) |-->(_1`first)->toLong()
 parseInt ( _1 ) |-->(_1`first)->toLong()
 toString ( _1 ) |-->((_1`first) + "")
 valueOf ( _1 ) |-->(_1`first)->toLong()
 toBinaryString ( _1 ) |-->(MathLib.decimal2binary(_1) + "")
 toHexString ( _1 ) |-->(MathLib.decimal2hex(_1) + "")
 toOctalString ( _1 ) |-->(MathLib.decimal2octal(_1) + "")
+min ( _1 ) |-->Set{_1`first, _1`last}->min()
 
-_1 ( ) |-->_1()
-_1 ( _2 ) |-->_1(_2)
+_0 |-->_0
+
+
+longMethodType::
+decode ( _1 ) |-->long
+parseLong ( _1 ) |-->long
+parseInt ( _1 ) |-->long
+toString ( _1 ) |-->String
+valueOf ( _1 ) |-->long
+toBinaryString ( _1 ) |-->String
+toHexString ( _1 ) |-->String
+toOctalString ( _1 ) |-->String
+min ( _1 ) |-->long
+
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
 
 
 filesMethodCall::
@@ -1966,6 +2301,37 @@ _1 ( ) |-->_1()
 _1 ( _2 ) |-->_1(_2)
 
 
+mathMethodType::
+cos ( _1 ) |-->double
+sin ( _1 ) |-->double
+tan ( _1 ) |-->double
+acos ( _1 ) |-->double
+asin ( _1 ) |-->double
+atan ( _1 ) |-->double
+floor ( _1 ) |-->double
+abs ( _1 ) |-->_1`ocltype
+round ( _1 ) |-->double
+cosh ( _1 ) |-->double
+sinh ( _1 ) |-->double
+tanh ( _1 ) |-->double
+ceil ( _1 ) |-->double
+exp ( _1 ) |-->double
+log ( _1 ) |-->double
+log10 ( _1 ) |-->double
+sqrt ( _1 ) |-->double
+cbrt ( _1 ) |-->double
+pow ( _1 ) |-->double
+max ( _1 ) |-->double
+min ( _1 ) |-->double
+toDegrees ( _1 ) |-->double
+toRadians ( _1 ) |-->double
+rint ( _1 ) |-->double
+random ( ) |-->double
+
+_1 ( ) |-->double
+_1 ( _2 ) |-->double
+
+
 shortMethodCall::
 decode ( _1 ) |-->(_1)->toInteger()
 parseShort ( _1 ) |-->(_1`first)->toInteger()
@@ -1974,6 +2340,16 @@ valueOf ( _1 ) |-->(_1`first)->toInteger()
 
 _1 ( ) |-->_1()
 _1 ( _2 ) |-->_1(_2)
+
+
+shortMethodType::
+decode ( _1 ) |-->int
+parseShort ( _1 ) |-->int
+toString ( _1 ) |-->String
+valueOf ( _1 ) |-->int
+
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
 
 
 stringMethodCall::
@@ -1987,6 +2363,17 @@ getByName ( _1 ) |-->_1
 
 _1 ( ) |-->_1()
 _1 ( _2 ) |-->_1(_2)
+
+
+stringMethodType::
+copyValueOf ( _1 ) |-->String
+valueOf ( _1 ) |-->String
+format ( _1 ) |-->String
+getByName ( _1 ) |-->_1`ocltype
+join ( _1 ) |-->String
+
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
 
 
 assertMethodCall::
@@ -2009,6 +2396,11 @@ is ( _1 ) |-->_1`assertMatcherCondition
 not ( _1 ) |-->/= _1`queryForm
 _1 |-->= _1`queryForm<when> _1 expression
 _1 |-->_1`assertMatcherCondition
+
+
+assertMethodType::
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
 
 
 firstQueryForm::
@@ -2038,6 +2430,28 @@ setLong ( _1 ) |-->    _1`first[_1`third+1] := _1`last
 setShort ( _1 ) |-->    _1`first[_1`third+1] := _1`last
 
 
+arrayMethodType::
+get ( _1 ) |-->OclAny
+getBoolean ( _1 ) |-->boolean
+getByte ( _1 ) |-->int
+getChar ( _1 ) |-->int
+getDouble ( _1 ) |-->double
+getFloat ( _1 ) |-->double
+getInt ( _1 ) |-->int
+getLength ( _1 ) |-->int
+getLong ( _1 ) |-->long
+getShort ( _1 ) |-->int
+set ( _1 ) |-->OclAny
+setBoolean ( _1 ) |-->boolean
+setByte ( _1 ) |-->int
+setChar ( _1 ) |-->int
+setDouble ( _1 ) |-->double
+setFloat ( _1 ) |-->double
+setInt ( _1 ) |-->int
+setLong ( _1 ) |-->long
+setShort ( _1 ) |-->int
+
+
 systemMethodCall::
 currentTimeMillis ( ) |-->OclDate.getSystemTime()
 getenv ( _1 ) |-->OclProcess.getEnvironmentProperty(_1)
@@ -2050,6 +2464,20 @@ arraycopy ( _1 ) |-->    for _x : Integer.subrange(1,_1`last) do _1`fifth[_1`sev
 
 _1 ( ) |-->_1()
 _1 ( _2 ) |-->_1(_2)
+
+
+systemMethodType::
+currentTimeMillis ( ) |-->long
+getenv ( _1 ) |-->String
+getProperty ( _1 ) |-->String
+getProperties ( ) |-->Map(String,String)
+exit ( _1 ) |-->int
+setProperty ( _1 ) |-->String
+clearProperty ( _1 ) |-->String
+arraycopy ( _1 ) |-->void
+
+_1 ( ) |-->OclAny
+_1 ( _2 ) |-->OclAny
 
 
 
@@ -2081,6 +2509,11 @@ _1 |-->_1`fithArgument<when> _1 expressionList
 _1 |-->_1
 
 
+isForEachCall:: 
+forEach ( _1 ) |-->true
+_* |-->false
+
+
 methodCall::
 super ( ) |-->super.initialise()
 super ( _1 ) |-->super.initialise(_1)
@@ -2088,11 +2521,14 @@ super ( _1 ) |-->super.initialise(_1)
 this ( ) |-->self.initialise()
 this ( _1 ) |-->self.initialise(_1) 
 
-println ( _1 ) |-->(_1) 
+parseInt ( _1 ) |-->(_1 + "")->toInteger()
+println ( _1 ) |-->(_1)
+deepToString ( _1 ) |-->(_1 + "")
+ 
 length ( ) |-->size
 size ( ) |-->size
-max ( _1 ) |-->max(Set{_1})
-min ( _1 ) |-->min(Set{_1})
+max ( _1 ) |-->Set{_1}->max()
+min ( _1 ) |-->Set{_1}->min()
 get ( _1 ) |-->at(_1+1)
 charAt ( _1 ) |-->at(_1+1)
 getTimeInMillis ( ) |-->time
@@ -2101,6 +2537,10 @@ computeTime ( ) |-->time
 exec ( _1 ) |-->OclProcess.newOclProcess(null,_1`first)
 schedule ( _1 ) |-->setTask(_1`first) ; _1`first.setSchedule(_1`tailtail)
 scheduleAtFixedRate ( _1 ) |-->setTask(_1`first) ; _1`first.setSchedule(_1`tailtail)
+
+allMatch ( _1 ) |-->->forAll( _x0 | (_1)->apply(_x0) )
+anyMatch ( _1 ) |-->->exists( _x0 | (_1)->apply(_x0) )
+distinct ( ) |-->->asOrderedSet()
 
 filter ( _1 ) |-->->select( _x1 | (_1)->apply(_x1) )
 mapToInt ( _1 ) |-->->collect( _x1 | (_1)->apply(_x1) )
@@ -2135,15 +2575,82 @@ _1 ( ) |-->_1()
 _1 ( _2 ) |-->_1(_2)
 
 
+methodCallType::
+super ( ) |-->OclType
+super ( _1 ) |-->OclType
+
+this ( ) |-->OclType
+this ( _1 ) |-->OclType 
+
+parseInt ( _1 ) |-->int
+println ( _1 ) |-->void
+deepToString ( _1 ) |-->String
+ 
+length ( ) |-->int
+size ( ) |-->int
+estimateSize ( ) |-->long
+getExactSizeIfKnown ( ) |-->long
+tryAdvance ( _1 ) |-->boolean
+capacity ( ) |-->int
+
+max ( _1 ) |-->OclAny
+min ( _1 ) |-->OclAny
+get ( _1 ) |-->OclAny
+charAt ( _1 ) |-->String
+getTimeInMillis ( ) |-->long
+setTimeInMillis ( _1 ) |-->void
+computeTime ( ) |-->long
+exec ( _1 ) |-->OclProcess
+schedule ( _1 ) |-->void
+scheduleAtFixedRate ( _1 ) |-->void
+
+allMatch ( _1 ) |-->boolean
+anyMatch ( _1 ) |-->boolean
+distinct ( ) |-->Sequence
+
+filter ( _1 ) |-->Sequence
+mapToInt ( _1 ) |-->Sequence
+stream ( ) |-->Sequence
+forEach ( _1 ) |-->void
+
+absolute ( _1 ) |-->void
+updateString ( _1 ) |-->void
+relative ( _1 ) |-->void
+
+assertTrue ( _1 ) |-->void
+assertFalse ( _1 ) |-->void
+assertEquals ( _1 ) |-->void
+assertNotEquals ( _1 ) |-->void
+assertNotNull ( _1 ) |-->void
+assertSame ( _1 ) |-->void
+assertNotSame ( _1 ) |-->void
+assertArrayEquals ( _1 ) |-->void
+fail ( ) |-->void
+fail ( _1 ) |-->void
+assertThat ( _1 ) |-->void
+
+writeBoolean ( _1 ) |-->void
+writeChar ( _1 ) |-->void
+writeShort ( _1 ) |-->void
+writeInt ( _1 ) |-->void
+writeLong ( _1 ) |-->void
+writeFloat ( _1 ) |-->void
+writeDouble ( _1 ) |-->void
+skipBytes ( _1 ) |-->int
+
+_1 ( ) |-->_1()
+_1 ( _2 ) |-->_1(_2)
+
+
 lambdaParameters::
-( _1 ) |-->_1
-( _1 , _* ) |-->_1 : OclAny, _*`lambdaParameter
-_1 |-->_1 : OclAny
+( _1 ) |-->lambda _1 : OclAny in 
+( _* ) |-->_*`lambdaParameter
+_1 |-->lambda _1 : OclAny in
 
 
 lambdaParameter::
-, |--> ,
-_1 |-->_1 : OclAny
+, |-->
+_1 |-->lambda _1 : OclAny in
 
 
 lambdaBody::
@@ -2151,7 +2658,30 @@ _1 |-->_1
 
 
 lambdaExpression::
-_1 -> _2 |-->lambda _1 in _2
+_1 -> _2 |-->lambda _1 in (_2`updateForm & _2`queryForm)<when> _2`isAssignment true
+_1 -> _2 |-->_1 _2
+
+
+forEachVariable::
+forEach ( _1 ) |-->_1`forEachVariable
+_1 -> _2 |-->_1`name
+
+_1 |-->_1`forEachVariable<when> _1 lambdaExpression
+_1 |-->_1`forEachVariable<when> _1 expression
+_1 |-->_1`forEachVariable<when> _1 expressionList
+
+_* |-->_forEach
+
+
+forEachUpdateForm::
+forEach ( _1 ) |-->_1`forEachUpdateForm
+_1 -> _2 |-->_2`updateForm
+
+_1 |-->_1`forEachUpdateForm<when> _1 lambdaExpression
+_1 |-->_1`forEachUpdateForm<when> _1 expression
+_1 |-->_1`forEachUpdateForm<when> _1 expressionList
+
+_* |-->    skip ; 
 
 
 expression::
@@ -2188,7 +2718,14 @@ _1 . first |-->_1->at("first")
 _1 . second |-->_1->at("second")
 _1 . third |-->_1->at("third")
 
+_1 :: parseLong |-->lambda _s : String in _s->toLong()
+_1 :: parseInt |-->lambda _s : String in _s->toInteger()
+_1 :: parseDouble |-->lambda _s : String in _s->toReal()
 _1 :: _2 |-->lambda _pars : OclAny in _1`dcolonObject._2(_pars)
+
+System . out |-->OclFile["System.out"]
+System . in |-->OclFile["System.in"]
+System . err |-->OclFile["System.err"]
 
 System.out |-->OclFile["System.out"]
 System.in |-->OclFile["System.in"]
@@ -2309,7 +2846,6 @@ Boolean . _1 |-->_1`booleanMethodCall
 
 Arrays . _1 |-->_1`arraysMethodCall
 
-
 Pattern . _1 |-->OclRegex_1`methodCallQueryForm
 
 
@@ -2341,11 +2877,20 @@ Character . _1 |-->_1`characterMethodCall
 
 Class . _1 |-->_1`classMethodCall
 
+Stream . _1 |-->_1`streamMethodCallQueryForm
+IntStream . _1 |-->_1`streamMethodCallQueryForm
+LongStream . _1 |-->_1`streamMethodCallQueryForm
+DoubleStream . _1 |-->_1`streamMethodCallQueryForm
+StreamSupport . _1 |-->_1`streamSupportQueryForm
+
+Spliterators . _1 |-->_1`spliteratorsQueryForm
+
 Thread . MAX_PRIORITY |-->10
 Thread . MIN_PRIORITY |-->1
 Thread . NORM_PRIORITY |-->5
 Thread . _1 |-->OclProcess._1
 
+ThreadLocalRandom . _1 |-->MathLib
 
 Void . TYPE |-->OclType["void"]
 void . class |-->OclType["void"]
@@ -2397,14 +2942,20 @@ _1 > > _2 |-->(_1/(2->pow(_2)))->oclAsType(long)
 
 _1 && _2 |-->_1 & _2
 _1 || _2 |-->_1 or _2
-_1 & _2 |-->MathLib.bitwiseAnd(_1,_2)<when> _1 integer
+_1 & _2 |-->MathLib.bitwiseAnd(_1,_2)<when> _1`ocltype int
+_1 & _2 |-->MathLib.bitwiseAnd(_1,_2)<when> _1`ocltype long
 _1 & _2 |-->_1 & _2
-_1 | _2 |-->MathLib.bitwiseOr(_1,_2)<when> _1 integer 
+_1 | _2 |-->MathLib.bitwiseOr(_1,_2)<when> _1`ocltype int
+_1 | _2 |-->MathLib.bitwiseOr(_1,_2)<when> _1`ocltype long
 _1 | _2 |-->_1 or _2 
-_1 ^ _2 |-->MathLib.bitwiseXor(_1,_2)<when> _1 integer
+_1 ^ _2 |-->MathLib.bitwiseXor(_1,_2)<when> _1`ocltype int
+_1 ^ _2 |-->MathLib.bitwiseXor(_1,_2)<when> _1`ocltype long
 _1 ^ _2 |-->_1 xor _2 
 
 _1 instanceof _2 |-->_1->oclIsKindOf(_2)
+
+
+_1 . _2 |-->(if _1`queryForm->keys()->contains(_2`keyvalue) then _1`queryForm_2`mapMethodCallQueryForm else _2`testdefault endif)<when> _1 Map, _2`methodName getOrDefault
 
 _1 . _2 |-->_1_2`mapMethodCallQueryForm<when> _1 Map
 _1 . _2 |-->_1_2`fileMethodCallQueryForm<when> _1 File
@@ -2417,6 +2968,267 @@ _1 . _2 |-->_1._2
 ( _1 ) |-->(_1)
 
 _1 |-->_1
+
+
+ocltype::
+- _1 |-->_1`ocltype
++ _1 |-->_1`ocltype
+! _1 |-->boolean
+~ _1 |-->_1`ocltype
+
+-- _1 |-->_1`ocltype
+++ _1 |-->_1`ocltype
+
+
+_1 ? _2 : _3 |-->_2`ocltype
+
+( int ) _1 |-->int
+( byte ) _1 |-->int
+( short ) _1 |-->int
+( long ) _1 |-->int
+
+( byte ) _1 |-->int
+( short ) _1 |-->int
+
+( _1 ) _2 |-->_1
+
+_1 instanceof _2 |-->boolean
+
+_1 . new _2 |-->_2
+
+_1 . this |-->_1
+_1 . length |-->int
+_1 . elementCount |-->int
+_1 . elementData |-->_1`ocltype
+_1 . first |-->OclAny
+_1 . second |-->OclAny
+_1 . third |-->OclAny
+
+_1 :: _2 |-->Function(OclAny,OclAny)
+
+System.out |-->OclFile
+System.in |-->OclFile
+System.err |-->OclFile
+
+System.out . _1 |-->OclFile["System.out"]._1`systemMethodType
+System.in . _1 |-->OclFile["System.in"]._1`systemMethodType
+System.err . _1 |-->OclFile["System.err"]._1`systemMethodType
+
+System . _1 |-->_1`systemMethodType
+Array . _1 |-->_1`arrayMethodType
+java.lang.reflect.Array . _1 |-->_1`arrayMethodType
+Assert . _1 |-->_1`assertMethodType
+
+Math . PI |-->double
+Math . E |-->double
+
+Math . _1 |-->_1`mathMethodType
+
+EnumSet . _1 |-->_1`enumsetMethodType
+
+Byte . MIN_VALUE |-->int
+Byte . MAX_VALUE |-->int
+Byte . SIZE |-->int
+Byte . TYPE |-->OclType
+byte . class |-->OclType
+
+Byte . _1 |-->_1`byteMethodType
+
+Short . MIN_VALUE |-->int
+Short . MAX_VALUE |-->int
+Short . SIZE |-->int
+Short . TYPE |-->OclType
+short . class |-->OclType
+
+Short . _1 |-->_1`shortMethodType
+
+Float . MAX_VALUE |-->double
+Float . MIN_VALUE |-->double
+Float . SIZE |-->int
+Float . MAX_EXPONENT |-->int
+Float . MIN_EXPONENT |-->int
+Float . MIN_NORMAL |-->double
+Float . NaN |-->double
+Float . POSITIVE_INFINITY |-->double
+Float . NEGATIVE_INFINITY |-->double
+Float . TYPE |-->OclType
+float . class |-->OclType
+
+Float . _1 |-->_1`doubleMethodType
+
+Double . MAX_VALUE |-->double
+Double . MIN_VALUE |-->double
+Double . MIN_NORMAL |-->double
+Double . MAX_EXPONENT |-->int
+Double . MIN_EXPONENT |-->int
+Double . SIZE |-->int
+Double . NaN |-->double
+Double . POSITIVE_INFINITY |-->double
+Double . NEGATIVE_INFINITY |-->double
+Double . TYPE |-->OclType
+double . class |-->OclType
+
+Double . _1 |-->_1`doubleMethodType
+
+Integer . MAX_VALUE |-->int
+Integer . MIN_VALUE |-->int
+Integer . SIZE |-->int
+Integer . TYPE |-->OclType
+int . class |-->OclType
+
+Integer . _1 |-->_1`integerMethodType
+
+Long . MAX_VALUE |-->long
+Long . MIN_VALUE |-->long
+Long . SIZE |-->int
+Long . TYPE |-->OclType
+long . class |-->OclType
+
+Long . _1 |-->_1`longMethodType
+
+GregorianCalendar . ERA |-->int
+GregorianCalendar . YEAR |-->int
+GregorianCalendar . MONTH |-->int
+GregorianCalendar . DAY_OF_MONTH |-->int
+GregorianCalendar . WEEK_OF_MONTH |-->int
+GregorianCalendar . DAY_OF_WEEK_IN_MONTH |-->int
+GregorianCalendar . AM_PM |-->int
+GregorianCalendar . HOUR |-->int
+GregorianCalendar . HOUR_OF_DAY |-->int
+GregorianCalendar . MINUTE |-->int
+GregorianCalendar . SECOND |-->int
+GregorianCalendar . MILLISECOND |-->int
+
+Calendar . _1 |-->_1`calendarMethodType
+GregorianCalendar . _1 |-->_1`calendarMethodType
+
+
+Collections . EMPTY_LIST |-->Sequence
+Collections . EMPTY_MAP |-->Map
+Collections . EMPTY_SET |-->Set
+
+Collections . _1 |-->_1`collectionsMethodType
+
+Boolean . TRUE |-->boolean
+Boolean . FALSE |-->boolean
+Boolean . TYPE |-->OclType
+boolean . class |-->OclType
+
+Boolean . _1 |-->_1`booleanMethodType
+
+Arrays . _1 |-->_1`arraysMethodType
+
+Pattern . _1 |-->_1`patternMethodType
+
+String . class |-->OclType
+
+String . _1 |-->_1`stringMethodType
+
+InetAddress . _1 |-->_1`stringMethodType
+
+BigInteger . ZERO |-->int
+BigInteger . ONE |-->int
+BigInteger . TEN |-->int
+
+BigInteger . _1 |-->_1`bigIntegerMethodType
+
+BigDecimal . ZERO |-->double
+BigDecimal . ONE |-->double
+BigDecimal . TEN |-->double
+
+BigDecimal . _1 |-->_1`bigDecimalMethodType
+
+Character . MAX_VALUE |-->String
+Character . MIN_VALUE |-->String
+Character . TYPE |-->OclType
+char . class |-->OclType
+
+Character . _1 |-->_1`characterMethodType
+
+Class . _1 |-->_1`classMethodType
+
+Thread . MAX_PRIORITY |-->int
+Thread . MIN_PRIORITY |-->int
+Thread . NORM_PRIORITY |-->int
+Thread . _1 |-->_1`threadMethodType
+
+Void . TYPE |-->OclType
+void . class |-->OclType
+
+_1 . new _2 |-->_2
+_1 . new _2 _3 |-->_3
+
+new _1 |-->_1
+new _1 _2 |-->_1
+
+
+_1 [ _2 ] |-->_1`elemType
+_1 ++ |-->_1`ocltype
+_1 -- |-->_1`ocltype
+
+_1 > _2 |-->boolean
+_1 < _2 |-->boolean
+_1 >= _2 |-->boolean
+_1 != _2 |-->boolean
+_1 <= _2 |-->boolean
+_1 == _2 |-->boolean
+
+_1 = _2 |-->_1`ocltype
+_1 += _2 |-->_1`ocltype
+_1 -= _2 |-->_1`ocltype
+_1 *= _2 |-->_1`ocltype
+_1 /= _2 |-->_1`ocltype
+_1 &= _2 |-->_1`ocltype
+_1 |= _2 |-->_1`ocltype
+_1 ^= _2 |-->_1`ocltype
+_1 <<= _2 |-->_1`ocltype
+_1 >>= _2 |-->_1`ocltype
+_1 >>>= _2 |-->_1`ocltype
+_1 %= _2 |-->_1`ocltype
+
+_1 + _2 |-->_1`ocltype
+
+_1 - _2 |-->int<when> _1 String, _2 String
+_1 - _2 |-->_1`ocltype<when> _2 String
+_1 - _2 |-->int<when> _1 String
+_1 - _2 |-->_1`ocltype
+
+_1 * _2 |-->_1`ocltype
+_1 % _2 |-->_1`ocltype
+_1 / _2 |-->_1`ocltype
+_1 < < _2 |-->long
+_1 > > > _2 |-->long
+_1 > > _2 |-->long
+
+_1 && _2 |-->boolean
+_1 || _2 |-->boolean
+_1 & _2 |-->_1`ocltype
+_1 | _2 |-->_1`ocltype 
+_1 ^ _2 |-->_1`ocltype 
+
+_1 instanceof _2 |-->boolean
+
+_1 . _2 |-->_2`mapMethodCallType<when> _1 Map
+_1 . _2 |-->_2`fileMethodCallType<when> _1 File
+_1 . _2 |-->_2`dateMethodCallType<when> _1 Date
+_1 . _2 |-->_2`collectionMethodCallType<when> _1 Collection
+
+_1 . _2 |-->_2`methodCallType<when> _2 methodCall
+
+_1 . _2 |-->OclAny
+
+( _1 ) |-->_1`ocltype
+
+_1 |-->int<when> _1 int
+_1 |-->long<when> _1 long
+_1 |-->boolean<when> _1 boolean
+_1 |-->String<when> _1 String
+_1 |-->Sequence<when> _1 Sequence
+_1 |-->Set<when> _1 Set
+_1 |-->Map<when> _1 Map
+_1 |-->Function<when> _1 Function
+
+_1 |-->_1`type
 
 
 sideEffect::
@@ -2461,6 +3273,11 @@ _1 | _2 |-->_1`preSideEffect_2`preSideEffect
 _1 & _2 |-->_1`preSideEffect_2`preSideEffect
 
 _1 = _2 |-->_1`preSideEffect_2`preSideEffect    _1`queryForm := _2`queryForm ;\n
+_1 += _2 |-->_1`preSideEffect_2`preSideEffect    _1`queryForm := _1`queryForm + _2`queryForm ;\n
+_1 -= _2 |-->_1`preSideEffect_2`preSideEffect    _1`queryForm := _1`queryForm - _2`queryForm ;\n
+_1 *= _2 |-->_1`preSideEffect_2`preSideEffect    _1`queryForm := _1`queryForm * _2`queryForm ;\n
+_1 /= _2 |-->_1`preSideEffect_2`preSideEffect    _1`queryForm := _1`queryForm / _2`queryForm ;\n
+_1 %= _2 |-->_1`preSideEffect_2`preSideEffect    _1`queryForm := _1`queryForm mod _2`queryForm ;\n
 
 _1 ++ |-->_1`preSideEffect
 _1 -- |-->_1`preSideEffect
@@ -2469,6 +3286,8 @@ _1 < < _2 |-->_1`preSideEffect_2`preSideEffect
 _1 > > > _2 |-->_1`preSideEffect_2`preSideEffect
 _1 > > _2 |-->_1`preSideEffect_2`preSideEffect
 
+_1 . incrementAndGet ( ) |-->    _1 := _1 + 1 ;\n
+_1 . decrementAndGet ( ) |-->    _1 := _1 - 1 ;\n
 _1 . new _2 |-->
 
 _1 . class |-->_1`preSideEffect
@@ -2490,9 +3309,10 @@ _1 ( ) |-->
 _1 ( _2 ) |-->_2`expressionListPreSideEffect
 
 _1 |-->_1`preSideEffect<when> _1 multiple
-
+_1 |-->_1`preSideEffect<when> _1 arrayInitializer
 
 _1 |-->
+_* |-->
 
 
 postSideEffect::
@@ -2592,6 +3412,7 @@ _1 *= _2 |-->    _1 := _1 * (_2`queryForm) ; _2`sideEffect<when> _2 updatesObjec
 _1 *= _2 |-->    _2`preSideEffect _1 := _1 * (_2`queryForm) _2`postSideEffect<when> _2 hasSideEffect
 _1 *= _2 |-->    _1 := _1*(_2)
 
+( _1 ) |-->_1`updateForm
 
 _1 /= _2 |-->    _1 := _1/(_2)
 _1 &= _2 |-->    _1 := MathLib.bitwiseAnd(_1, _2)
@@ -2602,6 +3423,13 @@ _1 <<= _2 |-->    _1 := _1*(2->pow(_2))
 _1 >>= _2 |-->    _1 := _1/(2->pow(_2))
 _1 >>>= _2 |-->    _1 := _1/(2->pow(_2))
 
+_1 < _2 |-->    _1`updateForm ; _2`updateForm
+_1 > _2 |-->    _1`updateForm ; _2`updateForm
+_1 <= _2 |-->    _1`updateForm ; _2`updateForm
+_1 >= _2 |-->    _1`updateForm ; _2`updateForm
+_1 == _2 |-->    _1`updateForm ; _2`updateForm
+
+_1 ? _2 : _3 |-->    _2`updateForm ; _3`updateForm
 
 Collections . _1 |-->_1`collectionsMethodCall
 Arrays . _1 |-->_1`arraysMethodCall
@@ -2617,22 +3445,28 @@ System.err . _1 |-->    OclFile["System.err"]._1`systemMethodCall
 System . _1 |-->_1`systemMethodCall
 
 
+_1 . _2 |-->    for _2`forEachVariable : _1 do\n    (_2`forEachUpdateForm)<when> _2 methodCall, _2`isForEachCall true
+
+_1 . _2 |-->    if _1->keys()->includes(_2`keyvalue) then skip else _1 := _1_2`mapMethodCallSideEffect<when> _1 Map, _2`methodName putIfAbsent 
+
 _1 . _2 |-->    _1 := _1_2`mapMethodCallSideEffect<when> _1 Map
 
 _1 . _2 |-->    _1 := _1_2`collectionMethodCallSideEffect<when> _1 Collection
 
-_1 . _2 |-->    _1_2`methodCallSideEffect<when> _1 File
+_1 . _2 |-->    skip<when> _1 File
     
 _1 . _2 |-->    _1`updatedObject := _1_2`methodCallSideEffect<when> _2 updatesObject
 
 
-_1 . _2 |-->_1`preSideEffect_2`preSideEffect    _1`queryForm_2<when> _2 methodCall
+_1 . _2 |-->_1`preSideEffect_2`preSideEffect    _1`queryForm_2`methodCallQueryForm<when> _2 methodCall
 
 
 _1 . _2 |-->_1`preSideEffect_2`preSideEffect    _1`queryForm._2
 
-_1 |-->    _1
-
+_1 |-->_1`updateForm<when> _1 expression
+_1 |-->    execute _1`queryForm<when> _1 methodCall
+_1 |-->    skip
+_* |-->    skip
 
 
 updatedObject::
@@ -2717,6 +3551,12 @@ StringBuilder _1 |-->StringLib.newString_1
 StringBuffer _1 |-->StringLib.newString_1
 URL _1 |-->OclDatasource.newURL_1
 
+AtomicInteger _1 |-->_1
+AtomicLong _1 |-->_1
+AtomicBoolean _1 |-->_1
+
+BitSet _1 |-->MathLib.toBitSequence_1
+
 Set _1 |-->Set{}_1`collectionCreationRest
 HashSet _1 |-->Set{}_1`collectionCreationRest
 LinkedHashSet _1 |-->Set{}_1`collectionCreationRest
@@ -2749,6 +3589,10 @@ HashBag _1 |-->Sequence{}_1`collectionCreationRest
 TreeList _1 |-->Sequence{}_1`collectionCreationRest
 
 Stream _1 |-->Sequence{}_1`collectionCreationRest
+IntStream _1 |-->Sequence{}
+LongStream _1 |-->Sequence{}
+DoubleStream _1 |-->Sequence{}
+
 JsonArray _1 |-->Sequence{}_1`collectionCreationRest
 JSONArray _1 |-->Sequence{}_1`collectionCreationRest
 
@@ -2770,6 +3614,7 @@ BufferedReader _1 |-->_1`newTextReader
 BufferedWriter _1 |-->_1`newTextWriter
 
 FileWriter _1 |-->_1`newTextWriter
+PrintWriter _1 |-->_1`newTextWriter
 StringWriter _1 |-->_1`newTextWriter
 Formatter _1 |-->_1`newTextWriter
 OutputStreamWriter _1 |-->_1`newTextWriter
@@ -2784,6 +3629,8 @@ InputStreamReader _1 |-->_1`newTextReader
 RandomAccessFile _1 |-->_1`newRAFile
 
 Socket _1 |-->OclDatasource.newSocket_1
+
+StringTokenizer _1 |-->OclIterator.newOclIterator_String_1`stringTokenizerArguments
 
 Thread _1 |-->OclProcess.newOclProcess_1
 Timer _1 |-->OclProcess.newOclProcess("","TimerTask")
@@ -2804,6 +3651,13 @@ _1 _2 |-->_1_2`collectionCreationRest<when> _1 multiple, _1`isCollectionCreatedN
 
 _1 _2 |-->_1_2
 _1 |-->_1
+
+
+stringTokenizerArguments::
+( _1 ) |-->_String(_1)<when> _1 multiple
+( _1 ) |-->(_1)
+_1 |-->_1`stringTokenizerArguments<when> _1 arguments
+
 
 
 isCollectionCreatedName::
@@ -2893,6 +3747,7 @@ intArrayInit::
 [ _1 ] [ _2 ] [ ] |-->Integer.subrange(1,_1)->collect(Integer.subrange(1,_2)->collect(Sequence{}))
 [ ] [ ] [ ] _1 |-->_1
 
+
 doubleArrayInit::
 [ ] |-->Sequence{}
 [ _1 ] |-->Integer.subrange(1,_1)->collect(0.0)
@@ -2959,6 +3814,10 @@ TreeList |-->Sequence
 
 BitSet |-->Sequence(boolean)
 Stream |-->Sequence
+IntStream |-->Sequence(int)
+LongStream |-->Sequence(long)
+DoubleStream |-->Sequence(double)
+
 JsonArray |-->Sequence
 JSONArray |-->Sequence
 
@@ -2990,6 +3849,13 @@ StringBuilder |-->String
 CharSequence |-->String
 Character |-->String
 InetAddress |-->String
+
+AtomicBoolean |-->boolean
+AtomicInteger |-->int
+AtomicLong |-->long
+AtomicIntegerArray |-->Sequence
+AtomicLongArray |-->Sequence
+AtomicReferenceArray |-->Sequence
 
 File |-->OclFile
 Formatter |-->OclFile
@@ -3055,6 +3921,7 @@ ListIterator |-->OclIterator
 StringTokenizer |-->OclIterator
 Enumeration |-->OclIterator
 Cursor |-->OclIterator
+Spliterator |-->OclIterator
 
 Pattern |-->OclRegex
 FileFilter |-->OclRegex
@@ -3265,10 +4132,11 @@ _1 |-->_1
 _1 ; _* |-->_1 _*`recurse
 
 resource::
-_1 _2 = _3 |-->    var _2 : _1 := _3 ;\n
-_1 _2 _3 = _4 |-->    var _3 : _2 = _4 ;\n
-_1 _2 _3 _4 = _5 |-->    var _4 : _3 = _5 ;\n
-_1 _2 _3 _4 _5 = _6 |-->    var _5 : _4 = _6 ;\n
+_1 _2 = _3 |-->    var _2 : _1 := _3 ;\n<action> _2`variableName _1
+_1 _2 _3 = _4 |-->    var _3 : _2 = _4 ;\n<action> _3`variableName _2
+_1 _2 _3 _4 = _5 |-->    var _4 : _3 = _5 ;\n<action> _4`variableName _3
+_1 _2 _3 _4 _5 = _6 |-->    var _5 : _4 = _6 ;\n<action> _5`variableName _4
+
 _1 _* |-->_*`recurse<when> _1 variableModifier
 
 
@@ -3284,6 +4152,7 @@ _* |-->
 explicitGenericInvocation::
 _1 _2 |-->_2
 
+
 explicitGenericInvocationSuffix::
 singleton _1 |-->Set{_1}
 
@@ -3294,28 +4163,42 @@ methodBody::
 ; |-->
 _1 |-->\n  activity: _1
 
+
 lambdaDefinitionFromMethodBody::
 ; |-->null
 _1 |-->_1
 
 
+isAssignment::
+_1 = _2 |-->true
+_1 += _2 |-->true
+_1 -= _2 |-->true
+
+_1 |-->_1`isAssignment<when> _1 expression
+
+_1 |-->false
+_* |-->false
+
+
 statement::
-break ; |-->    break
-break _1 ; |-->    break
+; |-->
+break ; |-->    break 
+break _1 ; |-->    break 
+continue ; |-->    continue 
+continue _1 ; |-->    continue 
 
-continue ; |-->    continue
-continue _1 ; |-->    continue
-
-throw _1 ; |-->    error _1
-throw ; |-->    error null
+throw _1 ; |-->    error _1 ;
+throw ; |-->    error null ;
 
 synchronized _1 _2 |-->_2
 
 _1 : _2 |-->_2
 _1 : _2 ; |-->_2
 
+while _1 _2 |-->    _1`preSideEffect    while _1 do (_1`updateForm ; _2 ; _1`preSideEffect ) ; <when> _1 hasSideEffect
 while _1 _2 |-->    while _1 do _2 ; 
 
+if _1 _2 else _3 |-->    if _1 then _2`noSemiStatement else _3 ; <when> _2 statement
 if _1 _2 else _3 |-->    if _1 then _2 else _3 ; 
 
 if _1 _2 |-->    if _1 then _2 else skip ; 
@@ -3325,19 +4208,72 @@ for ( _1 ) _2 |-->  _1 _2 _1`forIncrement ) ;
 switch _1 { _2 _* } |-->\n    for _x : Integer.subrange(1,1) do\n      ( var _switchval : _1`type ;\n        _switchval := _1 ; \n_2\n_* )\n
 switch _1 { _2 } |-->\n    for _x : Integer.subrange(1,1) do\n      ( var _switchval : _1`type ;\n        _switchval := _1 ; \n_2\n      )\n
 
-return _1 ; |-->    return _1
-return ; |-->    return
+return _1 ; |-->    return _1 
+return ; |-->    return 
 
 assert _1 : _2 ; |-->    assert _1 do _2 ; 
 assert _1 ; |-->    assert _1 ;
 
+try _1 _2 _* |-->    try (_1 _2) _* <when> _1 resourceSpecification
+try _1 _2 |-->    try (_1 _2) <when> _1 resourceSpecification
 try _1 _2 _* |-->    try _1 _2 _*
 try _1 _2 |-->    try _1 _2
 
-do _1 while _2 ; |-->  while true do (_1    if _2 then skip else break) ;
+do _1 while _2 ; |-->  while true do (_1 ;\n    if _2 then\n  _2`updateForm else break) ; <when> _2 hasSideEffect
+
+do _1 while _2 ; |-->  while true do (_1 ;\n    if _2 then skip else break) ;
   
 _1 ; |-->_1`updateForm ;<when> _1 expression
 _1 ; |-->_1
+_1 |-->_1
+
+
+noSemiStatement::
+; |-->
+break ; |-->    break 
+break _1 ; |-->    break 
+continue ; |-->    continue 
+continue _1 ; |-->    continue 
+
+throw _1 ; |-->    error _1 
+throw ; |-->    error null 
+
+synchronized _1 _2 |-->_2
+
+_1 : _2 |-->_2
+_1 : _2 ; |-->_2
+
+while _1 _2 |-->    _1`preSideEffect    while _1 do (_1`updateForm ; _2 ; _1`preSideEffect )<when> _1 hasSideEffect
+while _1 _2 |-->    while _1 do _2
+
+
+if _1 _2 else _3 |-->    if _1 then _2 else _3
+
+if _1 _2 |-->    if _1 then _2 else skip
+
+for ( _1 ) _2 |-->  _1 _2 _1`forIncrement ) 
+ 
+switch _1 { _2 _* } |-->\n    for _x : Integer.subrange(1,1) do\n      ( var _switchval : _1`type ;\n        _switchval := _1 ; \n_2\n_* )\n
+switch _1 { _2 } |-->\n    for _x : Integer.subrange(1,1) do\n      ( var _switchval : _1`type ;\n        _switchval := _1 ; \n_2\n      )\n
+
+return _1 ; |-->    return _1 
+return ; |-->    return 
+
+assert _1 : _2 ; |-->    assert _1 do _2
+assert _1 ; |-->    assert _1
+
+try _1 _2 _* |-->    try (_1 _2) _* <when> _1 resourceSpecification
+try _1 _2 |-->    try (_1 _2) <when> _1 resourceSpecification
+try _1 _2 _* |-->    try _1 _2 _*
+try _1 _2 |-->    try _1 _2
+
+do _1 while _2 ; |-->  while true do (_1 ;\n    if _2 then\n  _2`updateForm else break)<when> _2 hasSideEffect
+
+do _1 while _2 ; |-->  while true do (_1 ;\n    if _2 then skip else break)
+  
+_1 ; |-->_1`updateForm<when> _1 expression
+_1 ; |-->_1
+_1 |-->_1`noSemiStatement<when> _1 statement
 _1 |-->_1
 
 
@@ -3347,20 +4283,28 @@ _1 |-->_1 \n
 
 
 block::
-{ _1 _* } |-->( _1 _* )
+{ _1 } |-->( _1`noSemiStatement )<when> _1 blockStatement
 { _1 } |-->( _1 )
+{ _1 _2 } |-->( _1 _2`noSemiStatement )<when> _2 blockStatement
+{ _1 _2 } |-->( _1 _2 )
+{ _1 _2 _3 } |-->( _1 _2 _3`noSemiStatement )<when> _3 blockStatement
+{ _1 _2 _3 } |-->( _1 _2 _3 )
+{ _1 _2 _3 _4 } |-->( _1 _2 _3 _4`noSemiStatement )<when> _4 blockStatement
+{ _1 _2 _3 _4 } |-->( _1 _2 _3 _4 )
+
+{ _1 _* } |-->( _1 _* )
 { } |-->skip
 
 _1 |-->_1
 
 
 forIncrement::
-_1 ; _2 ; _3 |-->  ; _3`expressionListUpdateForm
-_1 ; ; _2 |-->  ; _2`expressionListUpdateForm
+_1 ; _2 ; _3 |--> ; _3`expressionListUpdateForm
+_1 ; ; _2 |--> ; _2`expressionListUpdateForm
 _1 ; ; |-->
-; _1 ; _2 |-->  ; _2`expressionListUpdateForm
+; _1 ; _2 |--> ; _2`expressionListUpdateForm
 ; _1 ; |-->
-; ; _1 |-->  ; _1`expressionListUpdateForm
+; ; _1 |--> ; _1`expressionListUpdateForm
 ; ; |-->
 _1 |-->
 

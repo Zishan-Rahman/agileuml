@@ -820,6 +820,7 @@ trailer::
 . upper _1 |-->->toUpperCase()
 . lower _1 |-->->toLowerCase()
 . strip _1 |-->->trim()
+. split _1 |-->->split_1
 . replace _1 |-->.replace_1
 . find _1 |-->->indexOf_1 - 1
 . startswith _1 |-->->hasPrefix_1
@@ -1043,6 +1044,7 @@ numpyTrailer::
 . linspace _1 |-->MathLib.numericSeries(_1`firstArg, _1`secondArg, 50)<when> _1`argCount 3
 . linspace _1 |-->MathLib.numericSeries(_1`firstArg, _1`secondArg, _1`thirdArg->oclAsType(int))<when> _1`argCount 5
 
+. matmul _1 |-->MatrixLib.matrixMultiplication(_1`firstArg,_1`secondArg)
 . prod _1 |-->MatrixLib.prdMatrix(_1`firstArg)
 . sum _1 |-->MatrixLib.sumMatrix(_1`firstArg)
 
@@ -1193,9 +1195,9 @@ _1 |-->OclAny
 
 
 pandasType::
-. read_csv _1 |-->Map
-. read_json _1 |-->Map
-. DataFrame _1 |-->Map
+. read_csv _1 |-->OclDataTable
+. read_json _1 |-->OclDataTable
+. DataFrame _1 |-->OclDataTable
 . Series _1 |-->Sequence
 
 _1 |-->OclAny 
@@ -1573,7 +1575,7 @@ _1 : _2 |-->.subrange(_1+1, _2)<when> _2 test
 1 : |-->->tail()
 _1 : |-->.subrange(_1+1)<when> _1 test
 _1 |-->->at(_1)<when> _1 String
-_1 |-->->select(_1)<when> _1`ocltype boolean
+_1 |-->->selectRows(_1)<when> _1`ocltype boolean
 _1 |-->->restrict(_1)<when> _1`ocltype Sequence
 _1 |-->[_1+1]
 
@@ -2157,6 +2159,7 @@ trailerOclType::
 
 . upper _1 |-->String
 . lower _1 |-->String
+. split _1 |-->Sequence
 . strip _1 |-->String
 . replace _1 |-->String
 . find _1 |-->int

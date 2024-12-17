@@ -741,6 +741,18 @@ public void findClones(java.util.Map clones,
       int ascore = (int) res.get("amber"); 
       res.set("amber", ascore+1); 
     }
+    else if (("->last".equals(operator) || 
+              "->first".equals(operator) || 
+              "->front".equals(operator) || 
+              "->tail".equals(operator)) && 
+             argument instanceof BasicExpression && 
+             ((BasicExpression) argument).isOperationCall())
+    { // redundant results computation
+      aUses.add("! Redundant results computation in: " + this);
+      int ascore = (int) res.get("amber"); 
+      res.set("amber", ascore+1); 
+    } 
+
 
     return res; 
   } 
@@ -5839,6 +5851,17 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     // return qf + ".get(0)"; 
   } // keys, values
   
+  public boolean containsSubexpression(Expression expr) 
+  { if (operator.equals("lambda") && accumulator != null &&
+        accumulator.containsSubexpression(expr))
+    { return true; }
+
+    if (argument.containsSubexpression(expr))
+    { return true; }
+ 
+    return (this + "").equals(expr + ""); 
+  } 
+
   public Vector mutants()
   { Vector res = new Vector(); 
     res.add(this); 

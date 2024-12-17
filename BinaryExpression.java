@@ -880,6 +880,37 @@ class BinaryExpression extends Expression
     return id; 
   } 
   
+  public boolean containsSubexpression(Expression expr) 
+  { if (operator.equals("->iterate"))
+    { if (accumulator != null && 
+          accumulator.containsSubexpression(expr))
+      { return true; } 
+    } 
+
+    if (operator.equals("#") || "#LC".equals(operator) ||
+        operator.equals("!") || operator.equals("#1") ||
+        operator.equals("|") || operator.equals("|R") ||
+        operator.equals("|C") || operator.equals("|unionAll") ||
+        operator.equals("|intersectAll") ||
+        operator.equals("|concatenateAll") ||
+        operator.equals("|selectMaximals") ||
+        operator.equals("|selectMinimals") ||
+        operator.equals("|sortedBy"))
+    { Expression lft = ((BinaryExpression) left).right;  
+      if (lft.containsSubexpression(expr))
+      { return true; }  
+    } 
+    else 
+    { if (left.containsSubexpression(expr)) 
+      { return true; }
+    } 
+ 
+    if (right.containsSubexpression(expr)) 
+    { return true; } 
+
+    return (this + "").equals(expr + ""); 
+  } 
+
   public Vector mutantOperators(String op)
   { Vector res = new Vector(); 
     if (":".equals(op))
@@ -5659,6 +5690,11 @@ public void findClones(java.util.Map clones,
       if (type == null) 
       { type = new Type("int", null); } 
     } 
+    /* else if (operator.equals("->split"))
+    { elementType = new Type("String",null); 
+      type = new Type("Sequence", null);
+      type.setElementType(elementType);  
+    } */ 
     else if ("->hasPrefix".equals(operator) || 
              "->hasSuffix".equals(operator) ||
              "->hasMatch".equals(operator) || 
@@ -20624,6 +20660,14 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
              "->intersectAll".equals(operator) || 
              "|intersectAll".equals(operator))
     { aUses.add("! High-cost operator in: " + this);
+      int ascore = (int) res.get("amber"); 
+      res.set("amber", ascore+1); 
+    } 
+    else if ("->at".equals(operator) && 
+             left instanceof BasicExpression && 
+             ((BasicExpression) left).isOperationCall())
+    { // redundant results computation
+      aUses.add("! Redundant results computation in: " + this);
       int ascore = (int) res.get("amber"); 
       res.set("amber", ascore+1); 
     } 
