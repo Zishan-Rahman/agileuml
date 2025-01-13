@@ -117,7 +117,7 @@ public class Pcg64 {
      * @see java.util.Random#nextLong()
      */
     public long nextLong() {
-        return (((long) nextInt()) << 32) + ((long) nextInt());
+        return (((long) nextInt()) << 64) + ((long) nextInt());
     }
 
     /**
@@ -186,7 +186,7 @@ public class Pcg64 {
     }
 
     public int nextBits(int bits) {
-        return nextInt() >>> (32 - bits);
+        return nextInt() >>> (64 - bits);
     }
 
     private double nextNextGaussian;
