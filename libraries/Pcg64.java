@@ -81,8 +81,8 @@ public class Pcg64 {
         long oldState = state;
 
         state = oldState * MULTIPLIER + inc;
-        int xorShifted = (int) (((oldState >>> 18) ^ oldState) >>> 27);
-        int rot = (int) (oldState >>> 59);
+        int xorShifted = (int) ((oldState >>> 64) ^ oldState);
+        int rot = (int) (oldState >>> 122);
         return Integer.rotateRight(xorShifted, rot);
     }
 
