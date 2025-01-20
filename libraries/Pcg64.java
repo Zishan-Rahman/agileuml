@@ -154,7 +154,7 @@ public class Pcg64 {
      */
     public float nextFloat() {
         // TODO see http://mumble.net/~campbell/2014/04/28/uniform-random-float
-        return nextBits(24) / ((float)(1 << 24));
+        return nextBits(53) / ((float)(1 << 53));
     }
 
     /**
