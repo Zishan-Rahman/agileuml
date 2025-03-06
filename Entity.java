@@ -7,7 +7,7 @@ import java.util.StringTokenizer;
 
 
 /******************************
-* Copyright (c) 2003--2024 Kevin Lano
+* Copyright (c) 2003--2025 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -12519,14 +12519,17 @@ System.out.println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
       String aname = att.getName();
       Type t = att.getType();
       int m = att.getKind();
+
       boolean froz = att.isFrozen(); 
       boolean uniq = att.isUnique(); 
       boolean scope = att.isClassScope(); 
       res = res + aname + " " + t + " " + m + " " + froz + " " + uniq + 
             " " + scope;
+
       if (i < attributes.size() - 1)
       { res = res + " "; }
     }
+
     return res;
   }   // for each op, save name, type, parameters, pre, post
 

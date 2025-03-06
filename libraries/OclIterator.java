@@ -355,6 +355,25 @@ class OclIterator { static ArrayList<OclIterator> OclIterator_allInstances = new
     columnNames = new ArrayList<String>(); 
   } 
   
+  
+  public static void main(String[] args)
+  { ArrayList lst = new ArrayList(); 
+    for (int i = 0; i < 1000000; i++)
+    { lst.add(i); } 
+    OclIterator iter1 = OclIterator.newOclIterator_Sequence(lst); 
+	java.util.Date d1 = new java.util.Date(); 
+	long t1 = d1.getTime(); 
+	
+	for (int j = 0; j < 1000000; j++) 
+	{ iter1.next(); 
+	  iter1.set(1); 
+	}
+	
+	java.util.Date d2 = new java.util.Date(); 
+	long t2 = d2.getTime();
+	System.out.println(t2-t1);  
+  }  
+
   /*
   public static void main(String[] args)
   { ArrayList lst = new ArrayList(); 

@@ -3,7 +3,7 @@ import java.util.List;
 import java.io.*; 
 
 /******************************
-* Copyright (c) 2003--2024 Kevin Lano
+* Copyright (c) 2003--2025 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -4728,6 +4728,14 @@ public class BSystemTypes extends BComponent
       "    return res; \n" + 
       "  }\n\n"; 
 
+     res = res + 
+       "  public static SortedSet<T> copyCollection<T>(SortedSet<T> a)\n" +
+       "  {\n" +
+       "    SortedSet<T> res = new SortedSet<T>();\n" +
+       "    res.UnionWith(a);\n" +
+       "    return res;\n" +
+       "  }\n\n";
+
     res = res + 
       "  public static Hashtable copyMap(Hashtable m)\n" + 
       "  { Hashtable res = new Hashtable(); \n" +
@@ -4743,6 +4751,15 @@ public class BSystemTypes extends BComponent
       "    { res.Add(f(col[i]));  }\n" + 
       "    return res; \n" + 
       "  }\n\n"; 
+
+    res = res +
+       "  public static ArrayList collectSortedSet<T>(SortedSet<T> col, Func<T, object> f)\n" +
+       "  {\n" +
+       "    ArrayList res = new ArrayList();\n" +
+       "    foreach (T x in col)\n" +
+       "    { res.Add(f(x)); }\n" +
+       "    return res;\n" +
+       "  }\n\n"; 
 
     res = res + 
       "  public static object iterate(ArrayList col, object init, Func<object,Func<object,object>> f)\n" + 
@@ -5130,8 +5147,9 @@ public class BSystemTypes extends BComponent
     return res; 
   } 
 
-   public static String generateExcludesAllMapOpCSharp()  // for CSharp
-   { String res = "  public static bool excludesAllMap(Hashtable sup, Hashtable sub) \n" +
+ public static String generateExcludesAllMapOpCSharp()  // for CSharp
+ { String res = 
+     "  public static bool excludesAllMap(Hashtable sup, Hashtable sub) \n" +
      " { foreach (DictionaryEntry pair in sub) \n" +
      "   { if (sup.ContainsKey(pair.Key))  \n" +
      "     { if (pair.Value.Equals(sup[pair.Key])) \n" +
@@ -5139,9 +5157,32 @@ public class BSystemTypes extends BComponent
      "     } \n" +
      "   } \n" +
      "   return true; \n" +
-     " } \n"; 
-     return res; 
-  } 
+     " } \n\n";
+
+   res = res +
+     "  public static bool excludesAll(ArrayList col1, ArrayList col2)\n" +
+       "  {\n" +
+       "    for (int i = 0; i < col1.Count; i++)\n" +
+       "    {\n" +
+       "      if (col2.Contains(col1[i]))\n" +
+       "      { return false; }\n" +
+       "    }\n" +
+       "    return true;\n" +
+       "  }\n\n"; 
+
+    res = res + 
+      "  public static bool excludesAll<T>(SortedSet<T> col1, SortedSet<T> col2)\n" +
+      "  {\n" +
+      "    foreach (T x in col1)\n" +
+      "    {\n" +
+      "      if (col2.Contains(x))\n" +
+      "      { return false; }\n" +
+      "    }\n" +
+      "    return true;\n" +
+      "  }\n\n";
+ 
+   return res; 
+ } 
 
 
    public static String generateIncludingMapOpCSharp()  // for CSharp
@@ -5363,7 +5404,30 @@ public class BSystemTypes extends BComponent
       "      } \n" +
       "    }     \n" +
       "    return true; \n" +
-      "  } \n"; 
+      "  } \n\n";
+
+    res = res + 
+        "  static bool excludesAll(std::set<_T>* a, std::set<_T>* b)\n" +
+        "  {\n" +
+        "    for (auto _pos = a->begin(); _pos != a->end(); ++_pos)\n" +
+        "    {\n" +
+        "      if (UmlRsdsLib<_T>::isIn(*_pos, b))\n" +
+        "      { return false; }\n" +
+        "    }\n" +
+        "    return true;\n" +
+        "  }\n\n"; 
+
+    res = res + 
+       "  static bool excludesAll(vector<_T>* a, vector<_T>* b)\n" +
+        "  {\n" +
+        "    for (auto _pos = a->begin(); _pos != a->end(); ++_pos)\n" +
+        "    {\n" +
+        "      if (UmlRsdsLib<_T>::isIn(*_pos, b))\n" +
+        "      { return false; }\n" +
+        "    }\n" +
+        "    return true;\n" +
+        "  }\n\n"; 
+ 
     return res; 
   } 
 
@@ -5482,7 +5546,53 @@ public class BSystemTypes extends BComponent
       "    for (int i = 1; i < se->size(); ++i)\n" +
       "    { res = UmlRsdsLib<_T>::intersectionMap(res, (*se)[i]); }\n" +
       "    return res;\n" +
-      "  }\n"; 
+      "  }\n\n"; 
+
+    res = res + 
+      "  static bool includesKey(map<string, _T>* m, string k)\n" +
+      "  { if (m->find(k) == m->end())\n" +
+      "    {\n" +
+      "      return false;\n" +
+      "    }\n" +
+      "    return true;\n" + 
+      "  }\n\n"; 
+
+    res = res + 
+      "  static bool excludesKey(map<string, _T>* m, string k)\n" +
+      "  { if (m->find(k) == m->end())\n" +
+      "    {\n" +
+      "      return true;\n" +
+      "    }\n" +
+      "    return false;\n" +
+      "  }\n\n"; 
+
+    res = res + 
+      "  static bool includesValue(map<string, _T>* s, _T val)\n" +
+      "  {\n" +
+      "    for (auto iter = s->begin(); iter != s->end(); ++iter)\n" +
+      "    {\n" +
+      "      _T value = iter->second;\n" +
+      "      if (val == value)\n" +
+      "      {\n" +
+      "          return true;\n" +
+      "      }\n" +
+      "    }\n" +
+      "    return false;\n" +
+      "  }\n\n";
+
+    res = res + 
+    "  static bool excludesValue(map<string, _T>* s, _T val)\n" +
+    "  {\n" +
+    "    for (auto iter = s->begin(); iter != s->end(); ++iter)\n" +
+    "    {\n" +
+    "       _T value = iter->second;\n" +
+    "       if (val == value)\n" +
+    "       {\n" +
+    "           return false;\n" +
+    "       }\n" +
+    "   }\n" +
+    "   return true;\n" +
+    " }\n\n";
 
     return res; 
   } 
@@ -5915,8 +6025,14 @@ public class BSystemTypes extends BComponent
                  "      }\n" +  
                  "      return res;\n" + 
                  "    }\n\n" +
-                 "    public static bool equalsSet(ArrayList a, ArrayList b)\n" + 
-                 "    { return isSubset(a,b) && isSubset(b,a); }\n\n"; 
+     "    public static bool equalsSet(ArrayList a, ArrayList b)\n" + 
+     "    { return isSubset(a,b) && isSubset(b,a); }\n\n"; 
+    res = res + 
+      "    public static bool isSubset<T>(SortedSet<T> a, SortedSet<T> b)\n" + 
+        "    { return a.IsSubsetOf(b); }\n\n" +  
+        "    public static bool equalsSet<T>(SortedSet<T> a, SortedSet<T> b)\n" + 
+        "    { return a.SetEquals(b); }\n\n"; 
+
     return res; 
   }  
 
@@ -6040,7 +6156,12 @@ public class BSystemTypes extends BComponent
     res = res + "    for (int i = 1; i < l.Count; i++)\n";
     res = res + "    { IComparable e = (IComparable) l[i];\n";
     res = res + "      if (res.CompareTo(e) < 0) { res = e; } }\n";
-    res = res + "    return res; }\n";
+    res = res + "    return res; }\n\n";
+
+     res = res +
+       "  public static T max<T>(SortedSet<T> st)\n" + 
+       "  { return st.Max; }\n\n"; 
+
     return res;
   } // map
 
@@ -6106,7 +6227,13 @@ public class BSystemTypes extends BComponent
     res = res + "    for (int i = 1; i < l.Count; i++)\n";
     res = res + "    { IComparable e = (IComparable) l[i];\n";
     res = res + "      if (res.CompareTo(e) > 0) { res = e; } }\n";
-    res = res + "    return res; }\n";
+    res = res + "    return res;\n" + 
+                "  }\n\n";
+
+     res = res +
+       "  public static T min<T>(SortedSet<T> st)\n" + 
+       "  { return st.Min; }\n\n"; 
+
     return res;
   } // map
 
@@ -6616,7 +6743,8 @@ public class BSystemTypes extends BComponent
       "  public static ArrayList union(ArrayList a, Collection b)\n" +
       "  { ArrayList res = new ArrayList(); \n" +
       "    res.addAll(a); res.addAll(b);\n" +
-      "    return res; }\n\n";  
+      "    return res;\n" + 
+      "  }\n\n";  
     return res;
   }
 
@@ -6648,10 +6776,24 @@ public class BSystemTypes extends BComponent
   { String res = "  public static ArrayList union(ArrayList a, ArrayList b)\n" +
       "  { ArrayList res = new ArrayList(); \n" +
       "    for (int i = 0; i < a.Count; i++)\n" +
-      "    { if (a[i] == null || res.Contains(a[i])) { } else { res.Add(a[i]); } }\n" +
+      "    { if (a[i] == null || res.Contains(a[i])) { }\n" + 
+      "      else { res.Add(a[i]); }\n" + 
+      "    }\n" +
       "    for (int j = 0; j < b.Count; j++)\n" +
-      "    { if (b[j] == null || res.Contains(b[j])) { } else { res.Add(b[j]); } }\n" +
-      "    return res; }\n";
+      "    { if (b[j] == null || res.Contains(b[j])) { }\n" + 
+      "      else { res.Add(b[j]); }\n" + 
+      "    }\n" +
+      "    return res; }\n\n";
+
+    res = res + 
+        "  public static SortedSet<T> union<T>(SortedSet<T> a, IEnumerable<T> b)\n" +
+        "  {\n" +
+        "    SortedSet<T> res = new SortedSet<T>();\n" +
+        "    res.UnionWith(a);\n" +
+        "    res.UnionWith(b);\n" +
+        "    return res;\n" +
+        "  }\n\n"; 
+
     return res;
   } // if both are sequences, concatenate is used. 
 
@@ -6922,19 +7064,43 @@ public class BSystemTypes extends BComponent
       "    { if (a[i] == null || b.Contains(a[i])) {}\n" + 
       "      else { res.Add(a[i]); }\n" +
       "    }\n" +
-      "    return res; }\n\n" +
+      "    return res;\n" + 
+      "  }\n\n" +
+
+        "  public static SortedSet<T> subtract<T>(SortedSet<T> a, IEnumerable<T> b)\n" +
+        "  {\n" +
+        "    SortedSet<T> res = new SortedSet<T>();\n" +
+        "    res.UnionWith(a);\n" +
+        "    res.ExceptWith(b);\n" +
+        "    return res;\n" +
+        "  }\n\n" +  
+
       "  public static ArrayList subtract(ArrayList a, object b)\n" +
       "  { ArrayList res = new ArrayList(); \n" +
       "    for (int i = 0; i < a.Count; i++)\n" + 
       "    { if (a[i] == null || b == a[i]) {}\n" + 
       "      else { res.Add(a[i]); }\n" +
       "    }\n" +
-      "    return res; }\n\n" + 
+      "    return res;\n" + 
+      "  }\n\n" + 
+
+        "  public static SortedSet<T> subtract<T>(SortedSet<T> a, T b)\n" +
+        "  {\n" +
+        "    SortedSet<T> res = new SortedSet<T>();\n" +
+        "    res.UnionWith(a);\n" +
+        "    res.Remove(b); \n" +
+        "    return res;\n" +
+        "  }\n\n" +
+
       "  public static string subtract(string a, string b)\n" +
       "  { string res = \"\"; \n" +
       "    for (int i = 0; i < a.Length; i++)\n" +
-      "    { if (b.IndexOf(a[i]) < 0) { res = res + a[i]; } }\n" +
-      "    return res; }\n\n";
+      "    { if (b.IndexOf(a[i]) < 0)\n" + 
+      "      { res = res + a[i]; }\n" + 
+      "    }\n" +
+      "    return res;\n" + 
+      "  }\n\n";
+
     return res;
   }
 
@@ -7010,17 +7176,20 @@ public class BSystemTypes extends BComponent
       "  { HashSet<T> res = new HashSet<T>(); \n" +
       "    res.addAll(a);\n" +
       "    res.retainAll(b);\n" +
-      "    return res; }\n\n" +
+      "    return res;\n" + 
+      "  }\n\n" +
       "  public static <T> TreeSet<T> intersection(TreeSet<T> a, Collection<T> b)\n" +
       "  { TreeSet<T> res = new TreeSet<T>(); \n" +
       "    res.addAll(a);\n" +
       "    res.retainAll(b);\n" +
-      "    return res; }\n\n" + 
+      "    return res;\n" + 
+      "  }\n\n" + 
       "  public static <T> ArrayList<T> intersection(ArrayList<T> a, Collection<T> b)\n" +
       "  { ArrayList<T> res = new ArrayList<T>(); \n" +
       "    res.addAll(a);\n" +
       "    res.retainAll(b);\n" +
-      "    return res; }\n\n";
+      "    return res;\n" + 
+      "  }\n\n";
     return res;   // shouldn't it always be a set?
   } // TreeSet version is valid? 
 
@@ -7028,8 +7197,21 @@ public class BSystemTypes extends BComponent
   { String res = "  public static ArrayList intersection(ArrayList a, ArrayList b)\n" +
       "  { ArrayList res = new ArrayList(); \n" +
       "    for (int i = 0; i < a.Count; i++)\n" + 
-      "    { if (a[i] != null && b.Contains(a[i])) { res.Add(a[i]); } }\n" + 
-      "    return res; }\n\n";
+      "    { if (a[i] != null && b.Contains(a[i]))\n" + 
+      "      { res.Add(a[i]); }\n" + 
+      "    }\n" + 
+      "    return res;\n" + 
+      "  }\n\n";
+
+        res = res + 
+          "  public static SortedSet<T> intersection<T>(SortedSet<T> a, IEnumerable<T> b)\n" +
+          "  {\n" +
+          "    SortedSet<T> res = new SortedSet<T>();\n" +
+          "    res.UnionWith(a);\n" +
+          "    res.IntersectWith(b); \n" +
+          "    return res;\n" +
+          "  }\n\n"; 
+
     return res;
   }
 
@@ -7114,6 +7296,18 @@ public class BSystemTypes extends BComponent
       "    { res = SystemTypes.intersection(res,(ArrayList) se[i]); }\n" +
       "    return res;\n" + 
       "  }\n\n";
+
+        res = res + 
+          "  public static SortedSet<T> intersectAllSet<T>(ArrayList se)\n" +
+          "  {\n" +
+          "    SortedSet<T> res = new SortedSet<T>();\n" +
+          "    if (se.Count == 0) { return res; }\n" +
+          "    res.UnionWith((IEnumerable<T>) se[0]);\n" +
+          "    for (int i = 1; i < se.Count; i++)\n" +
+          "    { res.IntersectWith((IEnumerable<T>) se[i]); }\n" +
+          "    return res;\n" +
+          "  }\n\n"; 
+
     return res;
   }
 
@@ -7234,6 +7428,16 @@ public class BSystemTypes extends BComponent
       "    }\n" +
       "    return res;\n" + 
       "  }\n\n";
+
+    res = res + 
+       "  public static SortedSet<T> unionAllSet<T>(ArrayList se)\n" +
+       "  {\n" +
+       "    SortedSet<T> res = new SortedSet<T>();\n" +
+       "    if (se.Count == 0) { return res; }\n" +
+       "    for (int i = 0; i < se.Count; i++)\n" +
+       "    { res.UnionWith((IEnumerable<T>) se[i]); }\n" +
+       "    return res;\n" +
+       "  }\n\n"; 
 
     res = res + 
       "  public static Hashtable unionAllMap(ArrayList se)\n" +
@@ -8843,6 +9047,16 @@ public class BSystemTypes extends BComponent
     "    }\n" + 
     "    return res;\n" + 
     "  }\n\n"; 
+
+     res = res + 
+        "  public static SortedSet<T> symmetricDifference<T>(SortedSet<T> a, IEnumerable<T> b)\n" +
+        "  {\n" +
+        "    SortedSet<T> res = new SortedSet<T>();\n" +
+        "    res.UnionWith(a);\n" +
+        "    res.SymmetricExceptWith(b); \n" +
+        "    return res;\n" +
+        "  }\n\n"; 
+
     return res; 
   }   
 
@@ -9295,10 +9509,18 @@ public class BSystemTypes extends BComponent
       "  { int res = 0; \n" + 
       "    for (int _i = 0; _i < l.Count; _i++)\n" + 
       "    { if (obj == l[_i]) { res++; } \n" + 
-      "      else if (obj != null && obj.Equals(l[_i])) { res++; } \n" + 
+      "      else if (obj != null && obj.Equals(l[_i]))\n" + 
+      "      { res++; } \n" + 
       "    }\n" + 
       "    return res; \n" + 
-      "  }\n\n" + 
+      "  }\n\n" +
+ 
+        "  public static int count<T>(SortedSet<T> st, T x)\n" +
+        "  { if (st.Contains(x))\n" +
+        "    { return 1; }\n" +
+        "    return 0; \n" +
+        "  }\n\n" +
+
       "  public static int count(string s, string x)\n" +
       "  { int res = 0; \n" +
       "    if (\"\".Equals(s)) { return res; }\n" + 
@@ -11248,13 +11470,15 @@ public class BSystemTypes extends BComponent
 	res = res + 
       "  public static boolean includesKey(Map m, Object key) \n" +
       "  { Object val = m.get(key); \n" + 
-      "    if (val == null) { return false; }\n" +
+      "    if (val == null)\n" + 
+      "    { return false; }\n" +
       "    return true;\n" +
       "  }\n\n"; 
     res = res + 
       "  public static boolean excludesKey(Map m, Object key) \n" +
       "  { Object val = m.get(key); \n" + 
-      "    if (val == null) { return true; }\n" +
+      "    if (val == null)\n" + 
+      "    { return true; }\n" +
       "    return false;\n" +
       "  }\n\n"; 
 	res = res + 
@@ -11264,7 +11488,7 @@ public class BSystemTypes extends BComponent
       "    for (int x = 0; x < keys.size(); x++)\n" +
       "    { Object v = m.get(x);\n" +
       "      if (v != null && v.equals(val))\n" +
-      "      { return true;  }\n" +
+      "      { return true; }\n" +
       "    }    \n" +
       "    return false;\n" +
       "  }\n\n"; 
@@ -11275,7 +11499,7 @@ public class BSystemTypes extends BComponent
       "    for (int x = 0; x < keys.size(); x++)\n" +
       "    { Object v = m.get(x);\n" +
       "      if (v != null && v.equals(val))\n" +
-      "      { return false;  }\n" +
+      "      { return false; }\n" +
       "    }    \n" +
       "    return true;\n" +
       "  }\n\n"; 
@@ -11594,6 +11818,8 @@ public class BSystemTypes extends BComponent
       "    }\n" +
       "    return result;\n" + 
       "  }\n\n";  
+
+    /* No need for includesKey, excludesKey, includesValue, excludesValue as these are operations of java.util.Map */ 
 
     return res; 
   } 

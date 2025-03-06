@@ -6,7 +6,7 @@ import javax.swing.JTextArea;
 import java.awt.*; 
 
 /******************************
-* Copyright (c) 2003--2024 Kevin Lano
+* Copyright (c) 2003--2025 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -301,8 +301,15 @@ public class Compiler2
         str.equals("select") || str.equals("collect") || 
         str.equals("reject") ||
         str.equals("includes") || str.equals("including") || 
+        str.equals("includesKey") || 
+        str.equals("includesValue") || 
+        str.equals("excludesKey") || 
+        str.equals("excludesValue") || 
         str.equals("excludes") ||
-        str.equals("excluding") || str.equals("intersection") || 
+        str.equals("excluding") || 
+        str.equals("excludingKey") || 
+        str.equals("excludingValue") || 
+        str.equals("intersection") || 
         str.equals("union") ||
         str.equals("unionAll") || str.equals("intersectAll") || 
         str.equals("at") ||
@@ -713,20 +720,20 @@ public class Compiler2
     { char c = str.charAt(i); 
       if (in == INUNKNOWN) 
       { if (isSymbolCharacter(c))
-        { sb = new StringBuffer();     // start new buffer for the symbol
+        { sb = new StringBuffer();  // new buffer for symbol
           lexicals.addElement(sb);  
           in = INSYMBOL; 
           sb.append(c); 
           previous = c; 
         }
         else if (isBasicExpCharacter(c))
-        { sb = new StringBuffer();     // start new buffer for the expression
+        { sb = new StringBuffer();  // new buffer for expression
           lexicals.addElement(sb);  
           in = INBASICEXP; 
           sb.append(c); 
         }           
         else if (isStringDelimiter(c))
-        { sb = new StringBuffer();     // start new buffer for the string
+        { sb = new StringBuffer();  // new buffer for the string
           lexicals.addElement(sb);  
           in = INSTRING; 
           sb.append('"'); 
@@ -742,18 +749,19 @@ public class Compiler2
             in = INBASICEXP; 
           } 
           else
-          { System.err.println("Unrecognised literal: " + c); } 
+          { System.err.println("!! Unrecognised UML/OCL token: " + c); } 
         }
       } 
       else if (in == INBASICEXP)
-      { if (isBasicExpCharacter(c) || c == '"')  // Why allow " in a basic exp???
-        { sb.append(c); }              // carry on adding to current basic exp
+      { if (isBasicExpCharacter(c) || 
+            c == '"')           // Why allow " in a basic exp???
+        { sb.append(c); }       // carry on adding to current basic exp
         else if (c == '_') 
         { // System.out.println("Metavariable symbol: " + c); 
           sb.append(c); 
         } 
         else if (isSymbolCharacter(c))
-        { sb = new StringBuffer();     // start new buffer for the symbol
+        { sb = new StringBuffer();     // new buffer for symbol
           lexicals.addElement(sb);  
           in = INSYMBOL; 
           sb.append(c); 
@@ -765,19 +773,19 @@ public class Compiler2
         { sb = new StringBuffer();     // unrecognised lexical
           lexicals.addElement(sb);  
           in = INUNKNOWN; 
-          System.err.println("Unrecognised literal in expression: " + c); 
+          System.err.println("!! Unrecognised token in expression: " + c); 
           sb.append(c); 
         }
       }
       else if (in == INSYMBOL)
       { if (isStringDelimiter(c))
-        { sb = new StringBuffer();     // start new buffer for the string
+        { sb = new StringBuffer();  // new buffer for the string
           lexicals.addElement(sb);  
           in = INSTRING; 
           sb.append('"'); 
         }
         else if (c == '(' || c == ')')
-        { sb = new StringBuffer();     // start new buffer for the new symbol
+        { sb = new StringBuffer();  // new buffer for new symbol
           lexicals.addElement(sb);  
           in = INSYMBOL; 
           previous = c; 
@@ -785,7 +793,7 @@ public class Compiler2
         }
         else if (c == '_') 
         { // System.out.println("Metavariable symbol: " + c); 
-          sb = new StringBuffer();     // start new buffer for the string
+          sb = new StringBuffer();  // new buffer for the string
           lexicals.addElement(sb);  
           in = INBASICEXP; 
           sb.append(c); 
@@ -1089,6 +1097,50 @@ public class Compiler2
         prev = updatePrev(prev,c);            
       } 
     }
+  }
+
+  public void filterLexicals()
+  { // removes invalid sequences such as ; ; and ; )
+
+    Vector newlexicals = new Vector(); 
+    boolean previousSemi = false; // last token was ';'
+    StringBuffer semi = new StringBuffer(); 
+    semi.append(";"); 
+
+    for (int i = 0; i < lexicals.size(); i++) 
+    { StringBuffer sb = (StringBuffer) lexicals.get(i); 
+      String ss = sb + ""; 
+      if (";".equals(ss))
+      { if (previousSemi) { } // skip the token
+        else 
+        { previousSemi = true; } 
+      } 
+      else if (")".equals(ss))
+      { if (previousSemi) 
+        { previousSemi = false; 
+          newlexicals.add(sb); 
+        } 
+        else 
+        { newlexicals.add(sb); } 
+      } 
+      else if ("else".equals(ss))
+      { if (previousSemi) 
+        { previousSemi = false; 
+          newlexicals.add(sb); 
+        } 
+        else 
+        { newlexicals.add(sb); } 
+      } 
+      else if (previousSemi)
+      { newlexicals.add(semi); 
+        previousSemi = false; 
+        newlexicals.add(sb); 
+      } 
+      else 
+      { newlexicals.add(sb); } 
+    } 
+
+    lexicals = newlexicals; 
   }
 
   public void nospacelexicalanalysisAST(String str) 
@@ -2771,6 +2823,13 @@ public Expression parse_lambda_expression(int bc, int st, int en, Vector entitie
     } 
   }
    
+
+  public void showLexicals()
+  { int sze = lexicals.size(); 
+    String lexs = showLexicals(0,sze-1); 
+    System.out.println(lexs); 
+  } 
+
   public String showLexicals(int st, int en)
   { String res = ""; 
     for (int i = st; i <= en; i++) 
@@ -3408,10 +3467,19 @@ public Expression parse_lambda_expression(int bc, int st, int en, Vector entitie
         { // System.out.println(">> Trying to parse at " + ss2); 
           Expression ee1 = parse_expression(bc+1,i+3,pend-1,entities,types); 
           if (ee1 == null) { continue; } 
-          Expression ee2 = parse_factor_expression(bc,pstart,i-1,entities,types); 
+
+          Expression ee2 = 
+            parse_factor_expression(bc,pstart,i-1,
+                                    entities,types); 
+
           if (ee2 == null) { continue; }
+
           if ("selectRows".equals(ss2))
-          { // convert it
+          { // convert it to 
+            // MathLib.dataTableFromRows(
+            //   MathLib.rowsOfDataTable(ee2)->select(
+            //     $row | ee1[$row/ee2] ) )
+            
             BasicExpression realarg = 
               BasicExpression.newStaticCallBasicExpression(
                  "rowsOfDataTable", "MathLib", ee2);
@@ -3429,8 +3497,32 @@ public Expression parse_lambda_expression(int bc, int st, int en, Vector entitie
                  "dataTableFromRows", "MathLib", be); 
             return res; 
           }  
+
+          if ("selectElements".equals(ss2))
+          { // convert it to 
+            // MatrixLib.selectElements(ee2, 
+            //    lambda $x : double in ee1[$x/ee2])
+            
+            BasicExpression svar =
+              BasicExpression.newVariableBasicExpression("$x");
+            svar.isEvent = false;  
+            Type dtype = new Type("double", null); 
+            Expression subee1 = 
+                ee1.substituteEq("" + ee2, svar);  
+            Expression func = 
+              UnaryExpression.newLambdaUnaryExpression(
+                       "$x", dtype, subee1); 
+            Vector pars = new Vector(); 
+            pars.add(ee2); 
+            pars.add(func); 
+            BasicExpression res = 
+              BasicExpression.newStaticCallBasicExpression(
+                 "selectElements", "MatrixLib", pars); 
+            return res; 
+          }  
  
-          BinaryExpression be = new BinaryExpression(ss+ss2,ee2,ee1); 
+          BinaryExpression be = 
+            new BinaryExpression(ss+ss2,ee2,ee1); 
           // System.out.println(">>> Parsed binary -> expression: " + be); 
           return be; 
         } 
@@ -3648,7 +3740,8 @@ public Expression parse_lambda_expression(int bc, int st, int en, Vector entitie
       // return null; 
     }       
 
-    if (pstart < pend && "]".equals(lexicals.get(pend) + "") && 
+    if (pstart < pend && 
+        "]".equals(lexicals.get(pend) + "") && 
         "[".equals(lexicals.get(pstart+1) + ""))
     { // iden[indexes]
 
@@ -6177,43 +6270,56 @@ public Vector parseAttributeDecsInit(Vector entities, Vector types)
       }
 
       if ("->includes".startsWith(st) || 
+          "->includesKey".startsWith(st) || 
+          "->includesValue".startsWith(st) || 
           "->includesAll".startsWith(st) || 
           "->including".startsWith(st))
       { mess[0] = "arg1->includes(elem) operator on sets, sequences. true if elem is in arg1\n" + 
           " arg1->includesAll(arg2)  true if all arg2 elements are in arg1\n" + 
-          " arg1->including(elem)  The same as arg1->union(Set{elem})"; 
-        return "arg1->includes(elem)  or  arg1->includesAll(arg2)  or  arg1->including(elem)"; 
+          " arg1->including(elem)  The same as arg1->union(Set{elem})\n" + 
+          " mp->includesKey(k)  and  mp->includesValue(v) are for Map mp\n"; 
+
+        return "arg1->includes(elem),  arg1->includesAll(arg2), arg1->including(elem), mp->includesKey(k), mp->includesValue(v)"; 
       }
 
       if ("->excludes".startsWith(st) ||
           "->excludesAll".startsWith(st) ||  
+          "->excludesKey".startsWith(st) || 
+          "->excludesValue".startsWith(st) || 
           "->excluding".startsWith(st) || 
           "->excludingFirst".startsWith(st) ||
-          "->excludingAt".startsWith(st))
-      { mess[0] = "arg1->excludes(elem) operator on sets, sequences. true if elem is not in arg1\n" + 
+          "->excludingAt".startsWith(st) ||
+          "->excludingKey".startsWith(st) ||
+          "->excludingValue".startsWith(st))
+      { mess[0] = "\n" + 
+          "arg1->excludes(elem) operator on sets, sequences. true if elem is not in arg1\n" + 
           " arg1->excludesAll(arg2)  true if arg1, arg2 have no common elements\n" + 
-          " arg1->excluding(elem)  The same as arg1 - Set{elem}\n" + 
+          " arg1->excluding(elem)  For collection arg1, the same as arg1 - Set{elem}\n" + 
           " arg1->excludingFirst(elem)  Removes first elem from sequence arg1\n" + 
-          " arg1->excludingAt(int)  Removes sequence element at index ind"; 
-        return "arg1->excludes(elem),  arg1->excludesAll(arg2),  arg1->excluding(elem), arg1->excludingFirst(elem) or arg1->excludingAt(int)"; 
+          " arg1->excludingAt(int)  Removes sequence element at index ind\n" + 
+          " mp->excludesKey(k), mp->excludesValue(v),  mp->excludingKey(k), mp->excludingValue(v) are for Map mp\n"; 
+        return "arg1->excludes(elem),  arg1->excludesAll(arg2),  arg1->excluding(elem), arg1->excludingFirst(elem), arg1->excludingAt(int), mp->excludesKey(k), mp->excludesValue(v), mp->excludingKey(k), mp->excludingValue(v)"; 
       }
     
       if ("->select".startsWith(st))
-      { mess[0] = "Selection (filter) operator on sets, sequences and maps.\n" + 
-          "col->select(x | P)  returns collection/map of same type as col.\n" + 
-          "col->selectMaximals(e), col->selectMinimals(e)  return subcollections of col for which e is maximal/minimal";  
+      { mess[0] = "\n" + 
+          "Selection (filter) operator on sets, sequences and maps.\n" + 
+          "col->select(x | P)  returns collection/map of same type as col, of col elements that satisfy P.\n" + 
+          "col->selectMaximals(e), col->selectMinimals(e)  return subcollections of collection col for which e is maximal/minimal";  
         return "arg1->select(x | Predicate)"; 
       }
 
       if ("->reject".startsWith(st))
-      { mess[0] = "Rejection (negative filter) operator on sets, sequences and maps.\n" + 
-          "col->reject(x | P)  returns collection/map of same type as col.";  
+      { mess[0] = "\n" + 
+          "Rejection (negative filter) operator on sets, sequences and maps.\n" + 
+          "col->reject(x | P)  returns collection/map of same type as col, omitting elements that satisfy P.";  
  
         return "arg1->reject(x | Predicate)"; 
       }
 
       if ("->collect".startsWith(st))
-      { mess[0] = "Collection operator on sets and sequences always returns a sequence\n" + 
+      { mess[0] = "\n" + 
+          "Collection operator on sets and sequences always returns a sequence in AgileUML,\n" + 
           "so that duplicated expression values are preserved.\n" + 
           "col->collect(x | e)  returns sequence of all e values for x in col.\n" + 
           "m->collect(x | e)  for Map m returns map with keys k of m, mapped to e value of x = m[k]\n"; 
@@ -11257,7 +11363,7 @@ private Vector parseUsingClause(int st, int en, Vector entities, Vector types)
 	{ String tag = "" + lexicals.get(st+1); 
 	  NLPSentence sent = parseSentence(st+2,en-1); 
 	  if (sent == null) 
-	  { System.err.println("!! Not a sentence: " + showLexicals(st+2,en-1)); 
+	  { System.err.println("!! Error: Not a sentence: " + showLexicals(st+2,en-1)); 
 	    return null; 
        }
        return sent; 
@@ -11299,10 +11405,39 @@ private Vector parseUsingClause(int st, int en, Vector entities, Vector types)
 
     // c.nospacelexicalanalysis("Map{ \"Name\" |-> Sequence{\"Braund, Mr. Owen Harris\"}->union(Sequence{\"Allen, Mr. William Henry\"}->union(Sequence{ \"Bonnell, Miss. Elizabeth\" })) }->union(Map{ \"Age\" |-> Sequence{22}->union(Sequence{35}->union(Sequence{ 58 })) }->union(Map{ \"Sex\" |-> Sequence{\"male\"}->union(Sequence{\"male\"}->union(Sequence{ \"female\" })) }->union(Map{ \"Fare\" |-> Sequence{102.0}->union(Sequence{99.0}->union(Sequence{ 250.0 })) }) ) )"); 
 
-     c.nospacelexicalanalysis("table->selectRows(table->at(p) > v)");  
-    Expression zz = c.parseExpression(); 
+  
+c.nospacelexicalanalysis("arr[i].x"); 
+Expression zz = c.parseExpression(); 
+System.out.println(zz); 
 
-    System.out.println(zz); 
+ /* c.nospacelexicalanalysis("table->restrict(table > v)");  
+ BinaryExpression zz = (BinaryExpression) c.parseExpression(); 
+
+ Expression zleft = zz.getLeft(); 
+ zleft.setType(new Type("Sequence", null)); 
+
+ System.out.println(zz);
+
+ Expression yy = zz.transformPythonSelectExpressions(); 
+
+ System.out.println(yy); */ 
+ 
+ /* 
+    c.nospacelexicalanalysis("execute (OclFile[\"system.in\"]).println(x)"); 
+
+    Statement stat = c.parseStatement(); 
+
+    System.out.println(stat); 
+
+    c.showLexicals(); */ 
+
+    // c.filterLexicals(); 
+
+    // c.showLexicals(); 
+
+    // stat = c.parseStatement(); 
+
+    // System.out.println(stat); 
 
     /* zz.typeCheck(new Vector(), new Vector(), new Vector(), new Vector()); 
 

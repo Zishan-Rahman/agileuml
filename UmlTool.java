@@ -1,5 +1,5 @@
 /******************************
-* Copyright (c) 2003--2024 Kevin Lano
+* Copyright (c) 2003--2025 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -12,7 +12,7 @@
  * 
  * Version information : 2.4
  *
- * Date : December 2024
+ * Date : February 2025
  * 
  * Description : This describes the GUI interface of 
  * the UML RSDS tool,
@@ -634,6 +634,10 @@ public void findPlugins()
     eisusecase.addActionListener(this);
     ucMI.add(eisusecase);
 
+    JMenuItem actorMI = new JMenuItem("Actor"); 
+    actorMI.addActionListener(this);
+    createMenu.add(actorMI); 
+
     // and special cases, such as loadXmi, loadCSV
 
     JMenuItem scMI = new JMenuItem("Entity Statemachine");
@@ -1037,7 +1041,7 @@ public void findPlugins()
       new JMenuItem("Simplify OCL"); 
     simplifyOCLop.addActionListener(this);
     simplifyOCLop.setToolTipText(
-      "Simplifies OCL expressions where possible");
+      "Simplifies OCL expressions & reduces code where possible");
     qualityMenu.add(simplifyOCLop);
 
     JMenuItem refineMenu = new JMenu("Refinement"); 
@@ -1625,6 +1629,10 @@ public void findPlugins()
       }
       else if (label.equals("General Use Case"))
       { ucdArea.addGeneralUseCase(); 
+        saved = false; 
+      }
+      else if (label.equals("Actor"))
+      { ucdArea.addActor(); 
         saved = false; 
       }
       else if (label.equals("Entity Statemachine"))
@@ -2911,7 +2919,7 @@ public void findPlugins()
         oed.pack();
         oed.setVisible(true);
         String opname = oed.getName(); 
-        String optype = oed.getType();  
+        String optype = oed.getOperatorType();  
         String opjava = oed.getPre(); 
         String opcsharp = oed.getPost(); 
         // Type t = ucdArea.lookupType(optype);
@@ -4568,7 +4576,7 @@ public void findPlugins()
     { window.ucdArea.java2python(); 
       window.ucdArea.saveModelToFile("output/model.txt"); 
 
-      RunApp rapp1 = new RunApp("uml2py"); 
+      RunApp rapp1 = new RunApp("uml2py3"); 
 
       try
       { rapp1.setFile("app.py"); 
@@ -4576,7 +4584,7 @@ public void findPlugins()
         appthread.start(); 
       } 
       catch (Exception ee2) 
-      { System.err.println("!! Unable to run uml2py"); } 
+      { System.err.println("!! Unable to run uml2py3"); } 
       return; 
     } 
 
@@ -4584,7 +4592,7 @@ public void findPlugins()
     { window.ucdArea.javascript2python(); 
       window.ucdArea.saveModelToFile("output/model.txt"); 
 
-      RunApp rapp1 = new RunApp("uml2py"); 
+      RunApp rapp1 = new RunApp("uml2py3"); 
 
       try
       { rapp1.setFile("app.py"); 
@@ -4592,7 +4600,7 @@ public void findPlugins()
         appthread.start(); 
       } 
       catch (Exception ee2) 
-      { System.err.println("!! Unable to run uml2py"); } 
+      { System.err.println("!! Unable to run uml2py3"); } 
       return; 
     } 
 

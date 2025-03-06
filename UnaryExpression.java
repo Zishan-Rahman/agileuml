@@ -3,7 +3,7 @@ import java.io.*;
 import javax.swing.JOptionPane; 
 
 /******************************
-* Copyright (c) 2003--2024 Kevin Lano
+* Copyright (c) 2003--2025 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -65,6 +65,7 @@ public class UnaryExpression extends Expression
     for (int i = pars.size()-1; i >= 0; i--) 
     { Attribute p = (Attribute) pars.get(i);
       Type oldtype = res.getType();  
+      res.setBrackets(true); 
       res = new UnaryExpression("lambda", res); 
       ((UnaryExpression) res).setAccumulator(p); 
       Type ftype = new Type("Function", null);
@@ -87,6 +88,7 @@ public class UnaryExpression extends Expression
     for (int i = pars.size()-1; i >= 0; i--) 
     { Attribute p = (Attribute) pars.get(i);
       Type oldtype = res.getType();  
+      res.setBrackets(true); 
       res = new UnaryExpression("lambda", res); 
       ((UnaryExpression) res).setAccumulator(p); 
       Type ftype = new Type("Function", null);
@@ -96,8 +98,25 @@ public class UnaryExpression extends Expression
     } 
     return res; 
   } 
-
       
+  public static Expression newLambdaUnaryExpression(
+                         String var, Type typ, 
+                         Expression body)
+  { // lambda var : typ in ... in body
+
+    Attribute par = 
+      new Attribute(var, typ, ModelElement.INTERNAL); 
+    body.setBrackets(true); 
+    UnaryExpression res = new UnaryExpression("lambda", body); 
+    res.setAccumulator(par); 
+
+    Type ftype = new Type("Function", null);
+    ftype.setKeyType(typ); 
+    ftype.setElementType(body.getType()); 
+    res.type = ftype; 
+     
+    return res; 
+  } 
 
   public static UnaryExpression newUnaryExpression(String op, Expression expr) 
   { if (expr == null) 
@@ -396,6 +415,32 @@ public class UnaryExpression extends Expression
     }
     return res;   
   }  
+
+  public Expression transformPythonSelectExpressions()
+  { Expression newarg = 
+        argument.transformPythonSelectExpressions();
+    UnaryExpression res = new UnaryExpression(operator,newarg); 
+    res.needsBracket = needsBracket; 
+    res.umlkind = umlkind; 
+    res.type = type; 
+    res.elementType = elementType;  // type of elements if a set
+    res.entity = entity; 
+    res.multiplicity = multiplicity;
+    res.formalParameter = formalParameter;
+    res.refactorELV = refactorELV; 
+ 
+    if (accumulator != null) 
+    { Attribute newacc = 
+         new Attribute(accumulator.getName(), 
+                 accumulator.getType(), 
+                 ModelElement.INTERNAL); 
+      res.accumulator = newacc; 
+    }
+    return res;   
+  }  
+
+     
+    
 
   public boolean isLambdaExpression()
   { return "lambda".equals(operator); } 
@@ -697,21 +742,57 @@ public void findClones(java.util.Map clones,
 
     argument.energyUse(res, rUses, aUses); 
 
-    if (operator.equals("->any"))
+    if (operator.equals("->notEmpty") && 
+        argument instanceof BinaryExpression)
+    { // ->select(P)->notEmpty()  is  ->exists(P)
+      BinaryExpression leftarg = (BinaryExpression) argument; 
+      String leftargop = leftarg.getOperator(); 
+      Expression leftargleft = leftarg.getLeft();
+      Expression leftargpred = leftarg.getRight();
+        
+      if (leftargop.equals("->select") || 
+          leftargop.equals("->reject") ||
+          leftargop.equals("|") ||
+          leftargop.equals("|R"))
+      { rUses.add("!! OCL efficiency smell (OES): Inefficient expression in: " + this + ",\n" + 
+                    ">>> instead use ->exists");
+        int rscore = (int) res.get("red"); 
+        res.set("red", rscore+1); 
+      }
+    } 
+    else if (operator.equals("->isEmpty") && 
+        argument instanceof BinaryExpression)
+    { // ->select(P)->isEmpty()  is  ->forAll(not(P))
+      BinaryExpression leftarg = (BinaryExpression) argument; 
+      String leftargop = leftarg.getOperator(); 
+      Expression leftargleft = leftarg.getLeft();
+      Expression leftargpred = leftarg.getRight();
+        
+      if (leftargop.equals("->select") || 
+          leftargop.equals("->reject") ||
+          leftargop.equals("|") ||
+          leftargop.equals("|R"))
+      { rUses.add("!! OCL efficiency smell (OES): Inefficient expression in: " + this + ",\n" + 
+                    ">>> instead use ->forAll");
+        int rscore = (int) res.get("red"); 
+        res.set("red", rscore+1); 
+      }
+    } 
+    else if (operator.equals("->any"))
     {
       if (argument instanceof BinaryExpression) 
       { BinaryExpression lbe = (BinaryExpression) argument; 
 
         if (lbe.operator.equals("|") ||
             lbe.operator.equals("->select"))
-        { rUses.add("!!! Inefficient col->select(x | P)->any() expression in: " + this + ",\n" + 
+        { rUses.add("!! OCL efficiency smell (OES): Inefficient col->select(x | P)->any() expression in: " + this + ",\n" + 
                     ">>> instead use:    col->any(x | P)");
           int rscore = (int) res.get("red"); 
           res.set("red", rscore+1); 
         }
         else if (lbe.operator.equals("|R") ||
             lbe.operator.equals("->reject"))
-        { rUses.add("!!! Inefficient col->reject(x | P)->any() expression in " + this + ", \n" + 
+        { rUses.add("!! OCL efficiency smell (OES): Inefficient col->reject(x | P)->any() expression in " + this + ", \n" + 
             ">>> instead, use:   col->any(x | not(P))");
           int rscore = (int) res.get("red"); 
           res.set("red", rscore+1); 
@@ -748,11 +829,11 @@ public void findClones(java.util.Map clones,
              argument instanceof BasicExpression && 
              ((BasicExpression) argument).isOperationCall())
     { // redundant results computation
-      aUses.add("! Redundant results computation in: " + this);
+
+      aUses.add("! Possible redundant results computation in: " + this);
       int ascore = (int) res.get("amber"); 
       res.set("amber", ascore+1); 
     } 
-
 
     return res; 
   } 
@@ -761,8 +842,111 @@ public void findClones(java.util.Map clones,
   { Expression arg = 
        argument.simplifyOCL(); 
 
-    if (operator.equals("->any"))
-    {
+    if (operator.equals("->size"))
+    { return Expression.simplifySize(arg); } 
+
+    if (operator.equals("->notEmpty") && 
+        argument instanceof BinaryExpression)
+    { // ->select(P)->notEmpty()  is  ->exists(P)
+      BinaryExpression leftarg = (BinaryExpression) argument; 
+      String leftargop = leftarg.getOperator(); 
+      Expression leftargleft = leftarg.getLeft();
+      Expression leftargpred = leftarg.getRight();
+        
+      if (leftargop.equals("->select"))
+      { // s->select(P)->notEmpty()
+        System.out.println(">> OCL efficiency smell (OES): Inefficient comparison: " + this);
+          
+        BinaryExpression res = 
+            new BinaryExpression("->exists", leftargleft,
+                                 leftargpred); 
+        return res; 
+      } 
+      else if (leftargop.equals("->reject"))
+      { // s->reject(P)->notEmpty()
+        System.out.println(">> OCL efficiency smell (OES): Inefficient comparison: " + this);
+          
+        UnaryExpression notpred = 
+            new UnaryExpression("not", leftargpred); 
+        BinaryExpression res = 
+            new BinaryExpression("->exists", leftargleft,
+                                 notpred); 
+        return res; 
+      } 
+      else if (leftargop.equals("|"))
+      { // s->select(x | P)->notEmpty()
+        System.out.println(">> OCL efficiency smell (OES): Inefficient comparison: " + this);
+          
+        BinaryExpression res = 
+            new BinaryExpression("#", leftargleft,
+                                 leftargpred); 
+        return res; 
+      } 
+      else if (leftargop.equals("|R"))
+      { // s->reject(x | P)->notEmpty()
+        System.out.println(">> OCL efficiency smell (OES): Inefficient comparison: " + this);
+          
+        UnaryExpression notpred = 
+             new UnaryExpression("not", leftargpred); 
+        BinaryExpression res = 
+            new BinaryExpression("#", leftargleft,
+                                 notpred); 
+        return res; 
+      } 
+    } 
+    else if (operator.equals("->isEmpty") && 
+        argument instanceof BinaryExpression)
+    { // ->select(P)->isEmpty()  is  ->forAll(not(P))
+      BinaryExpression leftarg = (BinaryExpression) argument; 
+      String leftargop = leftarg.getOperator(); 
+      Expression leftargleft = leftarg.getLeft();
+      Expression leftargpred = leftarg.getRight();
+        
+      if (leftargop.equals("->select"))
+      { // s->select(P)->isEmpty()
+        System.out.println(">> OCL efficiency smell (OES): Inefficient comparison: " + this);
+          
+        UnaryExpression notpred = 
+            new UnaryExpression("not", leftargpred); 
+        BinaryExpression res = 
+            new BinaryExpression("->forAll", leftargleft,
+                                 notpred); 
+        return res; 
+      } 
+      else if (leftargop.equals("->reject"))
+      { // s->reject(P)->isEmpty()
+        System.out.println(">> OCL efficiency smell (OES): Inefficient comparison: " + this);
+          
+        BinaryExpression res = 
+            new BinaryExpression("->forAll", leftargleft,
+                                 leftargpred); 
+        return res; 
+      } 
+      else if (leftargop.equals("|"))
+      { // s->select(x | P)->isEmpty()
+        System.out.println(">> OCL efficiency smell (OES): Inefficient comparison: " + this);
+
+        UnaryExpression notpred = 
+            new UnaryExpression("not", leftargpred); 
+
+        BinaryExpression res = 
+            new BinaryExpression("!", leftargleft,
+                                 notpred); 
+        return res; 
+      } 
+      else if (leftargop.equals("|R"))
+      { // s->reject(x | P)->isEmpty()
+        System.out.println(">> OCL efficiency smell (OES): Inefficient comparison: " + this);
+          
+        BinaryExpression res = 
+            new BinaryExpression("!", leftargleft,
+                                 leftargpred); 
+        return res; 
+      } 
+    } 
+    else if (operator.equals("->any") || operator.equals("->first"))
+    { // ->select(P)->any() should be ->any(P), etc
+
       if (argument instanceof BinaryExpression) 
       { BinaryExpression lbe = (BinaryExpression) argument; 
 
@@ -772,7 +956,7 @@ public void findClones(java.util.Map clones,
           BinaryExpression res = 
             new BinaryExpression("|A", lbe.left, lbe.right); 
 
-          System.out.println("! Inefficient ->any operation: " + 
+          System.out.println(">> OCL efficiency smell (OES): Inefficient " + operator + " expression: " + 
             this + 
             "\n! Replaced by " + res);
 
@@ -785,7 +969,7 @@ public void findClones(java.util.Map clones,
           BinaryExpression res = 
             new BinaryExpression("->any", lbe.left, lbe.right); 
 
-          System.out.println("! Inefficient ->any operation: " + 
+          System.out.println(">> OCL efficiency smell (OES): Inefficient " + operator + " expression: " + 
             this + 
             "\n! Replaced by " + res);
 
@@ -797,7 +981,7 @@ public void findClones(java.util.Map clones,
           BinaryExpression res = 
             new BinaryExpression("|A", lbe.left, notR); 
 
-          System.out.println("! Inefficient ->any operation: " + 
+          System.out.println(">> OCL efficiency smell (OES): Inefficient " + operator + " expression: " + 
             this + 
             "\n! Replaced by " + res);
 
@@ -809,7 +993,7 @@ public void findClones(java.util.Map clones,
           BinaryExpression res = 
             new BinaryExpression("->any", lbe.left, notR); 
 
-          System.out.println("! Inefficient ->any operation: " + 
+          System.out.println(">> OCL efficiency smell (OES): Inefficient " + operator + " expression: " + 
             this + 
             "\n! Replaced by " + res);
   
@@ -822,17 +1006,46 @@ public void findClones(java.util.Map clones,
       { // Redundant ->sort operation:  
         // Argument is already sorted.
 
-        System.out.println("! Redundant ->sort operation: " + 
+        System.out.println("! OES: Redundant ->sort operation: " + 
             this + 
             "\n! Argument is already sorted.");
         return arg; 
       }
     } 
+    else if (operator.equals("->last") && 
+             argument instanceof UnaryExpression)
+    { // s->front()->last()  is  s->at(s->size() - 1)
+      // s->tail()->last()  is  s->last()
 
+      UnaryExpression leftarg = (UnaryExpression) argument; 
+      String leftargop = leftarg.getOperator(); 
+      Expression leftargleft = leftarg.getArgument();
+
+      if (leftargop.equals("->front"))
+      { System.out.println("! OES: Inefficient ->at operation: " + this); 
+
+        UnaryExpression sze = 
+          new UnaryExpression("->size", leftargleft); 
+        BinaryExpression res = 
+          new BinaryExpression("->at", leftargleft, 
+            new BinaryExpression("-", sze, 
+                               new BasicExpression(1)));
+        return res; 
+      } 
+      else if (leftargop.equals("->tail"))
+      { System.out.println("! OES: Inefficient ->last operation: " + this); 
+        UnaryExpression res = 
+          new UnaryExpression("->last", leftargleft); 
+        return res; 
+      } 
+    }
+  
     UnaryExpression res = (UnaryExpression) clone(); 
     res.argument = arg; 
     return res; 
   } 
+ 
+
 
   public java.util.Map collectionOperatorUses(int level, 
                                       java.util.Map res, 
@@ -858,7 +1071,7 @@ public void findClones(java.util.Map clones,
 
       Vector vuses = variablesUsedIn(vars); 
       if (level > 1 && vuses.size() == 0)
-      { JOptionPane.showInputDialog(">> The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
+      { JOptionPane.showInputDialog(">> (LCE) flaw: The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
           "Use Extract local variable to optimise.");
         refactorELV = true;  
       }
@@ -6464,9 +6677,7 @@ private BExpression subcollectionsBinvariantForm(BExpression bsimp)
   public String toString()  // RSDS version of expression
   { if (operator.equals("lambda") && accumulator != null)
     { String res = "lambda " + accumulator.getName() + " : " + accumulator.getType() + " in " + argument;
-      if (needsBracket)
-      { return "(" + res + ")"; }
-      return res; 
+      return "(" + res + ")";
     } 
   
     if (operator.equals("-"))
@@ -6480,7 +6691,11 @@ private BExpression subcollectionsBinvariantForm(BExpression bsimp)
     { return "_" + argument; }
   
     if (operator.startsWith("->"))
-    { return argument + operator + "()"; } 
+    { String res = argument + operator + "()";
+      if (needsBracket)
+      { return "(" + res + ")"; }
+      return res;
+    } 
 
     if (operator.equals("?") || operator.equals("!"))
     { String res = operator + argument; 
@@ -6694,7 +6909,13 @@ private BExpression subcollectionsBinvariantForm(BExpression bsimp)
   { return this; } 
 
   public Expression simplify()
-  { return this; } 
+  { Expression argsimp = argument.simplify(); 
+    if ("->size".equals(operator))
+    { return simplifySize(argsimp); } 
+    UnaryExpression clne = (UnaryExpression) clone(); 
+    clne.argument = argsimp; 
+    return clne; 
+  } 
 
 
   public Expression filter(final Vector vars)

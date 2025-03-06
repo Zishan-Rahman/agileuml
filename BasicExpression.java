@@ -4,7 +4,7 @@ import javax.swing.JOptionPane;
 import java.io.*; 
 
 /******************************
-* Copyright (c) 2003--2024 Kevin Lano
+* Copyright (c) 2003--2025 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -760,6 +760,21 @@ class BasicExpression extends Expression
     return res; 
   } 
 
+  public static BasicExpression newStaticCallExpression(
+                      String cls, String op, Expression par) 
+  { Vector pars = new Vector(); 
+    pars.add(par); 
+    BasicExpression res = new BasicExpression(op);
+    BasicExpression obj = new BasicExpression(cls); 
+    obj.umlkind = CLASSID; 
+    res.setObjectRef(obj);  
+    res.umlkind = UPDATEOP;
+    res.isStatic = true; 
+    res.isEvent = true; 
+    res.parameters = pars; 
+    return res; 
+  } 
+
   public static BasicExpression newStaticCallBasicExpression(
                String f, Expression obj, Expression par) 
   { Vector pars = new Vector(); 
@@ -894,6 +909,30 @@ class BasicExpression extends Expression
     res.atTime = atTime;  
     res.downcast = downcast;
     res.isStatic = isStatic;  
+    return res; 
+  }
+
+  public Expression transformPythonSelectExpressions()
+  { BasicExpression res = (BasicExpression) clone();
+    if (arrayIndex != null) 
+    { res.arrayIndex = 
+        arrayIndex.transformPythonSelectExpressions(); 
+    }
+
+    if (parameters != null) 
+    { res.parameters = new Vector(); 
+      for (int i = 0; i < parameters.size(); i++) 
+      { if (parameters.get(i) instanceof Expression)
+	    { Expression par = (Expression) parameters.get(i); 
+          Expression pclone = 
+             par.transformPythonSelectExpressions(); 
+          res.parameters.add(pclone); 
+        }
+        else 
+        { res.parameters.add(parameters.get(i)); }
+      } 
+    } 
+
     return res; 
   }
 
@@ -17445,6 +17484,19 @@ public Statement generateDesignSubtract(Expression rhs)
     String s = toString();
     if (vars.contains(s))
     { res.add(s); }  // eg, att, or sig1.sig
+    else if (vars.contains(data))
+    { res.add(data); } 
+    else if (objectRef != null) 
+    { res.addAll(objectRef.variablesUsedIn(vars)); } 
+
+    if (parameters != null) 
+    { for (int i = 0; i < parameters.size(); i++) 
+      { Expression par = (Expression) parameters.get(i); 
+        Vector pvars = par.variablesUsedIn(vars); 
+        res = VectorUtil.union(res,pvars); 
+      } 
+    }  
+
     return res;
   }
 

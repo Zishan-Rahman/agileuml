@@ -3,7 +3,7 @@ import java.io.*;
 import javax.swing.JOptionPane;
 
 /******************************
-* Copyright (c) 2003--2024 Kevin Lano
+* Copyright (c) 2003--2025 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -57,6 +57,707 @@ abstract class Statement implements Cloneable
     return false; 
   } 
 
+  public static Statement cumulativeCode(Expression var,
+                                         Expression rng, 
+                                         Statement st)
+  { if (st == null) 
+    { return null; }
+
+    if (st instanceof AssignStatement)
+    { // patterns are s := s + var
+      // s := s * var, s := s - var, s := s / var
+      // Also same with expr instead of var,
+      // not involving var or s. 
+
+      AssignStatement asm = (AssignStatement) st; 
+          
+      Expression lhs = asm.getLeft(); 
+      Expression rhs = asm.getRight();
+      rhs.setBrackets(false); 
+
+      if ((lhs + " + " + var).equals("" + rhs))
+      { // lhs := lhs + loopRange->sum()
+
+        Expression smm = new UnaryExpression("->sum", rng); 
+        Expression newrhs = 
+            new BinaryExpression("+", lhs, smm); 
+        return new AssignStatement(lhs, newrhs); 
+      } 
+      else if (rhs instanceof BinaryExpression && 
+        ((BinaryExpression) rhs).getOperator().equals("+") &&
+        (((BinaryExpression) rhs).getLeft() + "").equals(lhs + ""))
+      { // lhs := lhs + expr
+        Expression expr = ((BinaryExpression) rhs).getRight(); 
+        Vector vuses = expr.getVariableUses();
+
+        if (VectorUtil.containsEqualString(lhs+"", vuses))
+        { return null; } 
+
+        if (VectorUtil.containsEqualString(var+"", vuses))
+        { // lhs := lhs + rng->collect(var|expr)->sum()
+          Expression coll = 
+            new BinaryExpression("|C", 
+              new BinaryExpression(":", var, rng), expr); 
+          Expression smm = new UnaryExpression("->sum", coll); 
+          Expression newrhs = 
+            new BinaryExpression("+", lhs, smm); 
+          return new AssignStatement(lhs, newrhs);
+        } 
+
+        // lhs := lhs + (rng->size())*expr
+        Expression sze = Expression.simplifySize(rng);
+        sze.setBrackets(true); 
+ 
+        Expression newrhs = 
+            new BinaryExpression("+", lhs, 
+              new BinaryExpression("*", expr, sze)); 
+        return new AssignStatement(lhs, newrhs); 
+      }         
+      else if ((lhs + " - " + var).equals("" + rhs))
+      { // lhs := lhs - loopRange->sum()
+
+        Expression smm = new UnaryExpression("->sum", rng); 
+        Expression newrhs = 
+            new BinaryExpression("-", lhs, smm); 
+        return new AssignStatement(lhs, newrhs); 
+      } 
+      else if (rhs instanceof BinaryExpression && 
+        ((BinaryExpression) rhs).getOperator().equals("-") &&
+        (((BinaryExpression) rhs).getLeft() + "").equals(lhs + ""))
+      { // lhs := lhs - expr
+        Expression expr = ((BinaryExpression) rhs).getRight(); 
+        Vector vuses = expr.getVariableUses();
+
+        if (VectorUtil.containsEqualString(lhs+"", vuses))
+        { return null; } 
+
+        if (VectorUtil.containsEqualString(var+"", vuses))
+        { // lhs := lhs - rng->collect(var|expr)->sum()
+          Expression coll = 
+            new BinaryExpression("|C", 
+              new BinaryExpression(":", var, rng), expr); 
+          Expression smm = new UnaryExpression("->sum", coll); 
+          Expression newrhs = 
+            new BinaryExpression("-", lhs, smm); 
+          return new AssignStatement(lhs, newrhs);
+        } 
+
+        // lhs := lhs - (rng->size())*expr
+        Expression sze = Expression.simplifySize(rng);
+        sze.setBrackets(true); 
+ 
+        Expression newrhs = 
+            new BinaryExpression("-", lhs, 
+              new BinaryExpression("*", expr, sze)); 
+        return new AssignStatement(lhs, newrhs); 
+      }         
+      else if ((lhs + " * " + var).equals("" + rhs))
+      { // lhs := lhs * loopRange->prd()
+
+        Expression prd = new UnaryExpression("->prd", rng); 
+        Expression newrhs = 
+            new BinaryExpression("*", lhs, prd); 
+        return new AssignStatement(lhs, newrhs); 
+      }   
+      else if (rhs instanceof BinaryExpression && 
+        ((BinaryExpression) rhs).getOperator().equals("*") &&
+        (((BinaryExpression) rhs).getLeft() + "").equals(lhs + ""))
+      { // lhs := lhs * expr
+        Expression expr = ((BinaryExpression) rhs).getRight(); 
+        Vector vuses = expr.getVariableUses();
+
+        if (VectorUtil.containsEqualString(lhs+"", vuses))
+        { return null; } 
+
+        if (VectorUtil.containsEqualString(var+"", vuses))
+        { // lhs := lhs * rng->collect(var|expr)->prd()
+          Expression coll = 
+            new BinaryExpression("|C", 
+              new BinaryExpression(":", var, rng), expr); 
+          Expression smm = new UnaryExpression("->prd", coll); 
+          Expression newrhs = 
+            new BinaryExpression("*", lhs, smm); 
+          return new AssignStatement(lhs, newrhs);
+        } 
+
+        // lhs := lhs * expr->pow(rng->size())
+        Expression sze = Expression.simplifySize(rng);
+        // sze.setBrackets(true); 
+ 
+        Expression newrhs = 
+            new BinaryExpression("*", lhs, 
+              new BinaryExpression("->pow", expr, sze)); 
+        return new AssignStatement(lhs, newrhs); 
+      }         
+      else if ((lhs + " / " + var).equals("" + rhs))
+      { // lhs := lhs / loopRange->prd()
+
+        Expression prd = new UnaryExpression("->prd", rng); 
+        Expression newrhs = 
+            new BinaryExpression("/", lhs, prd); 
+        return new AssignStatement(lhs, newrhs); 
+      }   
+      else if (rhs instanceof BinaryExpression && 
+        ((BinaryExpression) rhs).getOperator().equals("/") &&
+        (((BinaryExpression) rhs).getLeft() + "").equals(lhs + ""))
+      { // lhs := lhs / expr
+        Expression expr = ((BinaryExpression) rhs).getRight(); 
+        Vector vuses = expr.getVariableUses();
+
+        if (VectorUtil.containsEqualString(lhs+"", vuses))
+        { return null; } 
+
+        if (VectorUtil.containsEqualString(var+"", vuses))
+        { // lhs := lhs / rng->collect(var|expr)->prd()
+          Expression coll = 
+            new BinaryExpression("|C", 
+              new BinaryExpression(":", var, rng), expr); 
+          Expression smm = new UnaryExpression("->prd", coll); 
+          Expression newrhs = 
+            new BinaryExpression("/", lhs, smm); 
+          return new AssignStatement(lhs, newrhs);
+        } 
+
+        // lhs := lhs / expr->pow(rng->size())
+        Expression sze = Expression.simplifySize(rng);
+        // sze.setBrackets(true); 
+ 
+        Expression newrhs = 
+            new BinaryExpression("/", lhs, 
+              new BinaryExpression("->pow", expr, sze)); 
+        return new AssignStatement(lhs, newrhs); 
+      }         
+      else if ((lhs + " & " + var).equals("" + rhs))
+      { // lhs := lhs & loopRange->forAll(self)
+
+        Type elemt = rng.getElementType(); 
+        BasicExpression selfvar = 
+          BasicExpression.newVariableBasicExpression(
+                                             "self",elemt); 
+        Expression prd = 
+          new BinaryExpression("->forAll", rng, selfvar); 
+        Expression newrhs = 
+            new BinaryExpression("&", lhs, prd); 
+        return new AssignStatement(lhs, newrhs); 
+      }   
+      else if (rhs instanceof BinaryExpression && 
+        ((BinaryExpression) rhs).getOperator().equals("&") &&
+        (((BinaryExpression) rhs).getLeft() + "").equals(lhs + ""))
+      { // lhs := lhs & expr
+        Expression expr = ((BinaryExpression) rhs).getRight(); 
+        Vector vuses = expr.getVariableUses();
+
+        if (VectorUtil.containsEqualString(lhs+"", vuses))
+        { return null; } 
+
+        // lhs := lhs & rng->forAll(var|expr)
+
+        Expression coll = 
+            new BinaryExpression("!", 
+              new BinaryExpression(":", var, rng), expr); 
+        Expression newrhs = 
+            new BinaryExpression("&", lhs, coll); 
+        return new AssignStatement(lhs, newrhs);
+      }         
+      else if ((lhs + " or " + var).equals("" + rhs))
+      { // lhs := lhs or loopRange->exists(self)
+
+        Type elemt = rng.getElementType(); 
+        BasicExpression selfvar = 
+          BasicExpression.newVariableBasicExpression(
+                                             "self",elemt); 
+        Expression prd = 
+          new BinaryExpression("->exists", rng, selfvar); 
+        Expression newrhs = 
+            new BinaryExpression("or", lhs, prd); 
+        return new AssignStatement(lhs, newrhs); 
+      }   
+      else if (rhs instanceof BinaryExpression && 
+        ((BinaryExpression) rhs).getOperator().equals("or") &&
+        (((BinaryExpression) rhs).getLeft() + "").equals(lhs + ""))
+      { // lhs := lhs or expr
+        Expression expr = ((BinaryExpression) rhs).getRight(); 
+        Vector vuses = expr.getVariableUses();
+
+        if (VectorUtil.containsEqualString(lhs+"", vuses))
+        { return null; } 
+
+        // lhs := lhs or rng->exists(var|expr)
+
+        Expression coll = 
+            new BinaryExpression("#", 
+              new BinaryExpression(":", var, rng), expr); 
+        Expression newrhs = 
+            new BinaryExpression("or", lhs, coll); 
+        return new AssignStatement(lhs, newrhs);
+      }         
+    /*  else if (rhs instanceof BinaryExpression && 
+        (((BinaryExpression) rhs).getLeft() + "").equals(
+                                                    lhs + ""))
+      { BinaryExpression brhs = (BinaryExpression) rhs; 
+        Expression expr = brhs.getRight();
+        String oper = brhs.getOperator(); 
+ 
+        Vector vars = expr.getVariableUses(); 
+
+        if (VectorUtil.containsEqualString(var + "", vars) || 
+            VectorUtil.containsEqualString(lhs + "", vars))
+        { return null; } 
+
+        if ("+".equals(oper))
+        { // lhs := lhs + expr*(loopRange->size())
+
+          Expression smm = Expression.simplifySize(rng);
+          smm.setBrackets(true); 
+ 
+          Expression newrhs = 
+            new BinaryExpression("+", lhs, 
+              new BinaryExpression("*", expr, smm)); 
+          return new AssignStatement(lhs, newrhs); 
+        } 
+        else if ("-".equals(oper))
+        { // lhs := lhs - expr*(loopRange->size())
+
+          Expression smm = Expression.simplifySize(rng);
+          smm.setBrackets(true); 
+ 
+          Expression newrhs = 
+            new BinaryExpression("-", lhs, 
+              new BinaryExpression("*", expr, smm)); 
+          return new AssignStatement(lhs, newrhs); 
+        } 
+        else if ("*".equals(oper))
+        { // lhs := lhs * expr->pow(loopRange->size())
+
+          Expression smm = Expression.simplifySize(rng);
+          // smm.setBrackets(true); 
+ 
+          Expression newrhs = 
+            new BinaryExpression("*", lhs, 
+              new BinaryExpression("->pow", expr, smm)); 
+          return new AssignStatement(lhs, newrhs); 
+        } 
+        else if ("/".equals(oper))
+        { // lhs := lhs / expr->pow(loopRange->size())
+
+          Expression smm = Expression.simplifySize(rng);
+          // smm.setBrackets(true); 
+ 
+          Expression newrhs = 
+            new BinaryExpression("/", lhs, 
+              new BinaryExpression("->pow", expr, smm)); 
+          return new AssignStatement(lhs, newrhs); 
+        } 
+      } */ 
+    }
+    else if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+
+      // JOptionPane.showInputDialog(sq + " " + sq.size()); 
+
+      if (sq.size() == 0) 
+      { return null; }
+
+      if (sq.size() == 1)
+      { // patterns are s := s + var
+        // s := s * var
+
+        Statement stat0 = sq.getStatement(0); 
+
+        if (stat0 instanceof SequenceStatement)
+        { return Statement.cumulativeCode(var,rng,stat0); } 
+
+        if (stat0 instanceof AssignStatement) 
+        { return Statement.cumulativeCode(var,rng,stat0); }
+
+        return null; 
+      }
+
+      if (sq.size() == 2)
+      { // patterns are I := I + 1; V := V + I
+        // I := I + 1; V := V - I
+        // I := I + 1; V := V * I   var /= I
+        
+        Statement stat1 = sq.getStatement(0); 
+        Statement stat2 = sq.getStatement(1);
+
+        // JOptionPane.showInputDialog("**** Potential code reduction of loop >>: " + 
+        //   stat1 + " ; " + stat2 + 
+        //   " " + (stat1 instanceof AssignStatement) + " " + 
+        //         (stat2 instanceof AssignStatement));
+
+        if (stat1 instanceof AssignStatement && 
+            stat2 instanceof AssignStatement)
+        { AssignStatement ast1 = (AssignStatement) stat1; 
+          AssignStatement ast2 = (AssignStatement) stat2;
+
+          Expression lhs1 = ast1.getLeft(); 
+          Expression rhs1 = ast1.getRight();
+          Expression lhs2 = ast2.getLeft(); 
+          Expression rhs2 = ast2.getRight();
+
+          if ((var + "").equals("" + lhs1) || 
+              (var + "").equals("" + lhs2))
+          { return null; } 
+
+          Vector vars1 = rhs1.getVariableUses(); 
+          Vector vars2 = rhs2.getVariableUses(); 
+
+          if (VectorUtil.containsEqualString(var + "", vars1) || 
+              VectorUtil.containsEqualString(var + "", vars2))
+          { return null; } 
+          
+          rhs1.setBrackets(false); 
+          rhs2.setBrackets(false); 
+
+          // JOptionPane.showInputDialog("**** Potential code reduction of loop: " + lhs1 + " := " + rhs1 + " ; " + lhs2 + " ; " + rhs2);
+
+          if ((lhs1 + " + 1").equals("" + rhs1) && 
+              (lhs2 + " + " + lhs1).equals("" + rhs2))
+          { // I := I + 1; V := V + I
+            // reduces to V := V + n*I + (n*(n+1))/2; 
+            //            I := I + n
+
+            Expression rsize = 
+               Expression.simplifySize(rng);
+            Expression rsize1 = new BinaryExpression("+", rsize, 
+                    new BasicExpression(1));
+            rsize1.setBrackets(true);  
+            Expression prd = new BinaryExpression("*", rsize,
+                                                  rsize1);
+            prd.setBrackets(true);  
+ 
+            BinaryExpression isum = 
+              new BinaryExpression("/", prd, 
+                                   new BasicExpression(2));
+            BinaryExpression nsum = 
+              new BinaryExpression("*", rsize, lhs1); 
+            AssignStatement asn1 = 
+              new AssignStatement(lhs2,
+                new BinaryExpression("+", lhs2, 
+                  new BinaryExpression("+", nsum, isum)));
+            AssignStatement asn2 = 
+              new AssignStatement(lhs1, 
+                new BinaryExpression("+", lhs1, rsize)); 
+            SequenceStatement ss = new SequenceStatement(); 
+            ss.addStatement(asn1); 
+            ss.addStatement(asn2);
+
+            JOptionPane.showInputDialog(">> Code reduction of " + st + " to: " + ss);
+ 
+            return ss;    
+          } 
+          else if ((lhs2 + " + 1").equals("" + rhs2) && 
+              (lhs1 + " + " + lhs2).equals("" + rhs1))
+          { // V := V + I ; I := I + 1
+            // reduces to V := V + n*I + (n*(n-1))/2; 
+            //            I := I + n
+
+           /* JOptionPane.showInputDialog("**** Potential code reduction of loop: " + lhs1 + " := " + rhs1 + " ; " + lhs2 + " ; " + rhs2); */ 
+      
+            Expression rsize = 
+               Expression.simplifySize(rng);
+            Expression rsize1 = new BinaryExpression("-", rsize, 
+                    new BasicExpression(1));
+            rsize1.setBrackets(true);  
+            Expression prd = new BinaryExpression("*", rsize,
+                                                  rsize1);
+            prd.setBrackets(true);  
+ 
+            BinaryExpression isum = 
+              new BinaryExpression("/", prd, 
+                                   new BasicExpression(2));
+            BinaryExpression nsum = 
+              new BinaryExpression("*", rsize, lhs2); 
+            AssignStatement asn1 = 
+              new AssignStatement(lhs1,
+                new BinaryExpression("+", lhs1, 
+                  new BinaryExpression("+", nsum, isum)));
+            AssignStatement asn2 = 
+              new AssignStatement(lhs2, 
+                new BinaryExpression("+", lhs2, rsize)); 
+            SequenceStatement ss = new SequenceStatement(); 
+            ss.addStatement(asn1); 
+            ss.addStatement(asn2);
+
+            JOptionPane.showInputDialog(">> Code reduction of " + st + " to: " + ss);
+ 
+            return ss;    
+          } 
+          else if ((lhs1 + " + 1").equals("" + rhs1) && 
+              (lhs2 + " - " + lhs1).equals("" + rhs2))
+          { // I := I + 1; V := V - I
+            // reduces to V := V - n*I - (n*(n+1))/2; 
+            //            I := I + n
+
+            Expression rsize = 
+               Expression.simplifySize(rng);
+            Expression rsize1 = new BinaryExpression("+", rsize, 
+                    new BasicExpression(1));
+            rsize1.setBrackets(true);  
+            Expression prd = new BinaryExpression("*", rsize,
+                                                  rsize1);
+            prd.setBrackets(true);  
+ 
+            BinaryExpression isum = 
+              new BinaryExpression("/", prd, 
+                                   new BasicExpression(2));
+            BinaryExpression nsum = 
+              new BinaryExpression("*", rsize, lhs1); 
+            AssignStatement asn1 = 
+              new AssignStatement(lhs2,
+                new BinaryExpression("-", lhs2, 
+                  new BinaryExpression("-", nsum, isum)));
+            AssignStatement asn2 = 
+              new AssignStatement(lhs1, 
+                new BinaryExpression("+", lhs1, rsize)); 
+            SequenceStatement ss = new SequenceStatement(); 
+            ss.addStatement(asn1); 
+            ss.addStatement(asn2);
+
+            JOptionPane.showInputDialog(">> Code reduction of " + st + " to: " + ss);
+ 
+            return ss;    
+          } 
+          else if ((lhs2 + " + 1").equals("" + rhs2) && 
+              (lhs1 + " - " + lhs2).equals("" + rhs1))
+          { // V := V - I ; I := I + 1
+            // reduces to V := V - n*I - (n*(n-1))/2; 
+            //            I := I + n
+
+           /* JOptionPane.showInputDialog("**** Potential code reduction of loop: " + lhs1 + " := " + rhs1 + " ; " + lhs2 + " ; " + rhs2); */ 
+      
+            Expression rsize = 
+               Expression.simplifySize(rng);
+            Expression rsize1 = 
+               new BinaryExpression("-", rsize, 
+                    new BasicExpression(1));
+            rsize1.setBrackets(true);  
+            Expression prd = new BinaryExpression("*", rsize,
+                                                  rsize1);
+            prd.setBrackets(true);  
+ 
+            BinaryExpression isum = 
+              new BinaryExpression("/", prd, 
+                                   new BasicExpression(2));
+            BinaryExpression nsum = 
+              new BinaryExpression("*", rsize, lhs2); 
+            AssignStatement asn1 = 
+              new AssignStatement(lhs1,
+                new BinaryExpression("-", lhs1, 
+                  new BinaryExpression("-", nsum, isum)));
+            AssignStatement asn2 = 
+              new AssignStatement(lhs2, 
+                new BinaryExpression("+", lhs2, rsize)); 
+            SequenceStatement ss = new SequenceStatement(); 
+            ss.addStatement(asn1); 
+            ss.addStatement(asn2);
+
+            JOptionPane.showInputDialog(">> Code reduction of " + st + " to: " + ss);
+ 
+            return ss;    
+          } 
+          else if ((lhs1 + " + 1").equals("" + rhs1) && 
+              (lhs2 + " * " + lhs1).equals("" + rhs2))
+          { // I := I + 1; V := V * I
+            // reduces to V := V * MathLib.factorial(I + n)/
+            //                       MathLib.factorial(I); 
+            //            I := I + n
+
+            Expression rsize = 
+               Expression.simplifySize(rng);
+            Expression rsize1 = 
+                         new BinaryExpression("+", lhs1, rsize);
+            Expression fact1 = 
+              BasicExpression.newStaticCallExpression("MathLib",
+                                            "factorial", rsize1);
+            Expression fact2 = 
+              BasicExpression.newStaticCallExpression("MathLib",
+                                            "factorial", lhs1);
+            
+            BinaryExpression idiv = 
+              new BinaryExpression("/", fact1, fact2);
+            AssignStatement asn1 = 
+              new AssignStatement(lhs2,
+                new BinaryExpression("*", lhs2, idiv));
+            AssignStatement asn2 = 
+              new AssignStatement(lhs1, 
+                new BinaryExpression("+", lhs1, rsize)); 
+            SequenceStatement ss = new SequenceStatement(); 
+            ss.addStatement(asn1); 
+            ss.addStatement(asn2);
+
+            JOptionPane.showInputDialog(">> Code reduction of " + st + " to: " + ss);
+ 
+            return ss;    
+          } 
+          else if ((lhs2 + " + 1").equals("" + rhs2) && 
+              (lhs1 + " * " + lhs2).equals("" + rhs1))
+          { // V := V * I ; I := I + 1
+            // reduces to V := V * (I+n-1)!/I!; 
+            //            I := I + n
+
+            Expression rsize = 
+               Expression.simplifySize(rng);
+            Expression rsize1 = 
+               new BinaryExpression("+", lhs2, 
+                    new BinaryExpression("-", rsize, 
+                           new BasicExpression(1)));
+            Expression fact1 = 
+              BasicExpression.newStaticCallExpression("MathLib",
+                                            "factorial", rsize1);
+            Expression fact2 = 
+              BasicExpression.newStaticCallExpression("MathLib",
+                                            "factorial", lhs2);
+            
+            BinaryExpression idiv = 
+              new BinaryExpression("/", fact1, fact2);
+            AssignStatement asn1 = 
+              new AssignStatement(lhs1,
+                new BinaryExpression("*", lhs1, idiv));
+            AssignStatement asn2 = 
+              new AssignStatement(lhs2, 
+                new BinaryExpression("+", lhs2, rsize)); 
+            SequenceStatement ss = new SequenceStatement(); 
+            ss.addStatement(asn1); 
+            ss.addStatement(asn2);
+
+            JOptionPane.showInputDialog(">> Code reduction of " + st + " to: " + ss);
+ 
+            return ss;    
+          } 
+        }
+      }
+    } 
+
+    return null; 
+  }
+
+  public static boolean isCumulativeBody(Expression var,
+                                         Statement st)
+  { if (st == null) 
+    { return false; }
+
+    if (st instanceof AssignStatement)
+    { // patterns are s := s + var
+      // s := s * var
+
+      AssignStatement asm = (AssignStatement) st; 
+          // Vector vars = asm.getVariableUses(); 
+      Expression lhs = asm.getLeft(); 
+      Expression rhs = asm.getRight();
+      rhs.setBrackets(false); 
+
+      if ((lhs + " + " + var).equals("" + rhs))
+      { // lhs := lhs + loopRange->sum()
+        return true; 
+      } 
+      else if ((lhs + " - " + var).equals("" + rhs))
+      { // lhs := lhs - loopRange->sum()
+        return true; 
+      } 
+      else if ((lhs + " * " + var).equals("" + rhs))
+      { // lhs := lhs * loopRange->prd()
+        return true; 
+      }   
+      else if ((lhs + " / " + var).equals("" + rhs))
+      { // lhs := lhs / loopRange->prd()
+        return true; 
+      } 
+      else if ((lhs + " & " + var).equals("" + rhs))
+      { // lhs := lhs & loopRange->forAll(self)
+        return true; 
+      } 
+      else if ((lhs + " or " + var).equals("" + rhs))
+      { // lhs := lhs or loopRange->exists(self)
+        return true; 
+      } 
+      else if (rhs instanceof BinaryExpression && 
+        (((BinaryExpression) rhs).getLeft() + "").equals(
+                                                    lhs + ""))
+      { BinaryExpression brhs = (BinaryExpression) rhs; 
+        Expression expr = brhs.getRight();
+        String oper = brhs.getOperator(); 
+ 
+        Vector vars = expr.getVariableUses(); 
+
+        if (// VectorUtil.containsEqualString(var + "", vars) || 
+            VectorUtil.containsEqualString(lhs + "", vars))
+        { return false; } 
+
+        if ("+".equals(oper) || "-".equals(oper) || 
+            "*".equals(oper) || "/".equals(oper) ||
+            "&".equals(oper) || "or".equals(oper))
+        { return true; }
+ 
+        return false;
+      } 
+    }
+    else if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+
+      // JOptionPane.showInputDialog(sq + " " + sq.size()); 
+
+      if (sq.size() == 0) 
+      { return false; }
+
+      if (sq.size() == 1)
+      { // patterns are s := s + var
+        // s := s * var
+
+        Statement stat0 = sq.getStatement(0); 
+
+        if (stat0 instanceof SequenceStatement)
+        { return Statement.isCumulativeBody(var,stat0); } 
+
+        if (stat0 instanceof AssignStatement) 
+        { return Statement.isCumulativeBody(var, stat0); }
+
+        return false; 
+      } 
+      else if (sq.size() == 2)
+      { // patterns are I := I + 1; V := V + I
+        // I := I + 1; V := V * I   var /= I
+        
+        Statement stat1 = sq.getStatement(0); 
+        Statement stat2 = sq.getStatement(1);
+
+        /* JOptionPane.showInputDialog("++++ Potential code reduction of loop >>: " + 
+           stat1 + " ; " + stat2 + 
+           " " + (stat1 instanceof AssignStatement) + " " + 
+                 (stat2 instanceof AssignStatement)); */ 
+      
+        if (stat1 instanceof AssignStatement && 
+            stat2 instanceof AssignStatement)
+        { AssignStatement ast1 = (AssignStatement) stat1; 
+          AssignStatement ast2 = (AssignStatement) stat2;
+
+          Expression lhs1 = ast1.getLeft(); 
+          Expression rhs1 = ast1.getRight();
+          Expression lhs2 = ast2.getLeft(); 
+          Expression rhs2 = ast2.getRight();
+
+          if ((var + "").equals("" + lhs1) || 
+              (var + "").equals("" + lhs2))
+          { return false; } 
+
+          Vector vars1 = rhs1.getVariableUses(); 
+          Vector vars2 = rhs2.getVariableUses(); 
+
+          if (VectorUtil.containsEqualString(var + "", vars1) || 
+              VectorUtil.containsEqualString(var + "", vars2))
+          { return false; } 
+          
+          // JOptionPane.showInputDialog("++ Potential code reduction of loop: " + st);
+         
+          return true; 
+        } 
+      }  
+    } 
+
+    return false; 
+  } 
+
 
   public static boolean isEmpty(Statement st)
   { if (st == null) { return true; } 
@@ -74,7 +775,7 @@ abstract class Statement implements Cloneable
     if (isSingleBreakStatement(st))
     { return true; } 
     return false; 
-  } 
+  } // or continue or exit? 
 
   public static void addBeforeEnd(Statement blk, Statement st)
   { if (blk instanceof SequenceStatement && st != null) 
@@ -155,6 +856,22 @@ abstract class Statement implements Cloneable
     } 
 
     return st; 
+  } 
+
+  public static boolean hasSingleStatement(Statement st)
+  { if (st == null) 
+    { return false; }
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+
+      if (sq.size() == 1) 
+      { return true; } // or sq[1] is single
+
+      return false;
+    } 
+
+    return true; 
   } 
 
   public static Vector getReturnValues(Statement st)
@@ -520,7 +1237,7 @@ abstract class Statement implements Cloneable
       if ("exit".equals(called))
       { return true; }
       return false; 
-    }  
+    }  // OclProcess.exit(n)
 
     if (st instanceof ConditionalStatement) 
     { ConditionalStatement cs = (ConditionalStatement) st; 
@@ -557,6 +1274,20 @@ abstract class Statement implements Cloneable
 
     return false;
   } // Other cases, for all other forms of statement. 
+
+  public static boolean endsWithControlFlowBreak(Statement stat)
+  { if (Statement.endsWithReturn(stat))
+    { return true; } 
+
+    if (Statement.endsWithBreak(stat))
+    { return true; } 
+
+    if (Statement.endsWithContinue(stat))
+    { return true; } 
+
+    return Statement.endsWithExit(stat); 
+  } 
+
 
   public static Statement replaceReturnBySkip(Statement st)
   { if (st == null) 
@@ -2267,10 +2998,18 @@ class ReturnStatement extends Statement
   }
 
   public Map energyUse(Map uses, 
-                                Vector rUses, Vector oUses)
+                       Vector rUses, Vector oUses)
   { if (value == null) 
     { return uses; } 
     value.energyUse(uses, rUses, oUses); 
+
+    int syncomp = value.syntacticComplexity(); 
+
+    if (syncomp > TestParameters.syntacticComplexityLimit)
+    { System.err.println("!!! Code smell (MEL): too high expression complexity (" + syncomp + ") for " + value); 
+      System.err.println(">>> Recommend OCL refactoring"); 
+    } // amber flaw
+
     return uses; 
   }  
 
@@ -2569,7 +3308,10 @@ class ReturnStatement extends Statement
   public int syntacticComplexity()
   { if (value == null) 
     { return 1; } 
-    return value.syntacticComplexity() + 1; 
+
+    int syncomp = value.syntacticComplexity(); 
+
+    return syncomp + 1; 
   } 
 
   public int cyclomaticComplexity()
@@ -2844,7 +3586,7 @@ class BreakStatement extends Statement
   { return this; }  
 
   public Map energyUse(Map uses, 
-                                Vector rUses, Vector oUses)
+                       Vector rUses, Vector oUses)
   { return uses; }  
 
   public java.util.Map collectionOperatorUses(
@@ -3335,6 +4077,13 @@ class InvocationStatement extends Statement
   public Map energyUse(Map uses, 
                                 Vector rUses, Vector oUses)
   { callExp.energyUse(uses, rUses, oUses);  
+
+    int syncomp = callExp.syntacticComplexity(); 
+    if (syncomp > TestParameters.syntacticComplexityLimit)
+    { System.err.println("!!! Code smell (MEL): too high expression complexity (" + syncomp + ") for " + callExp); 
+      System.err.println(">>> Recommend OCL refactoring"); 
+    } 
+
     return uses; 
   }  
 
@@ -3921,7 +4670,10 @@ class InvocationStatement extends Statement
   public int syntacticComplexity()
   { if (callExp == null) 
     { return 1; } 
-    return callExp.syntacticComplexity() + 1; 
+
+    int syncomp = callExp.syntacticComplexity(); 
+
+    return syncomp + 1; 
   } 
 
   public int cyclomaticComplexity()
@@ -4098,6 +4850,13 @@ class ImplicitInvocationStatement extends Statement
   public Map energyUse(Map uses, 
                                 Vector rUses, Vector oUses)
   { callExp.energyUse(uses, rUses, oUses); 
+
+    int syncomp = callExp.syntacticComplexity(); 
+    if (syncomp > TestParameters.syntacticComplexityLimit)
+    { System.err.println("!!! Code smell (MEL): too high expression complexity (" + syncomp + ") for " + callExp); 
+      System.err.println(">>> Recommend OCL refactoring"); 
+    } 
+
     return uses; 
   }  
 
@@ -4374,7 +5133,9 @@ class ImplicitInvocationStatement extends Statement
   public int syntacticComplexity()
   { if (callExp == null) 
     { return 1; } 
-    return callExp.syntacticComplexity() + 1; 
+
+    int syncomp = callExp.syntacticComplexity(); 
+    return syncomp + 1; 
   } 
 
   public int cyclomaticComplexity()
@@ -4740,7 +5501,8 @@ class WhileStatement extends Statement
                          java.util.Map cdefs,
                          String rule, String op)
   { if (loopRange != null && 
-        loopRange.syntacticComplexity() >= UCDArea.CLONE_LIMIT) 
+        loopRange.syntacticComplexity() >= 
+                                UCDArea.CLONE_LIMIT) 
     { loopRange.findClones(clones,cdefs,rule,op); }  
     else if (loopTest != null && 
         loopTest.syntacticComplexity() >= UCDArea.CLONE_LIMIT) 
@@ -4758,6 +5520,28 @@ class WhileStatement extends Statement
   
     body.energyUse(uses,rUses,aUses);
 
+    if (loopKind == FOR) 
+    { if (loopRange != null) 
+      { int rcomp = loopRange.syntacticComplexity();
+
+        if (rcomp > TestParameters.syntacticComplexityLimit)
+        { int acount = (int) uses.get("amber"); 
+          uses.set("amber", acount + 1); 
+          aUses.add("! Code smell (MEL): too high expression complexity (" + rcomp + ") for " + loopRange + "\n" +  
+                    ">>> Recommend OCL refactoring"); 
+        } 
+      } 
+    }
+    else if (loopTest != null)
+    { int syncomp = loopTest.syntacticComplexity(); 
+      if (syncomp > TestParameters.syntacticComplexityLimit)
+      { int acount = (int) uses.get("amber"); 
+        uses.set("amber", acount + 1); 
+        aUses.add("! Code smell (MEL): too high expression complexity (" + syncomp + ") for " + loopTest + "\n" +  
+                  ">>> Recommend OCL refactoring"); 
+      }
+    }  
+
     if (loopKind == WHILE || loopKind == REPEAT)
     { if (loopTest != null && loopKind == WHILE &&
           "true".equals("" + loopTest)) 
@@ -4766,7 +5550,7 @@ class WhileStatement extends Statement
         rUses.add("!!! Unbounded while loop with true condition: may not terminate!: " + this); 
       }
       else if (loopTest != null && loopKind == REPEAT &&
-          "false".equals("" + loopTest)) 
+               "false".equals("" + loopTest)) 
       { int rcount = (int) uses.get("red"); 
         uses.set("red", rcount + 1); 
         rUses.add("!!! Unbounded repeat loop with false condition: may not terminate!: " + this); 
@@ -4783,8 +5567,14 @@ class WhileStatement extends Statement
     if (Statement.hasLoopStatement(body))
     { int rcount = (int) uses.get("amber"); 
       uses.set("amber", rcount + 1); 
-      aUses.add("!!! Nested loops can be very inefficient: " + this); 
+      aUses.add("! Nested loops can be very inefficient: " + this); 
     } // or indeed if there is a collection iteration expr
+    else if (loopKind == FOR && 
+             Statement.isCumulativeBody(loopVar,body))
+    { int rcount = (int) uses.get("amber"); 
+      uses.set("amber", rcount + 1); 
+      aUses.add("! Possible code reduction of loop to assignment(s): " + this);
+    }
 
     return uses; 
   } // red if nested loops. Amber for a while loop.
@@ -4800,8 +5590,8 @@ class WhileStatement extends Statement
     }
     else if (loopTest != null)
     { loopTest.collectionOperatorUses(nestingLevel, 
-                                       operatorsAtLevel, 
-                                       vars); 
+                                      operatorsAtLevel, 
+                                      vars); 
     }
 
     Vector newvars = new Vector(); 
@@ -4816,8 +5606,21 @@ class WhileStatement extends Statement
       newvars.addAll(vuses); 
     }  
   
+    // Also add the write frame variables of body to newvars
+
+    Vector wrfr = body.writeFrame();
+    for (int i = 0; i < wrfr.size(); i++) 
+    { String wrv = (String) wrfr.get(i); 
+      int k = wrv.indexOf("::"); 
+      if (k >= 0) 
+      { newvars.add(wrv.substring(k+2)); } 
+      else 
+      { newvars.add(wrv); } 
+    }  
+ 
     body.collectionOperatorUses(nestingLevel + 1,
                                 operatorsAtLevel, newvars);
+
     return operatorsAtLevel; 
   }  
 
@@ -4886,6 +5689,22 @@ class WhileStatement extends Statement
 
     Statement newbody = body.optimiseOCL();
  
+    if (loopKind == FOR)
+    { // check for cumulative patterns 
+
+      if (Statement.isCumulativeBody(lv,newbody))
+      { 
+        Statement newcode = 
+           Statement.cumulativeCode(lv,lr,newbody);
+
+        JOptionPane.showInputDialog(">> Cumulative while code: " + lv + " " + lr + " " + newbody + " " + newcode);
+ 
+        if (newcode != null) 
+        { return newcode; }  
+      } 
+    } 
+
+
     WhileStatement res = new WhileStatement(lt,newbody); 
     res.setEntity(entity); 
     res.setLoopKind(loopKind); 
@@ -4979,7 +5798,7 @@ class WhileStatement extends Statement
         BinaryExpression var1 = 
           new BinaryExpression("+",
             new BinaryExpression("-",new UnaryExpression("->size",loopRange),indbe), 
-                                        new BasicExpression("1")); 
+                                        new BasicExpression(1)); 
         BExpression bvar1 = var1.binvariantForm(env,local); 
         BStatement loop1 = new BLoopStatement(btest,invb,bvar1,
                                   new BVarStatement(loopVar + "", ss) );
@@ -6282,14 +7101,18 @@ class WhileStatement extends Statement
 
     if (loopKind == FOR) 
     { if (loopRange != null) 
-      { int rcomp = loopRange.syntacticComplexity(); 
+      { int rcomp = loopRange.syntacticComplexity();
+
         return res + rcomp + 1; 
       } 
     } 
 
     if (loopTest == null) 
-    { return res + 1; } 
-    return loopTest.syntacticComplexity() + res + 1; 
+    { return res + 1; }
+
+    int syncomp = loopTest.syntacticComplexity(); 
+ 
+    return syncomp + res + 1; 
   } 
 
   public int cyclomaticComplexity()
@@ -6651,7 +7474,17 @@ class CreationStatement extends Statement
 
   public Map energyUse(Map uses, Vector rUses, Vector aUses)
   { if (initialExpression != null) 
-    { initialExpression.energyUse(uses, rUses, aUses); } 
+    { initialExpression.energyUse(uses, rUses, aUses); 
+
+      int syncomp = initialExpression.syntacticComplexity(); 
+      if (syncomp > TestParameters.syntacticComplexityLimit)
+      { int acount = (int) uses.get("amber"); 
+        uses.set("amber", acount + 1); 
+        aUses.add("! Code smell (MEL): too high expression complexity (" + syncomp + ") for " + initialExpression + "\n" +  
+                  ">>> Recommend OCL refactoring");  
+      } 
+    } 
+
     return uses; 
   } 
 
@@ -6838,6 +7671,7 @@ class CreationStatement extends Statement
     { Expression newExpr = initialExpression.simplifyOCL(); 
       res.setInitialisation(newExpr); 
     }
+
     return res; 
   } 
 
@@ -7707,7 +8541,13 @@ class CreationStatement extends Statement
   { return this; } 
 
   public int syntacticComplexity()
-  { return 3; } // depends upon the type really. 
+  { if (initialExpression == null)
+    { return 3; } // depends upon the type really.
+
+    int syncomp = initialExpression.syntacticComplexity(); 
+    
+    return 3 + syncomp; 
+  } 
 
   public int cyclomaticComplexity()
   { return 0; } 
@@ -7938,6 +8778,16 @@ class SequenceStatement extends Statement
   public boolean notEmpty()
   { return statements.size() > 0; } 
 
+  public boolean isSkip()
+  { for (int i = 0; i < statements.size(); i++) 
+    { Statement st = (Statement) statements.get(i); 
+      if (st.isSkip()) { } 
+      else 
+      { return false; } 
+    } 
+    return true; 
+  } 
+
   public String cg(CGSpec cgs)
   { String etext = this + "";
     Vector args = new Vector();
@@ -7961,15 +8811,16 @@ class SequenceStatement extends Statement
     }
     CGRule r = cgs.matchedStatementRule(this,etext);
 
-    System.out.println(">> Matched statement rule: " + r + " for " + this); 
+    // System.out.println(">> Matched statement rule: " + r + " for " + this); 
 
     if (r != null)
     { // System.out.println(">>> Sequence rule: " + r + 
       //                    " " + args); 
       String res = r.applyRule(args);
       // System.out.println(">>> Applied sequence rule: " + res);  
-	  return res; 
+      return res; 
     }
+
     return etext;
   }
 
@@ -8086,7 +8937,14 @@ class SequenceStatement extends Statement
   public Map energyUse(Map uses, Vector rUses, Vector aUses)
   { for (int i = 0; i < statements.size(); i++) 
     { Statement stat = (Statement) statements.get(i); 
-      stat.energyUse(uses, rUses, aUses); 
+      stat.energyUse(uses, rUses, aUses);
+
+      if (i < statements.size()-1 && 
+          Statement.endsWithControlFlowBreak(stat))
+      { int acount = (int) uses.get("amber"); 
+        uses.set("amber", acount+1); 
+        aUses.add("!! Unreachable code: statements after " + stat + " in sequence cannot be reached -- they should be deleted"); 
+      } 
     }
 
     return uses; 
@@ -8114,9 +8972,28 @@ class SequenceStatement extends Statement
   { Vector newstats = new Vector(); 
     for (int i = 0; i < statements.size(); i++) 
     { Statement stat = (Statement) statements.get(i); 
-      Statement newstat = stat.optimiseOCL(); 
-      newstats.add(newstat); 
+
+      if (stat.isSkip()) 
+      { continue; } 
+      
+      Statement newstat = stat.optimiseOCL();
+
+      if (newstat instanceof SequenceStatement && 
+          ((SequenceStatement) newstat).size() == 1)
+      { Statement ss = 
+          ((SequenceStatement) newstat).getStatement(0); 
+        newstats.add(ss); 
+      }  
+      else 
+      { newstats.add(newstat); }
+
+      if (i < statements.size() - 1 &&
+          Statement.endsWithControlFlowBreak(newstat)) 
+      { System.out.println(">> Deleting statements after " + newstat); 
+        break; 
+      } 
     } 
+
     SequenceStatement res = new SequenceStatement(newstats);
     res.setEntity(entity); 
     res.setBrackets(brackets); 
@@ -8871,15 +9748,18 @@ class SequenceStatement extends Statement
 
   public Vector writeFrame()
   { Vector res = new Vector(); 
+
     for (int i = 0; i < statements.size(); i++) 
     { Statement stat = (Statement) statements.get(i); 
-      res.addAll(stat.writeFrame()); 
+      res = VectorUtil.union(res, stat.writeFrame()); 
     } 
+
     return res; 
   } 
 
   public int syntacticComplexity()
   { int res = 0; 
+
     for (int i = 0; i < statements.size(); i++) 
     { Statement stat = (Statement) statements.get(i); 
       res = res + stat.syntacticComplexity(); 
@@ -8893,19 +9773,23 @@ class SequenceStatement extends Statement
 
   public int cyclomaticComplexity()
   { int res = 0; 
+
     for (int i = 0; i < statements.size(); i++) 
     { Statement stat = (Statement) statements.get(i); 
       res = res + stat.cyclomaticComplexity(); 
     } 
+
     return res; 
   } 
 
   public int epl()
   { int res = 0; 
+
     for (int i = 0; i < statements.size(); i++) 
     { Statement stat = (Statement) statements.get(i); 
       res = res + stat.epl(); 
     } 
+
     return res; 
   } 
 
@@ -9627,7 +10511,17 @@ class ErrorStatement extends Statement
 
   public Map energyUse(Map uses, Vector rUses, Vector aUses)
   { if (thrownObject != null) 
-    { thrownObject.energyUse(uses, rUses, aUses); } 
+    { thrownObject.energyUse(uses, rUses, aUses);
+
+      int syncomp = thrownObject.syntacticComplexity(); 
+      if (syncomp > TestParameters.syntacticComplexityLimit)
+      { int acount = (int) uses.get("amber"); 
+        uses.set("amber", acount + 1); 
+        aUses.add("! Code smell (MEL): too high expression complexity (" + syncomp + ") for " + thrownObject + "\n" +  
+                  ">>> Recommend OCL refactoring");  
+      }
+    }
+ 
     return uses; 
   } 
 
@@ -9838,7 +10732,11 @@ class ErrorStatement extends Statement
 
   public int syntacticComplexity()
   { if (thrownObject != null) 
-    { return 1 + thrownObject.syntacticComplexity(); } 
+    { int syncomp = thrownObject.syntacticComplexity(); 
+       
+      return 1 + syncomp; 
+    }
+ 
     return 1;
   } 
 
@@ -9965,7 +10863,18 @@ class AssertStatement extends Statement
 
   public Map energyUse(Map uses, Vector rUses, Vector aUses)
   { if (condition != null) 
-    { condition.energyUse(uses, rUses, aUses); } 
+    { condition.energyUse(uses, rUses, aUses); 
+
+      int res = condition.syntacticComplexity();
+
+      if (res > TestParameters.syntacticComplexityLimit)
+      { int acount = (int) uses.get("amber"); 
+        uses.set("amber", acount + 1); 
+        aUses.add("! Code smell (MEL): too high expression complexity (" + res + ") for " + condition + "\n" +  
+                  ">>> Recommend OCL refactoring");  
+      } 
+    }
+ 
     if (message != null)
     { message.energyUse(uses, rUses, aUses); } 
     return uses; 
@@ -10224,7 +11133,8 @@ class AssertStatement extends Statement
     res = condition.writeFrame(); 
     
     if (message != null) 
-    { res = VectorUtil.union(res, message.writeFrame()); }  
+    { res = VectorUtil.union(res, message.writeFrame()); }
+  
     return res; 
   } 
 
@@ -10235,10 +11145,13 @@ class AssertStatement extends Statement
   { return this; } 
 
   public int syntacticComplexity()
-  { int res = condition.syntacticComplexity(); 
+  { int res = condition.syntacticComplexity();
+ 
     res++; 
+
     if (message != null) 
     { return res + message.syntacticComplexity(); } 
+
     return res;
   } 
 
@@ -12960,6 +13873,15 @@ class AssignStatement extends Statement
                                 Vector rUses, Vector oUses)
   { lhs.energyUse(uses, rUses, oUses); 
     rhs.energyUse(uses, rUses, oUses);
+
+    int syncomp = rhs.syntacticComplexity(); 
+    if (syncomp > TestParameters.syntacticComplexityLimit)
+    { int acount = (int) uses.get("amber"); 
+      uses.set("amber", acount + 1); 
+      oUses.add("! Code smell (MEL): too high expression complexity (" + syncomp + ") for " + rhs + "\n" + 
+                ">>> Recommend OCL refactoring");  
+    } 
+
     return uses; 
   }  
 
@@ -13581,7 +14503,9 @@ class AssignStatement extends Statement
   }  
 
   public int syntacticComplexity()
-  { return lhs.syntacticComplexity() + rhs.syntacticComplexity() + 1; } 
+  { int syncomp = rhs.syntacticComplexity(); 
+    return lhs.syntacticComplexity() + syncomp + 1; 
+  } 
 
   public int cyclomaticComplexity()
   { return 0; } 
@@ -13933,7 +14857,12 @@ class IfCase
   } 
 
   public int syntacticComplexity()
-  { int res = test.syntacticComplexity(); 
+  { int res = test.syntacticComplexity();
+    if (res > TestParameters.syntacticComplexityLimit)
+    { System.err.println("!!! Code smell (MEL): too high expression complexity (" + res + ") for " + test); 
+      System.err.println(">>> Recommend OCL refactoring");  
+    } 
+ 
     res = res + ifPart.syntacticComplexity();
     return res + 1; 
   }
@@ -14153,6 +15082,7 @@ class ConditionalStatement extends Statement
   public Statement optimiseOCL()
   { Expression testc = test.simplifyOCL(); 
     Statement ifc = ifPart.optimiseOCL(); 
+
     Statement elsec = null; 
     if (elsePart != null) 
     { elsec = elsePart.optimiseOCL(); }
@@ -14168,8 +15098,13 @@ class ConditionalStatement extends Statement
 
     Statement elseStat = Statement.getFirstStatement(elsePart); 
  
+    // if st->includes(x) then skip else (st := st->including(x))
+    // is just st := st->including(x) for set st
+
     if (test instanceof BinaryExpression && 
-        elseStat instanceof AssignStatement)
+        elseStat instanceof AssignStatement && 
+        Statement.hasSingleStatement(elsePart) &&
+        ifPart.isSkip())
     { BinaryExpression testbe = (BinaryExpression) test;
       AssignStatement elseassign = (AssignStatement) elseStat; 
 
@@ -14187,9 +15122,24 @@ class ConditionalStatement extends Statement
             (testbe.getRight() + "").equals(elsebe.getRight() + ""))
         { if (elsebe.getOperator().equals("->including") || 
               elsebe.getOperator().equals("->append"))
-          { return elseassign; }
+          { System.out.println("! Removing redundant test for set addition: " + this); 
+            return elseassign; 
+          }
         } 
       } 
+    } 
+
+    if (Statement.endsWithControlFlowBreak(ifc))
+    { Statement skipstat = new InvocationStatement("skip");
+ 
+      SequenceStatement ss = new SequenceStatement(); 
+      ss.addStatement(
+           new ConditionalStatement(testc, ifc, skipstat)); 
+      ss.addStatement(elsec);
+
+      System.out.println(">> Promoting nested statements from else branch: " + elsec); 
+ 
+      return ss; 
     } 
 
     return new ConditionalStatement(testc, ifc, elsec); 
@@ -14210,6 +15160,15 @@ class ConditionalStatement extends Statement
   { test.energyUse(uses, rUses, oUses); 
     ifPart.energyUse(uses, rUses, oUses);
 
+    int res = test.syntacticComplexity();
+
+    if (res > TestParameters.syntacticComplexityLimit)
+    { int acount = (int) uses.get("amber"); 
+      uses.set("amber", acount + 1); 
+      oUses.add("! Code smell (MEL): too high expression complexity (" + res + ") for " + test + "\n" +  
+                ">>> Recommend OCL refactoring");  
+    } 
+
     if (elsePart != null) 
     { elsePart.energyUse(uses, rUses, oUses); } 
     else 
@@ -14217,6 +15176,8 @@ class ConditionalStatement extends Statement
 
     Statement elseStat = Statement.getFirstStatement(elsePart); 
  
+    // JOptionPane.showInputDialog("Code: " + elseStat + " " + test); 
+
     if (test instanceof BinaryExpression && 
         elseStat instanceof AssignStatement)
     { BinaryExpression testbe = (BinaryExpression) test;
@@ -14238,9 +15199,28 @@ class ConditionalStatement extends Statement
               elsebe.getOperator().equals("->append"))
           { rUses.add("!! Possibly using sequence " + ifExp + " as set in: " + this + 
                "\n>> Recommend declaring " + ifExp + " as a Set or SortedSet"); 
-            int oscore = (int) uses.get("red"); 
-            uses.set("red", oscore + 1); 
+            int rscore = (int) uses.get("red"); 
+            uses.set("red", rscore + 1); 
           }
+        } 
+        else 
+        { if (Statement.hasSingleStatement(elsePart) &&
+              ifPart.isSkip())
+          { if ("->includes".equals(testbe.getOperator()) && 
+                (testbe.getLeft() + "").equals(
+                             elseassign.getLhs() + "") && 
+                 ifExp.hasSetType() && 
+                 (testbe.getLeft() + "").equals(ifExp + "") && 
+                 (testbe.getLeft() + "").equals(elsebe.getLeft() + "") && 
+                 (testbe.getRight() + "").equals(elsebe.getRight() + ""))
+            { if (elsebe.getOperator().equals("->including") || 
+                  elsebe.getOperator().equals("->append"))
+              { oUses.add("! Redundant test on set addition " + ifExp + " in: " + this); 
+                int oscore = (int) uses.get("amber"); 
+                uses.set("amber", oscore + 1); 
+              }
+            }
+          } 
         } 
       } 
     } 
@@ -14755,6 +15735,7 @@ class ConditionalStatement extends Statement
 
   public int syntacticComplexity()
   { int res = test.syntacticComplexity();
+
     res = res + ifPart.syntacticComplexity(); 
     if (elsePart != null)
     { res = res + elsePart.syntacticComplexity(); }
