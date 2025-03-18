@@ -48,8 +48,8 @@ classBodyElement
     ; 
 
 attributeDefinition 
-    :  'attribute' identifier ('identity' | 'derived')? ':' type ';' 
-    | 'static' 'attribute' identifier ':' type ';'
+    :  'attribute' identifier ('identity' | 'derived')? ':' type ( ':=' expression )? ';' 
+    | 'static' 'attribute' identifier ':' type ( ':=' expression )? ';'
     ; 
 
 operationDefinition
@@ -96,7 +96,8 @@ invariant
 
 stereotype
       : 'stereotype' identifier ';'  
-      | 'stereotype' identifier '=' STRING_LITERAL ';'  
+      | 'stereotype' identifier '=' STRING1_LITERAL ';'  
+      | 'stereotype' identifier '=' STRING2_LITERAL ';'  
       | 'stereotype' identifier '=' identifier ';' 
       ;
 
@@ -121,8 +122,10 @@ type
     | 'Set' '(' type ')'  
     | 'Bag' '(' type ')' 
     | 'OrderedSet' '(' type ')' 
+    | 'SortedSet' '(' type ')' 
     | 'Ref' '(' type ')'  
     | 'Map' '(' type ',' type ')' 
+    | 'SortedMap' '(' type ',' type ')' 
     | 'Function' '(' type ',' type ')' 
     | ID
     ; 
@@ -150,7 +153,8 @@ basicExpression
     | ID '@pre'  
     |	INT  
     | FLOAT_LITERAL
-    | STRING_LITERAL
+    | STRING1_LITERAL
+    | STRING2_LITERAL
     | ID   
     |	'(' expression ')'
     ; 
@@ -264,7 +268,7 @@ factor2Expression
    | factor2Expression ('->pow' | '->gcd') '(' expression ')' 
    | factor2Expression ('->at' | '->union' | '->intersection' 
             | '->includes' | '->excludes' | '->including' 
-            | '->excluding' | '->includesAll'  
+            | '->excluding' | '->excludingKey' | '->excludingValue' | '->includesAll'  
             | '->symmetricDifference' 
             | '->excludesAll' | '->prepend' | '->append'  
             | '->count' | '->apply' ) 
@@ -311,6 +315,7 @@ setExpression
     | 'SortedSet{' expressionList? '}' 
     | 'Sequence{' expressionList? '}' 
     | 'Map{' expressionList? '}'
+    | 'SortedMap{' expressionList? '}'
     ; 
 
 statement 
@@ -366,7 +371,9 @@ identifier: ID ;
 
 FLOAT_LITERAL:  Digits '.' Digits ;
 
-STRING_LITERAL:     '"' (~["\\\r\n] | EscapeSequence)* '"';
+STRING1_LITERAL:     '"' (~["\\\r\n] | EscapeSequence)* '"';
+
+STRING2_LITERAL:     '\'' (~['\\\r\n] | EscapeSequence)* '\'';
 
 NULL_LITERAL:       'null';
 
