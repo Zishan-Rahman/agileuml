@@ -797,6 +797,12 @@ public void findClones(java.util.Map clones,
           int rscore = (int) res.get("red"); 
           res.set("red", rscore+1); 
         }
+        else if (lbe.operator.equals("|C"))
+        { rUses.add("!! OCL efficiency smell (OES): Inefficient col->collect(x | e)->any() expression in " + this + ", \n" + 
+            ">>> instead, use:  let x = col->any() in e");
+          int rscore = (int) res.get("red"); 
+          res.set("red", rscore+1); 
+        }
       } 
     }
     else if ("->sort".equals(operator))
@@ -834,6 +840,17 @@ public void findClones(java.util.Map clones,
       int ascore = (int) res.get("amber"); 
       res.set("amber", ascore+1); 
     } 
+    else if (("->last".equals(operator) || 
+              "->first".equals(operator)) && 
+             argument instanceof BinaryExpression && 
+             "|C".equals(
+                ((BinaryExpression) argument).getOperator()))
+    { // redundant results computation
+
+      aUses.add("! OCL efficiency smell (OES): Redundant results computation in: " + this);
+      int ascore = (int) res.get("amber"); 
+      res.set("amber", ascore+1); 
+    } 
 
     return res; 
   } 
@@ -844,6 +861,22 @@ public void findClones(java.util.Map clones,
 
     if (operator.equals("->size"))
     { return Expression.simplifySize(arg); } 
+
+    if (operator.equals("->last"))
+    { return Expression.simplifyLast(arg); } 
+
+    if (operator.equals("->first") && 
+        arg instanceof UnaryExpression)
+    { return Expression.simplifyFirst(arg); } 
+
+    if (operator.equals("not"))
+    { return Expression.negate(arg); }
+
+    if (operator.equals("->front"))
+    { return Expression.simplifyFront(arg); } 
+
+    if (operator.equals("->tail"))
+    { return Expression.simplifyTail(arg); } 
 
     if (operator.equals("->notEmpty") && 
         argument instanceof BinaryExpression)
@@ -944,8 +977,12 @@ public void findClones(java.util.Map clones,
         return res; 
       } 
     } 
-    else if (operator.equals("->any") || operator.equals("->first"))
-    { // ->select(P)->any() should be ->any(P), etc
+    else if (operator.equals("->any") || 
+             operator.equals("->first"))
+    { // col->select(P)->any() should be col->any(P), etc
+      // col->collect(x|e)->first() should be 
+      //                let x = col->first() in e
+           
 
       if (argument instanceof BinaryExpression) 
       { BinaryExpression lbe = (BinaryExpression) argument; 
@@ -999,6 +1036,26 @@ public void findClones(java.util.Map clones,
   
           return res; 
         }
+        else if (lbe.operator.equals("|C") && 
+                 operator.equals("->first"))
+        { Expression res = Expression.simplifyFirst(lbe); 
+ 
+          System.out.println(">> OCL efficiency smell (OES): Inefficient " + operator + " expression: " + 
+            this + 
+            "\n! Replaced by " + res);
+  
+          return res; 
+        }
+        else if (lbe.operator.equals("|C") && 
+                 operator.equals("->any"))
+        { Expression res = Expression.simplifyAny(lbe); 
+ 
+          System.out.println(">> OCL efficiency smell (OES): Inefficient " + operator + " expression: " + 
+            this + 
+            "\n! Replaced by " + res);
+  
+          return res; 
+        }
       } 
     }
     else if ("->sort".equals(operator))
@@ -1011,33 +1068,6 @@ public void findClones(java.util.Map clones,
             "\n! Argument is already sorted.");
         return arg; 
       }
-    } 
-    else if (operator.equals("->last") && 
-             argument instanceof UnaryExpression)
-    { // s->front()->last()  is  s->at(s->size() - 1)
-      // s->tail()->last()  is  s->last()
-
-      UnaryExpression leftarg = (UnaryExpression) argument; 
-      String leftargop = leftarg.getOperator(); 
-      Expression leftargleft = leftarg.getArgument();
-
-      if (leftargop.equals("->front"))
-      { System.out.println("! OES: Inefficient ->at operation: " + this); 
-
-        UnaryExpression sze = 
-          new UnaryExpression("->size", leftargleft); 
-        BinaryExpression res = 
-          new BinaryExpression("->at", leftargleft, 
-            new BinaryExpression("-", sze, 
-                               new BasicExpression(1)));
-        return res; 
-      } 
-      else if (leftargop.equals("->tail"))
-      { System.out.println("! OES: Inefficient ->last operation: " + this); 
-        UnaryExpression res = 
-          new UnaryExpression("->last", leftargleft); 
-        return res; 
-      } 
     }
   
     UnaryExpression res = (UnaryExpression) clone(); 
@@ -2450,6 +2480,8 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     if ("->asOrderedSet".equals(operator))
     { return argument.isSorted(); }
 
+    // also ->asSet, surely?
+
     return false; 
   } 
 
@@ -2724,6 +2756,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
 
     boolean res = argument.typeCheck(typs,ents,contexts,env); 
     multiplicity = ModelElement.ONE; 
+    Type argumentType = argument.getType(); 
 
     if (operator.equals("->size") || 
         operator.equals("->toInteger") ||
@@ -2740,7 +2773,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
 
     if (operator.equals("->succ") || 
         operator.equals("->pred"))
-    { type = argument.getType(); 
+    { type = argumentType; 
       elementType = argument.getElementType(); 
       return res; 
     } 
@@ -2753,7 +2786,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     } 
 
     if (operator.equals("!"))
-    { Type argtype = argument.getType(); 
+    { Type argtype = argumentType; 
       if (argtype != null && "Ref".equals(argtype.getName()))
       { type = argtype.getElementType(); } 
       else 
@@ -2762,14 +2795,14 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     } 
 
     if (operator.equals("?"))
-    { Type argtype = argument.getType(); 
+    { Type argtype = argumentType; 
       type = new Type("Ref", null); 
       type.setElementType(argtype);
       return res;   
     } 
     
     if (operator.equals("->copy"))
-    { type = argument.type; 
+    { type = argumentType; 
       elementType = argument.elementType; 
       multiplicity = argument.multiplicity;
       isSorted = argument.isSorted;  
@@ -2788,19 +2821,29 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     
     if (operator.equals("->last") || 
         operator.equals("->first"))
-    { type = argument.elementType; 
-      if (type != null && type.isCollectionType())
+    { if (argumentType != null && 
+          (argumentType.isMapType() || 
+           argumentType.isStringType()))
+      { type = argumentType; } 
+      else 
+      { type = argument.elementType; }
+ 
+      if (type != null && 
+          (type.isCollectionType() || 
+           type.isMapType()) 
+         )
       { multiplicity = ModelElement.MANY; 
         elementType = type.getElementType(); 
       } 
       else if (type == null)
-      { JOptionPane.showMessageDialog(null, "No type for: " + this, "Type error", JOptionPane.ERROR_MESSAGE); 
+      { System.err.println("!! ERROR: No type for: " + this); 
         type = new Type("OclAny", null); 
       } 
       else 
       { 
         elementType = type; 
-      } 
+      } // for strings
+
       return res; 
     } 
 
@@ -2818,10 +2861,17 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     if (operator.equals("->any"))
     { type = argument.elementType; // for ->any()
       elementType = argument.elementType; 
+
       if (type != null && type.isCollectionType())
       { multiplicity = ModelElement.MANY; 
         elementType = type.getElementType(); 
       } 
+      else if (type != null && type.isMapType())
+      { multiplicity = ModelElement.MANY; 
+        type = argument.type; 
+        elementType = type.getElementType(); 
+      } // a maplet
+
       return res; 
     }
 
@@ -2959,9 +3009,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
         { Association ast = ent.getDefinedRole(closured.data); 
           entity = ent; 
           if (ast == null)   // something very bad has happened
-          { System.err.println("TYPE ERROR: Undefined role: " + argument); 
-            JOptionPane.showMessageDialog(null, "Undefined role " + argument, "Type error",
-			                                         JOptionPane.ERROR_MESSAGE);  
+          { System.err.println("!! TYPE ERROR: Undefined role: " + argument); 
             return false; 
           } 
           multiplicity = ast.getCard2();
@@ -3070,13 +3118,17 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     if (operator.equals("->reverse") || 
         operator.equals("->tail") || 
         operator.equals("->front"))  
-    { type = argument.getType(); 
+    { type = argumentType; 
       modality = argument.modality; 
       elementType = argument.elementType;
 
       if (operator.equals("->front") || 
           operator.equals("->tail"))
       { isSorted = argument.isSorted; } 
+      else if (operator.equals("->reverse") && 
+               argument.isSorted)
+      { System.err.println("! Warning: ->reverse used on sorted argument!: " + argument); } 
+      // ok to take front, tail of sorted sets and maps
 
       if ("String".equals(argument.getType() + ""))
       { type = new Type("String",null); 
@@ -3084,27 +3136,22 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
         multiplicity = ModelElement.ONE; 
         return res;  
       }
-      else 
-      { /* if (type == null) // objectRef is multiple but an attribute
-        { type = argument.getElementType();
-          Entity e = argument.getEntity();
-          if (type == null && e != null) 
-          { type = e.getFeatureType(((BasicExpression) argument).data); } 
-          // System.out.println("Element type of " + this + ": " + e + " " + type);
-          if (type == null)
-          { System.err.println("TYPE ERROR: Can't determine element type of " + this); 
-            JOptionPane.showMessageDialog(null, "No type for: " + this, "Type error", JOptionPane.ERROR_MESSAGE); 
-            type = new Type("void",null);
-            elementType = type; 
-          }  // hack
-        }  */ 
+      else if (argument.isSortedSet() || 
+               argument.isSortedMap())
+      { type = argumentType;
+        entity = argument.entity;
+        multiplicity = ModelElement.MANY;
+      }
+      else
+      {  
         type = new Type("Sequence", null); 
         type.setElementType(elementType); 
         entity = argument.entity;
         multiplicity = ModelElement.MANY; 
       }
+
       // and case where it is an extension operator
-      System.out.println("**Type of " + this + " is " + type);
+      System.out.println(">>>*** Type of " + this + " is " + type);
       return res;
     }
     
@@ -3126,7 +3173,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
       elementType = type.getElementType(); 
     }
   
-    System.out.println(">>> *** Type of " + this + " is " + type);
+    System.out.println(">>>*** Type of " + this + " is " + type);
       
     return res; 
   } 
@@ -3241,7 +3288,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
       { } 
       else 
       { System.err.println("!! Argument of " + operator + 
-          " must be numeric, not " + argumentType); 
+          " must be integer, not " + argumentType); 
         
         argument.setType(new Type("int", null)); 
       } 
@@ -3260,7 +3307,10 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
         operator.equals("->round") ||
         operator.equals("->floor"))
     { if (Type.hasVacuousType(argument))
-      { argument.setType(new Type("double", null)); 
+      { System.err.println("!! Argument of " + operator + 
+          " must be double, not " + argumentType);
+ 
+        argument.setType(new Type("double", null)); 
         if (argument instanceof BasicExpression)
         { String vname = argument + ""; 
           vartypes.put(vname, new Type("double", null)); 
@@ -3339,6 +3389,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     { type = argument.type; 
       elementType = argument.elementType; 
       multiplicity = argument.multiplicity; 
+      isSorted = argument.isSorted; 
       return res; 
     }  
 
@@ -3365,7 +3416,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
         elementType = type.getElementType(); 
       } 
       else if (type == null)
-      { JOptionPane.showMessageDialog(null, "No type for: " + this, "Type error", JOptionPane.ERROR_MESSAGE); 
+      { System.err.println("!! ERROR: No type for: " + this); 
         type = new Type("OclAny", null); 
       } 
       else 
@@ -3374,11 +3425,12 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
       } 
 
       if (argumentType.isString() || 
-          argumentType.isCollection())
+          argumentType.isCollection() || 
+          argumentType.isMap())
       { } 
       else 
       { System.err.println("!! Argument of " + operator + 
-          " must be String or Collection, not " + argumentType); 
+          " must be String or Map/Collection, not " + argumentType); 
         argument.setType(new Type("Sequence", null)); 
       } 
 
@@ -3393,9 +3445,18 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
       if (argumentType.isNumeric()) 
       { return res; } 
 
+      /* if (operator.equals("-") && 
+          (argumentType.isCollection() || 
+           argumentType.isMap()))
+      { return res; } 
+      
+      if (operator.equals("-")) 
+      { System.err.println("!! Argument of - must be numeric, map or collection, not " + argumentType); } 
+      else */ 
+ 
       System.err.println("!! Argument of " + operator + 
-        " must be numeric, not " + argumentType); 
-        
+          " must be numeric, not " + argumentType); 
+  
       type = new Type("double",null); 
       elementType = new Type("double",null); 
 
@@ -3410,15 +3471,23 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     if (operator.equals("->any"))
     { type = argument.elementType; // for ->any()
       elementType = argument.elementType; 
+
       if (type != null && type.isCollectionType())
       { multiplicity = ModelElement.MANY; 
         elementType = type.getElementType(); 
       } 
 
+      if (argument.type != null && argument.type.isMapType())
+      { type = argument.type; 
+        multiplicity = ModelElement.MANY; 
+        elementType = type.getElementType(); 
+      }   
+
       if (type == null) 
       { type = new Type("OclAny", null); } 
 
-      if (argumentType.isCollection()) { } 
+      if (argumentType.isCollection() || 
+          argumentType.isMap()) { } 
       else 
       { System.err.println("!! Argument of ->any() must be collection, not " + argumentType); 
         argument.setType(new Type("Sequence", null));
@@ -3427,6 +3496,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
           vartypes.put(vname, argument.type); 
         }
       } 
+      // also the case of maps - it is a maplet
 
       return res; 
     }
@@ -3670,8 +3740,10 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     if (operator.equals("->asSet"))
     { type = new Type("Set",null); 
       elementType = argument.elementType;
+
       if (argument.isMap())
       { elementType = argument.type; }  
+
       entity = argument.entity; 
       type.setElementType(elementType); 
       multiplicity = ModelElement.MANY; 
@@ -4000,31 +4072,23 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
         multiplicity = ModelElement.ONE; 
         return res;  
       }
-      else 
-      { /* if (type == null) // objectRef is multiple but an attribute
-        { type = argument.getElementType();
-          Entity e = argument.getEntity();
-          if (type == null && e != null) 
-          { type = e.getFeatureType(((BasicExpression) argument).data); } 
-          // System.out.println("Element type of " + this + ": " + e + " " + type);
-          if (type == null)
-          { System.err.println("!!! TYPE ERROR: Can't determine element type of " + this); 
-            JOptionPane.showMessageDialog(null, "No type for: " + this, "Type error", JOptionPane.ERROR_MESSAGE); 
-            type = new Type("void",null);
-            elementType = type; 
-          }  // hack
-        }  */ 
-        type = new Type("Sequence", null); 
-        type.setElementType(elementType); 
-        entity = argument.entity;
-        multiplicity = ModelElement.MANY; 
-      }
+      
+      if (type != null) 
+      { type.setElementType(elementType); }
+ 
+      entity = argument.entity;
+      multiplicity = ModelElement.MANY; 
 
-      if (argumentType.isString() || argumentType.isSequence())
+      if (operator.equals("->front") || 
+          operator.equals("->tail"))
+      { isSorted = argument.isSorted; } 
+      
+      if (argumentType.isString() || argumentType.isSorted() ||
+          argumentType.isSequence())
       { } 
       else
       { System.err.println("!! Argument of " + operator + 
-          " must be a sequence or string, not " + argumentType); 
+          " must be a sequence, sorted collection/map or string, not " + argumentType); 
         argument.setType(new Type("Sequence",null)); 
         argument.setElementType(new Type("OclAny",null)); 
         
@@ -4036,7 +4100,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
       } 
 
       // and case where it is an extension operator
-      System.out.println("**Type of " + this + " is " + type);
+      System.out.println(">>** Type of " + this + " is " + type);
       return res;
     }
     
@@ -5159,17 +5223,25 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
       { String tname = type.getJava7(); 
         return "((" + tname + ") " + qf + ".clone())";
       }
+
       String tname = type.getName(); 
+
       if ("String".equals(tname))
       { return "(\"\"" + qf + ")"; } 
+
       if ("Set".equals(tname) && isSorted())
       { return "Ocl.copySortedSet(" + qf + ")"; } 
       if ("Set".equals(tname))
       { return "Ocl.copySet(" + qf + ")"; } 
+
       if ("Sequence".equals(tname))
       { return "Ocl.copySequence(" + qf + ")"; } 
+
+      if ("Map".equals(tname) && isSorted())
+      { return "Ocl.copySortedMap(" + qf + ")"; } 
       if ("Map".equals(tname))
       { return "Ocl.copyMap(" + qf + ")"; } 
+      
       return qf; 
     }    
 

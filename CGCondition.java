@@ -1,5 +1,5 @@
 /******************************
-* Copyright (c) 2003--2024 Kevin Lano
+* Copyright (c) 2003--2025 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -106,6 +106,13 @@ public class CGCondition
   public boolean hasVariable()
   { if (variable != null && 
         variable.startsWith("_")) 
+    { return true; } 
+    return false; 
+  } 
+
+  public boolean hasStereotype()
+  { if (stereotype != null && 
+        stereotype.length() > 0)
     { return true; } 
     return false; 
   } 
@@ -282,7 +289,7 @@ public class CGCondition
         //   "Global variable " + rvar + " value is " + stereo,   "",
         //   JOptionPane.INFORMATION_MESSAGE);
 
-        System.out.println(">--> Replacing global variable " + rvar + " by " + varValue); 
+        // System.out.println(">--> Replacing global variable " + rvar + " by " + varValue); 
       }
     } // No metafeatures allowed
 
@@ -391,7 +398,7 @@ public class CGCondition
       else if (varValue != null) // no stereotype
       { stereo = stereo.replace(rvar,varValue); 
 
-        System.out.println(">--> Replacing global variable " + rvar + " by " + varValue); 
+        // System.out.println(">--> Replacing global variable " + rvar + " by " + varValue); 
       }
 
     } 
@@ -577,7 +584,7 @@ public class CGCondition
             { } 
             else 
             { return false; } 
-            System.out.println("||| Condition " + cond + " is satisfied by " + m); 
+            // System.out.println("||| Condition " + cond + " is satisfied by " + m); 
           } 
           else if ("_+".equals(cvar) && 
               m instanceof Vector)
@@ -585,7 +592,7 @@ public class CGCondition
             { } 
             else 
             { return false; } 
-            System.out.println("||| Condition " + cond + " is satisfied by " + m); 
+            // System.out.println("||| Condition " + cond + " is satisfied by " + m); 
           } 
           else if (var.equals(cvar))
           { if (m instanceof Type && 
@@ -612,17 +619,18 @@ public class CGCondition
             else if (m instanceof ASTTerm && 
                cond.conditionSatisfiedASTTerm((ASTTerm) m, vars,
                   eargs, new Vector(), entities, cgs, gvars))
-            { System.out.println("||| ASTTerm condition " + cond + " satisfied by term " + m); 
-              System.out.println(); 
+            { // System.out.println("||| ASTTerm condition " + cond + " satisfied by term " + m); 
+              // System.out.println(); 
             } 
             else 
             { return false; } 
 		  
-            System.out.println("||| Condition " + cond + " is satisfied by " + m); 
+            // System.out.println("||| Condition " + cond + " is satisfied by " + m); 
           } 
         } 
       } 
     } 
+
     return res; 
   } 
 
@@ -690,7 +698,7 @@ public class CGCondition
             { } 
             else 
             { return false; } 
-            System.out.println("||| Condition " + cond + " is satisfied by " + m); 
+            // System.out.println("||| Condition " + cond + " is satisfied by " + m); 
           } 
           else if ("_+".equals(cvar) && 
               m instanceof Vector)
@@ -698,7 +706,7 @@ public class CGCondition
             { } 
             else 
             { return false; } 
-            System.out.println("||| Condition " + cond + " is satisfied by " + m); 
+            // System.out.println("||| Condition " + cond + " is satisfied by " + m); 
           } 
           else if (m instanceof Type && 
               cond.conditionSatisfied((Type) m, entities,cgs)) 
@@ -725,13 +733,13 @@ public class CGCondition
                    cond.conditionSatisfiedASTTerm((ASTTerm) m,
                           vars, eargs, reps,  
                           entities, cgs, gvars))
-          { System.out.println("||| ASTTerm condition " + cond + " satisfied by term " + m); 
-            System.out.println(); 
+          { // System.out.println("||| ASTTerm condition " + cond + " satisfied by term " + m); 
+            // System.out.println(); 
           } 
           else 
           { return false; } 
 		  
-          System.out.println("||| Condition " + cond + " is satisfied by " + m); 
+          // System.out.println("||| Condition " + cond + " is satisfied by " + m); 
         } 
       } 
     } 
@@ -800,19 +808,19 @@ public class CGCondition
 
 
   public boolean conditionSatisfied(Type t, Vector entities, CGSpec cgs)
-  { System.out.println("||| Checking type condition " + t + " " + stereotype); 
-    System.out.println(); 
+  { // System.out.println("||| Checking type condition " + t + " " + stereotype); 
+    // System.out.println(); 
 
     if ("string".equals(stereotype.toLowerCase()) && t.isStringType())
     { return positive; }
 
     if ("class".equals(stereotype.toLowerCase()) && t.isEntityType(entities))
-    { System.out.println("||| Condition class satisfied for " + t); 
+    { // System.out.println("||| Condition class satisfied for " + t); 
       return positive; 
     }
 
     if ("interface".equals(stereotype.toLowerCase()) && t.isInterfaceType(entities))
-    { System.out.println("||| Condition interface satisfied for " + t); 
+    { // System.out.println("||| Condition interface satisfied for " + t); 
       return positive; 
     }
 
@@ -874,12 +882,12 @@ public class CGCondition
     { return positive; }
 
     if ("class".equals(stereotype.toLowerCase()) && !(t.isEntityType(entities)))
-    { System.out.println("||| " + t + " is not a class"); 
+    { // System.out.println("||| " + t + " is not a class"); 
       return !positive; 
     }
 
     if ("interface".equals(stereotype.toLowerCase()) && !(t.isInterfaceType(entities)))
-    { System.out.println("||| " + t + " is not an interface"); 
+    { // System.out.println("||| " + t + " is not an interface"); 
       return !positive; 
     }
 
@@ -942,7 +950,7 @@ public class CGCondition
   }
 
   public boolean conditionSatisfied(Vector v, Vector entities, CGSpec cgs, Vector gvars)
-  { System.out.println(".>>>. Checking vector condition " + quantifier + " " + stereotype); 
+  { // System.out.println(".>>>. Checking vector condition " + quantifier + " " + stereotype); 
     
     if ("all".equals(quantifier))
     { if (v.size() == 0) 
@@ -1327,10 +1335,10 @@ public class CGCondition
 	  boolean hasall = true;  
 	  for (int i = 0; i < subterms.size(); i++) 
 	  { ASTTerm sb = (ASTTerm) subterms.get(i); 
-	    if (stereotype.equals(sb.getTag())) 
-		{ hasany = true; } 
-		else 
-		{ hasall = false; }
+         if (stereotype.equals(sb.getTag())) 
+         { hasany = true; } 
+         else 
+         { hasall = false; }
 	  } 
 	  
 	  if (quantifier.equals("all") && positive)
@@ -1415,11 +1423,11 @@ public class CGCondition
 
         /* JOptionPane.showMessageDialog(null, 
            "Global variable " + rvar + " value is " + stereo,   "",
-          JOptionPane.INFORMATION_MESSAGE); 
+            JOptionPane.INFORMATION_MESSAGE); 
 
-        JOptionPane.showMessageDialog(null,
-          ">--> Replacing global variable " + rvar + " by " + varValue + " in " + alit + " = " + stereo, "", 
-          JOptionPane.INFORMATION_MESSAGE);  */ 
+          JOptionPane.showMessageDialog(null,
+            ">--> Replacing global variable " + rvar + " by " + varValue + " in " + alit + " = " + stereo, "", 
+            JOptionPane.INFORMATION_MESSAGE);  */ 
         }
       }
 
@@ -1433,7 +1441,7 @@ public class CGCondition
 
     Vector metafs = CGRule.metafeatures(variable); 
 
-    System.out.println("*** Metafeatures of " + variable + " are: " + metafs); 
+    // System.out.println("*** Metafeatures of " + variable + " are: " + metafs); 
     /* JOptionPane.showMessageDialog(null, 
                  " metafeatures of = " + variable + 
                  " are: " + metafs, 
@@ -1582,7 +1590,7 @@ public class CGCondition
     } 
 
     if (a.hasType(stereotype))
-    { System.out.println("|||>> condition that type of " + a + " = " + stereotype + " is satisfied"); 
+    { // System.out.println("|||>> condition that type of " + a + " = " + stereotype + " is satisfied"); 
       return positive; 
     } 
 

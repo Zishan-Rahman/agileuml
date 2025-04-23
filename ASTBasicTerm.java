@@ -295,7 +295,7 @@ public class ASTBasicTerm extends ASTTerm
 
         if (r.satisfiesAllConditions(args,eargs,ents,cgs)) 
              // r.satisfiesConditions(eargs,ents,cgs))
-        { System.out.println(">>>> Applying basic term " + tag + " rule " + r + " for " + this); 
+        { // System.out.println(">>>> Applying basic term " + tag + " rule " + r + " for " + this); 
           return r.applyRule(args,eargs,cgs); 
         }  
       }   
@@ -306,7 +306,7 @@ public class ASTBasicTerm extends ASTTerm
     { Vector tagrules = cgs.getRulesForCategory(tag);
       if (tagrules.equals(rules)) 
       { return toString(); }
-      System.out.println(">> Applying default rule _0 |-->_0 to " + this);  
+      // System.out.println(">> Applying default rule _0 |-->_0 to " + this);  
       return this.cgRules(cgs,tagrules); 
     } 
 
@@ -1181,6 +1181,8 @@ public class ASTBasicTerm extends ASTTerm
     }
 
     if ("Collection".equals(value) || 
+        "SequencedCollection".equals(value) || 
+        "SequencedSet".equals(value) || 
         "Iterable".equals(value) || 
         "AbstractCollection".equals(value))
     { modelElement = new Type("Sequence", null); 
@@ -1302,6 +1304,7 @@ public class ASTBasicTerm extends ASTTerm
         "LinkedBlockingDeque".equals(value) ||
         "ArrayBlockingQueue".equals(value) ||
         "BlockingQueue".equals(value) || 
+        "LinkedHashSet".equals(value) || 
         "ListOrderedSet".equals(value) ||
         "SetUniqueList".equals(value))
     { modelElement = new Type("Sequence", null); 
@@ -1399,7 +1402,7 @@ public class ASTBasicTerm extends ASTTerm
     { modelElement = new Type("Set", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Set"; 
-    }
+    } // OrderedSet for LinkedHashSet
  
     if ("SortedSet".equals(value) || "TreeSet".equals(value))
     { modelElement = new Type("Set", null); 
@@ -1415,12 +1418,13 @@ public class ASTBasicTerm extends ASTTerm
     }
  
     if ("HashMap".equals(value) || 
+        "SequencedMap".equals(value) || 
         "LinkedHashMap".equals(value) || 
         "EnumMap".equals(value))
     { modelElement = new Type("Map", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Map"; 
-    } 
+    } // OrderedMap for LinkedHashMap
     
     if ("SortedMap".equals(value) || "TreeMap".equals(value))
     { modelElement = new Type("Map", null); 
@@ -2014,6 +2018,8 @@ public class ASTBasicTerm extends ASTTerm
       return "OclAny"; }
 
     if ("Collection".equals(value) || 
+        "SequencedCollection".equals(value) || 
+        "SequencedSet".equals(value) || 
         "Iterable".equals(value) || 
         "AbstractCollection".equals(value))
     { modelElement = new Type("Sequence", null); 
@@ -2024,19 +2030,26 @@ public class ASTBasicTerm extends ASTTerm
     if ("Class".equals(value))
     { modelElement = new Type("OclType", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclType"; }
+      return "OclType";
+    }
+
     if ("Comparable".equals(value))
     { modelElement = new Type("OclAny", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclAny"; }
+      return "OclAny";
+    }
+
     if ("Cloneable".equals(value))
     { modelElement = new Type("OclAny", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclAny"; }
+      return "OclAny"; 
+    }
+
     if ("Serializable".equals(value))
     { modelElement = new Type("OclAny", null); 
       expression = new BasicExpression((Type) modelElement); 
-      return "OclAny"; }
+      return "OclAny"; 
+    }
 
     if ("Runnable".equals(value))
     { modelElement = new Type("Runnable", null); 
@@ -2104,10 +2117,12 @@ public class ASTBasicTerm extends ASTTerm
     { modelElement = new Type("Sequence", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence"; } 
+
     if ("AbstractList".equals(value))
     { modelElement = new Type("Sequence", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence"; } 
+
     if ("Vector".equals(value))
     { modelElement = new Type("Sequence", null); 
       expression = new BasicExpression((Type) modelElement); 
@@ -2115,7 +2130,8 @@ public class ASTBasicTerm extends ASTTerm
     }
  
     if ("LinkedList".equals(value) || "List".equals(value) ||
-        "Stack".equals(value) || 
+        "Stack".equals(value) ||
+        "LinkedHashSet".equals(value) ||  
         "Queue".equals(value) || "Deque".equals(value))
     { modelElement = new Type("Sequence", null); 
       expression = new BasicExpression((Type) modelElement); 
@@ -2195,11 +2211,12 @@ public class ASTBasicTerm extends ASTTerm
     } 
 
     if ("Set".equals(value) ||
-        "HashSet".equals(value) || "EnumSet".equals(value))
+        "HashSet".equals(value) || 
+        "EnumSet".equals(value))
     { modelElement = new Type("Set", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Set"; 
-    }
+    } // OrderedSet for LinkedHashSet
  
     if ("SortedSet".equals(value) || "TreeSet".equals(value))
     { modelElement = new Type("Set", null);
@@ -2215,12 +2232,13 @@ public class ASTBasicTerm extends ASTTerm
     }
  
     if ("HashMap".equals(value) || 
+        "SequencedMap".equals(value) || 
         "LinkedHashMap".equals(value) || 
         "EnumMap".equals(value))
     { modelElement = new Type("Map", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Map"; 
-    }
+    } // OrderedMap for LinkedHashMap
  
     if ("SortedMap".equals(value) || "TreeMap".equals(value))
     { modelElement = new Type("Map", null); 
@@ -2598,15 +2616,15 @@ public class ASTBasicTerm extends ASTTerm
     expression = 
       BasicExpression.newValueBasicExpression(value,typ); 
 
-    System.out.println(">> Expression of " + this + " ==> " + expression); 
+    // System.out.println(">> Expression of " + this + " ==> " + expression); 
       
     if (typ != null) 
-    { System.out.println(">>> Type of " + value + " is " + typ);
+    { // System.out.println(">>> Type of " + value + " is " + typ);
       // expression.setType(new Type(typ, null)); 
     } 
     
     if (tag.equals("integerLiteral"))
-    { System.out.println(">>> Type of " + value + " is integer"); 
+    { // System.out.println(">>> Type of " + value + " is integer"); 
 
       value = Expression.removeUnderscores(value); 
 
@@ -2624,7 +2642,7 @@ public class ASTBasicTerm extends ASTTerm
       }  
     }
     else if (tag.equals("floatLiteral"))
-    { System.out.println(">>> Type of " + value + " is double"); 
+    { // System.out.println(">>> Type of " + value + " is double"); 
 
       value = Expression.removeUnderscores(value); 
 
@@ -2655,7 +2673,7 @@ public class ASTBasicTerm extends ASTTerm
     }
     else if (tag.equals("literal") && value.endsWith("\"") && 
              value.startsWith("\""))
-    { System.out.println(">>> Type of " + value + " is String"); 
+    { // System.out.println(">>> Type of " + value + " is String"); 
       expression.setType(new Type("String", null)); 
 
       ASTTerm.setType(this,"String"); 
@@ -2663,7 +2681,7 @@ public class ASTBasicTerm extends ASTTerm
     }
     else if (tag.equals("literal") && value.endsWith("\'") && 
              value.startsWith("\'"))
-    { System.out.println(">>> Type of " + value + " is String"); 
+    { // System.out.println(">>> Type of " + value + " is String"); 
       value = "\"" + value.substring(1,value.length()-1) + "\""; 
       expression.setType(new Type("String", null)); 
       ASTTerm.setType(this,"String"); 
@@ -2672,7 +2690,7 @@ public class ASTBasicTerm extends ASTTerm
     else if (tag.equals("literal") && 
              (value.equals("true") || value.equals("false"))
             )
-    { System.out.println(">>> Type of " + value + " is String"); 
+    { // System.out.println(">>> Type of " + value + " is String"); 
       expression.setType(new Type("boolean", null)); 
       ASTTerm.setType(this,"boolean"); 
       ASTTerm.setType(value,"boolean"); 

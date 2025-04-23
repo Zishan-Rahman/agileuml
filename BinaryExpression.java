@@ -65,6 +65,24 @@ class BinaryExpression extends Expression
   } 
 
   public static Expression newLetBinaryExpression(
+                         Expression var, 
+                         Type typ, Expression initexpr, 
+                         Expression expr)
+  { // let v : typ = initexpr in expr
+
+    String vname = var + ""; 
+    Attribute accum = 
+      new Attribute(vname, typ, ModelElement.INTERNAL); 
+    // accum.setElementType(typ); 
+  
+    BinaryExpression res = 
+      new BinaryExpression("let", initexpr, expr);
+    res.setAccumulator(accum);  
+    res.setBrackets(true); 
+    return res; 
+  } 
+
+  public static Expression newLetBinaryExpression(
                          Expression body, 
                          Type typ, Type etyp, 
                          Expression expr)
@@ -841,6 +859,10 @@ class BinaryExpression extends Expression
     { op = "->sortedBy"; 
       lft = ((BinaryExpression) left).right;  
       out.println(id + ".variable = \"" + ((BinaryExpression) left).left + "\""); 
+    } 
+    else if (operator.equals("->sortedBy"))
+    { op = "->sortedBy"; 
+      out.println(id + ".variable = \"self\""); 
     } 
     else if (operator.equals("let"))
     { op = "let";
@@ -1796,10 +1818,14 @@ class BinaryExpression extends Expression
     res.left = lr; 
     if ("->select".equals(operator) || "->reject".equals(operator) || 
         "->collect".equals(operator) || "->closure".equals(operator) ||
-        "->selectMinimals".equals(operator) || "->selectMaximals".equals(operator) ||
-        "->isUnique".equals(operator) || "->sortedBy".equals(operator) || 
-        "->unionAll".equals(operator) || "->existsLC".equals(operator) ||
-        "->intersectAll".equals(operator) || "->concatenateAll".equals(operator) ||  
+        "->selectMinimals".equals(operator) || 
+        "->selectMaximals".equals(operator) ||
+        "->isUnique".equals(operator) || 
+        "->sortedBy".equals(operator) || 
+        "->unionAll".equals(operator) || 
+        "->existsLC".equals(operator) ||
+        "->intersectAll".equals(operator) || 
+        "->concatenateAll".equals(operator) ||  
         "->exists".equals(operator) || "->exists1".equals(operator) || 
         "->forAll".equals(operator))
     { res.right = right; } 
@@ -6424,7 +6450,9 @@ public void findClones(java.util.Map clones,
     { type = new Type("Sequence",null); } 
     else if (operator.equals("->sortedBy") || 
              operator.equals("|sortedBy"))
-    { type = new Type("Sequence",null); } 
+    { type = new Type("Sequence",null);
+      type.setSorted(false);
+    } 
     else if (Type.isMapType(tleft))
     { type = new Type("Map", null); }
     else if (Type.isSetType(tleft)) 
@@ -6938,7 +6966,8 @@ public boolean conflictsWithIn(String op, Expression el,
     if (operator.equals("->sortedBy") || 
         operator.equals("|sortedBy"))
     { String col = collectQueryForm(lqf,rqf,rprim,env,local); 
-      if (operator.equals("->sortedBy") && left.umlkind == CLASSID)
+      if (operator.equals("->sortedBy") && 
+          left.umlkind == CLASSID)
       { lqf = ((BasicExpression) left).classExtentQueryForm(env,local); }   // And pass lqf to collectQueryForm? 
       else if (operator.equals("|sortedBy") && ((BinaryExpression) left).right.umlkind == CLASSID)
       { BinaryExpression leftbe = (BinaryExpression) left; 
@@ -6947,7 +6976,8 @@ public boolean conflictsWithIn(String op, Expression el,
       else if (operator.equals("|sortedBy"))
       { BinaryExpression leftbe = (BinaryExpression) left; 
         lqf = leftbe.getRight().queryForm(env,local); 
-      }      
+      }   
+   
       return "Set.sortedBy(" + lqf + ", " + col + ")"; 
     } 
 
@@ -11926,7 +11956,7 @@ public boolean conflictsWithIn(String op, Expression el,
       collectleft = beleft.right; 
       collectvar = beleft.left + ""; 
       if (beleft.right == null || beleft.right.elementType == null)
-      { System.err.println("TYPE ERROR: no element type of: " + beleft);
+      { System.err.println("!! TYPE ERROR: no element type of: " + beleft);
         JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
                                       "Design error", JOptionPane.ERROR_MESSAGE);
       }
@@ -12030,7 +12060,7 @@ public boolean conflictsWithIn(String op, Expression el,
       collectleft = beleft.right; 
       collectvar = beleft.left + ""; 
       if (beleft.right == null || beleft.right.elementType == null)
-      { System.err.println("TYPE ERROR: no element type of: " + beleft);
+      { System.err.println("!! TYPE ERROR: no element type of: " + beleft);
         JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
                                       "Design error", JOptionPane.ERROR_MESSAGE);
       }
@@ -12144,7 +12174,7 @@ public boolean conflictsWithIn(String op, Expression el,
       collectleft = beleft.right; 
       collectvar = beleft.left + ""; 
       if (beleft.right == null || beleft.right.elementType == null)
-      { System.err.println("TYPE ERROR: no element type of: " + beleft);
+      { System.err.println("!! TYPE ERROR: no element type of: " + beleft);
         JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
                                       "Design error", JOptionPane.ERROR_MESSAGE);
       }
@@ -12267,7 +12297,7 @@ public boolean conflictsWithIn(String op, Expression el,
       collectleft = beleft.right; 
       collectvar = beleft.left + ""; 
       if (beleft.right == null || beleft.right.elementType == null)
-      { System.err.println("TYPE ERROR: no element type of: " + beleft);
+      { System.err.println("!! TYPE ERROR: no element type of: " + beleft);
         JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
                                       "Design error", JOptionPane.ERROR_MESSAGE);
       }
@@ -20771,9 +20801,14 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
     // c->reject(P)->size() > 0 
     // replaced by c->exists(not(P))
     
+    // c->size() > 0 replaced by c->notEmpty()
+    // c->size() = 0 replaced by c->isEmpty()
 
     Expression lexpr = left.simplifyOCL(); 
     Expression rexpr = right.simplifyOCL(); 
+
+    if ("->at".equals(operator)) 
+    { return Expression.simplifyAt(lexpr, rexpr); } 
 
     if ("->union".equals(operator) && 
         lexpr instanceof SetExpression && 
@@ -20782,6 +20817,17 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
       SetExpression res = 
         SetExpression.mergeSetExpressions((SetExpression) lexpr,
                                           (SetExpression) rexpr); 
+      return res; 
+    } 
+
+    int synLeft = lexpr.syntacticComplexity();
+    int synRight = rexpr.syntacticComplexity();
+
+    if (("&".equals(operator) || "or".equals(operator)) && 
+        synLeft > synRight)
+    { BinaryExpression res = 
+        new BinaryExpression(operator, rexpr, lexpr); 
+      System.out.println(">> OCL efficiency smell (OES): Inefficient logical combination: " + this);
       return res; 
     } 
 
@@ -20838,6 +20884,15 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
           return res; 
         } 
       }
+      else if ("->size".equals(leftop))
+      { // col->size() = 0 is col->isEmpty()
+        System.out.println(">> OCL efficiency smell (OES): Inefficient comparison: " + this);
+          
+        Expression col = arg.getArgument(); 
+        UnaryExpression res = 
+          new UnaryExpression("->isEmpty", col); 
+        return res; 
+      } 
     }
 
     if (operator.equals("=") && "0".equals(right + "") && 
@@ -20967,6 +21022,15 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
           return res; 
         } 
       }
+      else if ("->size".equals(leftop)) 
+      { // col->size() > 0
+
+        System.out.println(">> OCL efficiency smell (OES): Inefficient comparison: " + this);
+        Expression col = arg.getArgument(); 
+        UnaryExpression res = 
+          new UnaryExpression("->notEmpty", col); 
+        return res; 
+      } 
     }
 
     if (operator.equals(">") && "0".equals(right + "") && 
@@ -21142,9 +21206,12 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
     // ->select(...)->any() is a red flag, likewise 
     // s->select(...)->size() = 0
     // s->count(x)->size() = 0
-    // mp->keys()->includes(x)  
+    // mp->keys()->includes(x)
+    // sq->collect(x|e)->at(i) or ->first() or ->last()  
 
-    int syn = syntacticComplexity(); 
+    int synLeft = left.syntacticComplexity();
+    int synRight = right.syntacticComplexity();
+    int syn = synLeft + synRight + 1; 
     if (syn > TestParameters.syntacticComplexityLimit)
     { aUses.add("! Excessive expression size (MEL) in " + this + " : try to simplify OCL expression");
       int ascore = (int) res.get("amber"); 
@@ -21153,6 +21220,13 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
 
     left.energyUse(res, rUses, aUses); 
     right.energyUse(res, rUses, aUses); 
+
+    if (("&".equals(operator) || "or".equals(operator)) && 
+        synLeft > synRight)
+    { aUses.add("! >> OCL efficiency smell (OES): Possibly inefficient execution order: " + this + "\n>> c(left) = " + synLeft + ", c(right) = " + synRight);
+      int ascore = (int) res.get("amber"); 
+      res.set("amber", ascore+1);
+    } 
 
     if (operator.equals("=") && "0".equals(right + "") && 
         left instanceof UnaryExpression)
@@ -21174,6 +21248,13 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
           int ascore = (int) res.get("amber"); 
           res.set("amber", ascore+1);
         } 
+      }
+      else if ("->size".equals(leftop))
+      { // col->size() = 0 is col->isEmpty()
+
+        aUses.add("! >> OCL efficiency smell (OES): Inefficient comparison: " + this + "\n More efficient to use ->isEmpty");
+        int ascore = (int) res.get("amber"); 
+        res.set("amber", ascore+1);
       }
     }
     else if (operator.equals("=") && "0".equals(right + "") && 
@@ -21230,6 +21311,13 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
           res.set("amber", ascore+1);
         } 
       }
+      else if ("->size".equals(leftop)) 
+      { // col->size() > 0
+
+        aUses.add("! >> OCL efficiency smell (OES): Inefficient comparison: " + this + "\n More efficient to use ->notEmpty");
+        int ascore = (int) res.get("amber"); 
+        res.set("amber", ascore+1);
+      } 
     }
     else if (operator.equals(">") && "0".equals(right + "") && 
              left instanceof BinaryExpression)
@@ -21297,6 +21385,16 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
              left instanceof BasicExpression && 
              ((BasicExpression) left).isOperationCall())
     { // redundant results computation
+      aUses.add("! OCL efficiency smell (OES): Redundant results computation in: " + this);
+      int ascore = (int) res.get("amber"); 
+      res.set("amber", ascore+1); 
+    } 
+    else if ("->at".equals(operator) && 
+             left instanceof BinaryExpression && 
+             "|C".equals(
+                    ((BinaryExpression) left).getOperator()))
+    { // redundant results computation
+
       aUses.add("! OCL efficiency smell (OES): Redundant results computation in: " + this);
       int ascore = (int) res.get("amber"); 
       res.set("amber", ascore+1); 

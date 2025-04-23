@@ -4002,21 +4002,21 @@ class BasicExpression extends Expression
       }          
     }
 
-    if (isFunction(data))
+    if (isFunction(data) && objectRef != null)
     { umlkind = FUNCTION;
-      if (objectRef == null) // error
-      { System.err.println("!! TYPE ERROR: OCL operator " + data +
-          " should have object ref: arg." + data + "(pars)");
+      // if (objectRef == null) // error
+      // { System.err.println("!! TYPE ERROR: OCL operator " + data +
+      //     " should have object ref: arg." + data + "(pars)");
    
-        if (parameters != null && parameters.size() > 0)
-        { objectRef = (Expression) parameters.get(0); 
-          parameters.remove(0); 
-        } 
-        else 
-        { type = null;
-          return false;
-        } 
-      }
+      //   if (parameters != null && parameters.size() > 0)
+      //   { objectRef = (Expression) parameters.get(0); 
+      //     parameters.remove(0); 
+      //   } 
+      //   else 
+      //   { type = null;
+      //     return false;
+      //   } 
+      // }
    
       entity = objectRef.entity; // default
       multiplicity = ModelElement.ONE; // default 
@@ -5777,9 +5777,10 @@ class BasicExpression extends Expression
 
     // JOptionPane.showInputDialog(this + " is function: " + isFunction(data)); 
 
-    if (isFunction(data))
+    if (isFunction(data) && objectRef != null)
     { umlkind = FUNCTION;
-      if (objectRef == null) // error
+
+      /* if (objectRef == null) // error
       { System.err.println("!! TYPE ERROR: OCL operator " + data +
                            " should have an argument: arg->" + data + "(pars)");
         if (parameters != null && parameters.size() > 0)
@@ -5790,7 +5791,8 @@ class BasicExpression extends Expression
         { type = null;
           return false;
         } 
-      }
+      } */
+
       entity = objectRef.entity; // default
       multiplicity = ModelElement.ONE; // default 
       modality = objectRef.modality; 
@@ -17705,6 +17707,8 @@ public Statement generateDesignSubtract(Expression rhs)
 
   public Expression simplifyOCL() 
   { // Replaces energy-expensive processing by simpler. 
+    // sq.subrange(i,j) for j < 0 is 
+    //                      sq.subrange(i,sq->size() + j)
 
     Expression objR = objectRef; 
     if (objectRef != null) 
@@ -17723,6 +17727,19 @@ public Statement generateDesignSubtract(Expression rhs)
     } 
     else 
     { pars = parameters; } 
+
+    if ("subrange".equals(data) &&
+        arrayIndex == null && 
+        pars != null && 
+        pars.size() == 2 &&  
+        (objectRef.isSequence() || 
+         objectRef.isString()))
+    { Expression res = 
+        Expression.simplifySubrange(objR, 
+                                    (Expression) pars.get(0), 
+                                    (Expression) pars.get(1)); 
+      return res; 
+    } 
 
     BasicExpression res = (BasicExpression) clone(); 
     res.objectRef = objR; 
@@ -17782,7 +17799,7 @@ public Statement generateDesignSubtract(Expression rhs)
                 "setAttributeValue".equals(data) || 
                 "hasAttribute".equals(data) || 
                 "removeAttribute".equals(data)))
-      { rUses.add("!!! Reflection is expensive: " + this);
+      { rUses.add("!!! Reflection is energy-expensive: " + this);
         int rscore = (int) res.get("red"); 
         res.set("red", rscore+1); 
       } 
@@ -17809,8 +17826,8 @@ public Statement generateDesignSubtract(Expression rhs)
 
       Vector vuses = variablesUsedIn(vars); 
       if (level > 1 && vuses.size() == 0)
-      { JOptionPane.showInputDialog(">> The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
-          "Use Extract local variable to optimise.");
+      { System.out.println(">> The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
+          "    Use Extract local variable to optimise.");
         refactorELV = true;  
       }
  

@@ -223,6 +223,13 @@ abstract class Expression
     return false; 
   } 
 
+  public boolean isSortedMap() 
+  { if (type != null && type.getName().equals("Map") &&
+        type.isSorted())
+    { return true; } 
+    return false; 
+  } 
+
   public boolean isEmptyCollection() 
   { if ("Set{}".equals(this + "") || 
         "Sequence{}".equals(this + ""))
@@ -1953,6 +1960,11 @@ abstract class Expression
   public boolean isSet()
   { return type != null && type.isSet(); }
 
+  public boolean isSortedSet()
+  { return type != null && type.isSet() && 
+           type.isSorted(); 
+  }
+
   public boolean isSequence()
   { return type != null && type.isSequence(); }
 
@@ -2393,12 +2405,13 @@ abstract class Expression
   { needsBracket = brack; } 
 
   public Expression completeness(Entity ent)
-  { Expression res = new BasicExpression("true",0);
+  { Expression res = new BasicExpression(true);
     return res;
   }
 
   public static String evaluateString(String op, String le, String re) 
-  { if ("+".equals(op) || "-".equals(op) || "*".equals(op) || "/".equals(op))
+  { if ("+".equals(op) || "-".equals(op) || 
+        "*".equals(op) || "/".equals(op))
     { int li; 
       int ri;
       long ll; 
@@ -3155,6 +3168,341 @@ abstract class Expression
     return new BinaryExpression("=>",ante,succ);
   }
 
+  public static Expression simplifyLast(Expression src)
+  { // sq->reverse()->last() is  sq->first()
+    // sq->front()->last()  is  sq->at(sq->size() - 1)
+    // sq->tail()->last() is  sq->last()
+    // sq->append(x)->last() is x
+
+    if (src instanceof UnaryExpression && 
+        "->tail".equals(
+           ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument(); 
+      System.out.println("! OES: Inefficient ->at operation: " + src + "->last()"); 
+
+      return Expression.simplifyLast(uarg); 
+    } 
+
+    if (src instanceof UnaryExpression && 
+        "->front".equals(
+            ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument();
+      System.out.println("! OES: Inefficient ->at operation: " + src + "->last()"); 
+
+      Expression sze = Expression.simplifySize(uarg);  
+      return new BinaryExpression("->at", uarg, 
+               new BinaryExpression("-", sze, 
+                     new BasicExpression(1))); 
+    } 
+       
+    if (src instanceof UnaryExpression && 
+        "->reverse".equals(
+           ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument();
+      System.out.println("! OES: Inefficient ->last operation: " + src + "->last()"); 
+
+      return Expression.simplifyFirst(uarg); 
+    } 
+
+    if (src instanceof BinaryExpression && 
+        "->append".equals(
+           ((BinaryExpression) src).getOperator()))
+    { BinaryExpression usrc = (BinaryExpression) src; 
+      Expression uarg = usrc.getRight();
+      System.out.println("! OES: Inefficient ->last operation: " + src + "->last()"); 
+
+      return uarg; 
+    } 
+
+    if (src instanceof BinaryExpression && 
+        "|C".equals(
+           ((BinaryExpression) src).getOperator()))
+    { BinaryExpression collexpr = (BinaryExpression) src; 
+      BinaryExpression indom = 
+            (BinaryExpression) collexpr.getLeft();
+      Expression valexpr = collexpr.getRight(); 
+
+      Expression varexpr = indom.getLeft();
+      Expression srccoll = indom.getRight(); 
+ 
+      Expression atexpr =  
+        Expression.simplifyLast(srccoll); 
+ 
+      System.out.println("! OES: Inefficient ->last operation: " + src + "->first()"); 
+
+      return BinaryExpression.newLetBinaryExpression(
+               varexpr, srccoll.getElementType(), 
+               atexpr, valexpr); 
+    } 
+
+    return new UnaryExpression("->last", src); 
+  } 
+
+
+  public static Expression simplifyFirst(Expression src)
+  { // sq->reverse()->first() is  sq->last()
+    // sq->front()->first()  is  sq->first()
+    // sq->tail()->first() is  sq->at(2)
+    // sq->select(x | P)->first()  is  sq->any(x | P)
+    // sq->reject(x | P)->first()  is  sq->any(x | not(P))
+
+   if (src instanceof SetExpression && 
+       src.isSequence() && 
+       ((SetExpression) src).size() >= 1)
+    { SetExpression usrc = (SetExpression) src; 
+      Expression uarg = usrc.getElement(0); 
+
+      System.out.println("! OES: Inefficient ->first operation: " + src + "->first()");
+ 
+      return uarg; 
+    } 
+
+    if (src instanceof UnaryExpression && 
+        "->tail".equals(
+           ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument(); 
+
+      System.out.println("! OES: Inefficient ->at operation: " + src + "->first()");
+ 
+      return new BinaryExpression("->at", 
+                            uarg, new BasicExpression(2)); 
+    } 
+
+    if (src instanceof UnaryExpression && 
+        "->front".equals(
+            ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument();
+
+      System.out.println("! OES: Inefficient ->first operation: " + src + "->first()"); 
+
+      return Expression.simplifyFirst(uarg); 
+    } 
+       
+    if (src instanceof UnaryExpression && 
+        "->reverse".equals(
+           ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument();
+      System.out.println("! OES: Inefficient ->first operation: " + src + "->first()"); 
+
+      return Expression.simplifyLast(uarg); 
+    } 
+
+    if (src instanceof BinaryExpression && 
+        "|C".equals(
+           ((BinaryExpression) src).getOperator()))
+    { BinaryExpression collexpr = (BinaryExpression) src; 
+      BinaryExpression indom = 
+            (BinaryExpression) collexpr.getLeft();
+      Expression valexpr = collexpr.getRight(); 
+
+      Expression varexpr = indom.getLeft();
+      Expression srccoll = indom.getRight(); 
+ 
+      Expression atexpr =  
+        Expression.simplifyFirst(srccoll); 
+ 
+      System.out.println("! OES: Inefficient ->first operation: " + src + "->first()"); 
+
+      return BinaryExpression.newLetBinaryExpression(
+               varexpr, srccoll.getElementType(), 
+               atexpr, valexpr); 
+    } 
+
+    return new UnaryExpression("->first", src); 
+  } 
+
+  public static Expression simplifyAny(Expression src)
+  { // sq->select(x | P)->any()  is  sq->any(x | P)
+    // sq->reject(x | P)->any()  is  sq->any(x | not(P))
+    // sq->collect(x | e)->any()  is  let x = sq->any(x) in e
+
+    if (src instanceof SetExpression && 
+        ((SetExpression) src).size() == 1)
+    { SetExpression usrc = (SetExpression) src; 
+      Expression uarg = usrc.getElement(0); 
+
+      System.out.println("! OES: Inefficient ->any operation: " + src + "->any()");
+ 
+      return uarg; 
+    } 
+
+    if (src instanceof BinaryExpression && 
+        "|C".equals(
+           ((BinaryExpression) src).getOperator()))
+    { BinaryExpression collexpr = (BinaryExpression) src; 
+      BinaryExpression indom = 
+            (BinaryExpression) collexpr.getLeft();
+      Expression valexpr = collexpr.getRight(); 
+
+      Expression varexpr = indom.getLeft();
+      Expression srccoll = indom.getRight(); 
+ 
+      Expression atexpr =  
+        Expression.simplifyAny(srccoll); 
+ 
+      System.out.println("! OES: Inefficient ->any operation: " + src + "->any()"); 
+
+      return BinaryExpression.newLetBinaryExpression(
+               varexpr, srccoll.getElementType(), 
+               atexpr, valexpr); 
+    } 
+
+    return new UnaryExpression("->any", src); 
+  } 
+
+  public static Expression simplifyFront(Expression src)
+  { // sq->front()->front()  is  sq.subrange(1, sq->size()-2)
+    // sq->tail()->front() is  sq.subrange(2,sq->size()-1)
+    // sq->collect(x|e)->front() is sq->front()->collect(x|e)
+
+    if (src instanceof UnaryExpression && 
+        "->tail".equals(
+           ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument(); 
+      System.out.println("! OES: Inefficient ->front operation: " + src + "->front()"); 
+
+      Expression sze = Expression.simplifySize(uarg); 
+      Vector pars = new Vector(); 
+      pars.add(new BasicExpression(2)); 
+      pars.add(new BinaryExpression("-", sze, 
+                       new BasicExpression(1))); 
+      return BasicExpression.newFunctionBasicExpression(
+                                 "subrange", uarg, pars); 
+    } 
+
+    if (src instanceof UnaryExpression && 
+        "->front".equals(
+            ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument();
+      System.out.println("! OES: Inefficient ->front operation: " + src + "->front()"); 
+
+      Expression sze = Expression.simplifySize(uarg); 
+      Vector pars = new Vector(); 
+      pars.add(new BasicExpression(1)); 
+      pars.add(new BinaryExpression("-", sze, 
+                       new BasicExpression(2))); 
+      return BasicExpression.newFunctionBasicExpression(
+                                 "subrange", uarg, pars); 
+    } 
+       
+    if (src instanceof BinaryExpression && 
+        "->collect".equals(
+            ((BinaryExpression) src).getOperator()))
+    { BinaryExpression bsrc = (BinaryExpression) src; 
+      Expression bleft = bsrc.getLeft();
+      Expression bright = bsrc.getRight(); 
+
+      System.out.println("! OES: Inefficient ->front operation: " + src + "->front()"); 
+
+      Expression newsrc = 
+                   Expression.simplifyFront(bleft);  
+      return 
+        new BinaryExpression("->collect", newsrc, bright); 
+    } 
+
+    if (src instanceof BinaryExpression && 
+        "|C".equals(
+            ((BinaryExpression) src).getOperator()))
+    { BinaryExpression bsrc = (BinaryExpression) src; 
+      BinaryExpression bleft = 
+          (BinaryExpression) bsrc.getLeft(); // x : col
+      Expression bright = bsrc.getRight();
+      Expression x = bleft.getLeft();  
+      Expression col = bleft.getRight(); 
+
+      System.out.println("! OES: Inefficient ->front operation: " + src + "->front()"); 
+
+      Expression newsrc = 
+                   Expression.simplifyFront(col);  
+      return 
+        new BinaryExpression("|C", 
+              new BinaryExpression(":", x, newsrc), bright); 
+    } 
+
+    return new UnaryExpression("->front", src); 
+  } 
+
+  public static Expression simplifyTail(Expression src)
+  { // sq->tail()->tail()  is  sq.subrange(3)
+    // sq->front()->tail() is  sq.subrange(2,sq->size()-1)
+    // sq->collect(e)->tail() is sq->tail()->collect(e)
+
+    if (src instanceof UnaryExpression && 
+        "->tail".equals(
+           ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument(); 
+      System.out.println("! OES: Inefficient ->tail operation: " + src + "->tail()"); 
+
+      Expression sze = Expression.simplifySize(uarg); 
+      Vector pars = new Vector(); 
+      pars.add(new BasicExpression(3)); 
+      pars.add(sze); 
+      return BasicExpression.newFunctionBasicExpression(
+                                 "subrange", uarg, pars); 
+    } 
+
+    if (src instanceof UnaryExpression && 
+        "->front".equals(
+            ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument();
+      System.out.println("! OES: Inefficient ->tail operation: " + src + "->tail()"); 
+
+      Expression sze = Expression.simplifySize(uarg); 
+      Vector pars = new Vector(); 
+      pars.add(new BasicExpression(2)); 
+      pars.add(new BinaryExpression("-", sze, 
+                       new BasicExpression(1))); 
+      return BasicExpression.newFunctionBasicExpression(
+                                 "subrange", uarg, pars); 
+    } 
+       
+    if (src instanceof BinaryExpression && 
+        "->collect".equals(
+            ((BinaryExpression) src).getOperator()))
+    { BinaryExpression bsrc = (BinaryExpression) src; 
+      Expression bleft = bsrc.getLeft();
+      Expression bright = bsrc.getRight(); 
+
+      System.out.println("! OES: Inefficient ->tail operation: " + src + "->tail()"); 
+
+      Expression newsrc = 
+                   Expression.simplifyTail(bleft);  
+      return 
+        new BinaryExpression("->collect", newsrc, bright); 
+    } 
+
+    if (src instanceof BinaryExpression && 
+        "|C".equals(
+            ((BinaryExpression) src).getOperator()))
+    { BinaryExpression bsrc = (BinaryExpression) src; 
+      BinaryExpression bleft = 
+          (BinaryExpression) bsrc.getLeft(); // x : col
+      Expression bright = bsrc.getRight();
+      Expression x = bleft.getLeft();  
+      Expression col = bleft.getRight(); 
+
+      System.out.println("! OES: Inefficient ->tail operation: " + src + "->tail()"); 
+
+      Expression newsrc = 
+                   Expression.simplifyTail(col);  
+      return 
+        new BinaryExpression("|C", 
+              new BinaryExpression(":", x, newsrc), bright); 
+    } 
+
+    return new UnaryExpression("->tail", src); 
+  } 
+
   public static Expression simplifySize(Expression arg)
   { // Integer.subrange(1,n)->size() is n
     // Integer.subrange(n,m)->size() is m-n+1
@@ -3202,12 +3550,265 @@ abstract class Expression
     return new UnaryExpression("->size", arg); 
   } 
 
+  public static Expression simplifySubrange(Expression src, 
+                                      Expression arg1, 
+                                      Expression arg2)
+  { // sq.subrange(i,j)  for j < 0  is  
+    //      sq.subrange(i, sq->size() + j)
+    // sq.subrange(i,j)  for i < 0  is  
+    //      sq.subrange(sq->size() + i, j)
+    // sq->collect(x|e).subrange(a,b) is 
+    //      sq.subrange(a,b)->collect(x|e)
+      
+    arg1.setBrackets(false); 
+    arg2.setBrackets(false); 
+
+    Expression par1 = arg1; 
+    Expression par2 = arg2; 
+
+    if ((src.isSequence() || src.isString()) && 
+        Expression.isDecimalInteger(arg1 + ""))
+    { int val1 = Expression.convertInteger(arg1 + ""); 
+      if (val1 < 0) 
+      { Expression sze = 
+          Expression.simplifySize(src);
+        par1 = 
+          new BinaryExpression("-", sze, 
+                             new BasicExpression(-val1));
+      } 
+    } 
+
+    if ((src.isSequence() || src.isString()) && 
+        arg1 instanceof UnaryExpression && 
+        "-".equals(((UnaryExpression) arg1).getOperator()) )
+    { UnaryExpression marg = (UnaryExpression) arg1; 
+      Expression narg = marg.getArgument(); 
+      narg.setBrackets(false); 
+
+      if (Expression.isDecimalInteger(narg + ""))
+      { int val1 = Expression.convertInteger(narg + "");
+        if (val1 > 0)
+        { Expression sze = 
+            Expression.simplifySize(src);
+          par1 = 
+                new BinaryExpression("-", sze, 
+                         new BasicExpression(val1)); 
+        }
+      } 
+    } 
+
+    if ((src.isSequence() || src.isString()) && 
+        arg1 instanceof BinaryExpression && 
+        "+".equals(((BinaryExpression) arg1).getOperator()) )
+    { BinaryExpression marg = (BinaryExpression) arg1; 
+      Expression larg = marg.getLeft(); 
+      larg.setBrackets(false); 
+      Expression rarg = marg.getRight(); 
+      rarg.setBrackets(false); 
+
+      if ("1".equals(rarg + "") && 
+          Expression.isDecimalInteger(larg + ""))
+      { int val = Expression.convertInteger(larg + "");
+        if (val < 0)
+        { Expression sze = 
+            Expression.simplifySize(src);
+          int actualval = (val + 1); 
+          par1 = 
+                new BinaryExpression("+", sze, 
+                       new BasicExpression(actualval)); 
+        }
+      }
+      else if ("1".equals(rarg + "") && 
+               larg instanceof UnaryExpression && 
+               "-".equals(
+                 ((UnaryExpression) larg).getOperator()))
+      { UnaryExpression ularg = (UnaryExpression) larg; 
+        Expression lnarg = ularg.getArgument();
+        lnarg.setBrackets(false);
+        if (Expression.isDecimalInteger(lnarg + ""))  
+        { int lval = Expression.convertInteger(lnarg + "");
+          int actualValue = (lval - 1); 
+          Expression sze = 
+            Expression.simplifySize(src);
+          par1 = 
+                new BinaryExpression("-", sze, 
+                             new BasicExpression(actualValue)); 
+        }
+      } 
+ 
+    } 
+
+    if ((src.isSequence() || src.isString()) && 
+        Expression.isDecimalInteger(arg2 + ""))
+    { int val2 = Expression.convertInteger(arg2 + ""); 
+
+      if (val2 < 0) 
+      { Expression sze = 
+          Expression.simplifySize(src);
+        par2 = 
+          new BinaryExpression("-", sze, 
+                             new BasicExpression(-val2));
+      } 
+    }
+
+    if ((src.isSequence() || src.isString()) && 
+        arg2 instanceof UnaryExpression && 
+        "-".equals(((UnaryExpression) arg2).getOperator()) )
+    { UnaryExpression marg = (UnaryExpression) arg2; 
+      Expression narg = marg.getArgument(); 
+      narg.setBrackets(false); 
+
+      if (Expression.isDecimalInteger(narg + ""))
+      { int val2 = Expression.convertInteger(narg + "");
+        if (val2 > 0)
+        { Expression sze = 
+            Expression.simplifySize(src);
+          par2 = 
+                new BinaryExpression("-", sze, 
+                         new BasicExpression(val2)); 
+        }
+      } 
+    } 
+        
+    Vector pars = new Vector(); 
+    pars.add(par1); 
+    pars.add(par2);  
+    return BasicExpression.newFunctionBasicExpression(
+                 "subrange", src, pars);   
+  }
+
+  public static Expression simplifyAt(Expression src, 
+                                      Expression arg)
+  { // sq->front()->at(i)  is  sq->at(i)
+    // sq->tail()->at(i)  is  sq->at(i+1)
+    // sq->reverse()->at(i)  is  sq->at(sq->size() - i + 1)
+    // sq->at(i)  for i < 0  is  sq->at(sq->size() + i + 1)
+    // sq->at(-i) for i > 0  is  sq->at(sq->size() - i + 1)
+    // sq->collect(x|e)->at(i)  is  let x = sq->at(i) in e
+
+    arg.setBrackets(false); 
+
+    if ((src.isSequence() || src.isString()) && 
+        Expression.isDecimalInteger(arg + ""))
+    { int val = Expression.convertInteger(arg + ""); 
+
+      if (val < 0) 
+      { Expression sze = 
+          Expression.simplifySize(src);
+        Expression indx = 
+          new BinaryExpression("+", sze, 
+                new BinaryExpression("-", new BasicExpression(1), 
+                                     new BasicExpression(-val))); 
+        return new BinaryExpression("->at", src, indx); 
+      } 
+    } 
+
+    if ((src.isSequence() || src.isString()) && 
+        arg instanceof UnaryExpression && 
+        "-".equals(((UnaryExpression) arg).getOperator()) )
+    { UnaryExpression marg = (UnaryExpression) arg; 
+      Expression narg = marg.getArgument(); 
+      narg.setBrackets(false); 
+
+      if (Expression.isDecimalInteger(narg + ""))
+      { int val = Expression.convertInteger(narg + "");
+        if (val > 0)
+        { Expression sze = 
+            Expression.simplifySize(src);
+          Expression indx = 
+            new BinaryExpression("+",  
+                new BinaryExpression("-", sze, 
+                         new BasicExpression(val)), 
+                new BasicExpression(1)); 
+          return new BinaryExpression("->at", src, indx); 
+        }
+      } 
+    } 
+ 
+
+    if (src instanceof UnaryExpression && 
+        "->front".equals(
+           ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument(); 
+
+      System.out.println("! OES: Inefficient ->at operation: " + src + "->at()"); 
+
+      return new BinaryExpression("->at", uarg, arg); 
+    } 
+
+    if (src instanceof UnaryExpression && 
+        "->tail".equals(
+            ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument(); 
+      System.out.println("! OES: Inefficient ->at operation: " + src + "->at()");
+ 
+      return new BinaryExpression("->at", uarg, 
+               new BinaryExpression("+", arg, 
+                     new BasicExpression(1))); 
+    } 
+       
+    if (src instanceof UnaryExpression && 
+        "->reverse".equals(
+           ((UnaryExpression) src).getOperator()))
+    { UnaryExpression usrc = (UnaryExpression) src; 
+      Expression uarg = usrc.getArgument();
+      Expression sze = 
+         Expression.simplifySize(uarg); 
+      Expression indx = 
+        new BinaryExpression("+", 
+          new BinaryExpression("-", sze, arg), 
+          new BasicExpression(1));  
+ 
+      System.out.println("! OES: Inefficient ->at operation: " + src + "->at()"); 
+      return new BinaryExpression("->at", uarg, indx); 
+    } 
+
+    if (src instanceof BinaryExpression && 
+        "|C".equals(
+           ((BinaryExpression) src).getOperator()))
+    { BinaryExpression collexpr = (BinaryExpression) src; 
+      BinaryExpression indom = 
+            (BinaryExpression) collexpr.getLeft();
+      Expression valexpr = collexpr.getRight(); 
+
+      Expression varexpr = indom.getLeft();
+      Expression srccoll = indom.getRight(); 
+ 
+      Expression atexpr =  
+        new BinaryExpression("->at", srccoll, arg); 
+ 
+      System.out.println("! OES: Inefficient ->at operation: " + src + "->at()"); 
+
+      return BinaryExpression.newLetBinaryExpression(
+               varexpr, srccoll.getElementType(), 
+               atexpr, valexpr); 
+    } 
+
+    return new BinaryExpression("->at", src, arg); 
+  } 
 
   private static Expression simplifyEq(final Expression e1,
                                        final Expression e2, 
                                        final Vector vars)
   { if (e1.equals(e2))
     { return new BasicExpression(true); }
+
+    if (Expression.isDecimalInteger(e1 + "") && 
+        Expression.isDecimalInteger(e2 + ""))
+    { int val1 = Expression.convertInteger(e1 + "");
+      int val2 = Expression.convertInteger(e2 + ""); 
+
+      if (val1 != val2) 
+      { return new BasicExpression(false); } 
+      return new BasicExpression(true); 
+    } 
+ 
+    // if literal numeric values and different, return false
+
+    // if different literals from same enumeration, return false
+
                    /* if different states of same component, false */
                    /*for (int i = 0; i < comps.size(); i++) 
                      { Statemachine sm = (Statemachine) comps.elementAt(i); 
@@ -3225,6 +3826,7 @@ abstract class Expression
         if (!b2) { return new BasicExpression("false"); } 
       } 
     } */ 
+
     return new BinaryExpression("=",e1,e2); 
   }  // new version: 
   // else if (e1.getKind() == VALUE && e2.getKind() == VALUE)
@@ -3269,7 +3871,14 @@ abstract class Expression
   public static Expression negate(Expression e)
   { if (e instanceof BinaryExpression)
     { BinaryExpression be = (BinaryExpression) e; 
-      String op = be.operator; 
+      String op = be.operator;
+ 
+      if (op.equals("->includes"))
+      { return new BinaryExpression("->excludes", be.left, be.right); } 
+
+      if (op.equals("->excludes"))
+      { return new BinaryExpression("->includes", be.left, be.right); }       
+
       if (op.equals("&"))
       { Expression nleft = negate(be.left); 
         Expression nright = negate(be.right); 
@@ -3278,7 +3887,8 @@ abstract class Expression
         res.setBrackets(true); 
         return res; 
       } 
-      else if (op.equals("or"))
+      
+      if (op.equals("or"))
       { Expression nleft = negate(be.left); 
         Expression nright = negate(be.right); 
         Expression res = 
@@ -3286,47 +3896,60 @@ abstract class Expression
         res.setBrackets(true); 
         return res; 
       } 
-      else if (op.equals("->exists"))
+      
+      if (op.equals("->exists"))
       { Expression nright = negate(be.right); 
         Expression res = 
             new BinaryExpression("->forAll", be.left, nright); 
         res.setBrackets(true); 
         return res; 
       } 
-      else if (op.equals("->forAll"))
+      
+      if (op.equals("->forAll"))
       { Expression nright = negate(be.right); 
         Expression res = 
            new BinaryExpression("->exists", be.left, nright); 
         res.setBrackets(true); 
         return res; 
       } 
-      else if (op.equals("#"))
+      
+      if (op.equals("#"))
       { Expression nright = negate(be.right); 
         Expression res = 
            new BinaryExpression("!", be.left, nright); 
         res.setBrackets(true); 
         return res; 
       } 
-      else if (op.equals("!"))
+      
+      if (op.equals("!"))
       { Expression nright = negate(be.right); 
         Expression res = 
            new BinaryExpression("#", be.left, nright); 
         res.setBrackets(true); 
         return res; 
       } 
-      else if (op.equals("->includesAll")) 
+      
+      if (op.equals("->includesAll")) 
       { return new BinaryExpression("/<:",be.right,be.left); } 
 
 
       String nop = negateOp(be.operator); 
       if (!(nop.equals(be.operator))) 
       { return new BinaryExpression(nop,be.left,be.right); } 
+
       return new UnaryExpression("not",e); 
     } 
     else if (e instanceof UnaryExpression) 
     { UnaryExpression ue = (UnaryExpression) e; 
+
       if (ue.operator.equals("not"))
       { return ue.argument; } 
+
+      if (ue.operator.equals("->isEmpty"))
+      { return new UnaryExpression("->notEmpty", ue.argument); } 
+
+      if (ue.operator.equals("->notEmpty"))
+      { return new UnaryExpression("->isEmpty", ue.argument); } 
     } 
     else if (e instanceof BasicExpression)
     { if (e.isTrueString())

@@ -1,5 +1,5 @@
 /******************************
-* Copyright (c) 2003--2024 Kevin Lano
+* Copyright (c) 2003--2025 Kevin Lano
 * This program and the accompanying materials are made available under the
 * terms of the Eclipse Public License 2.0 which is available at
 * http://www.eclipse.org/legal/epl-2.0
@@ -158,7 +158,7 @@ public class CGRule
     else 
     { System.err.println("! Warning: some extra metavariables on RHS of " + this);
       
-      System.out.println(">> These will be treated as global variables: " + rhsVariables); 
+      System.err.println(">> These will be treated as global variables: " + rhsVariables); 
     }
 
     conditions = whens;
@@ -180,7 +180,7 @@ public class CGRule
     else 
     { System.err.println("! Warning: some extra metavariables on RHS of " + this); 
       
-      System.out.println(">> These will be treated as global variables: " + rhsVariables); 
+      System.err.println(">> These will be treated as global variables: " + rhsVariables); 
     }
 
     conditions = new Vector();
@@ -197,7 +197,7 @@ public class CGRule
   { actions = acts;
     rhsVariables.addAll(metavariables(acts)); 
     rhsVariables.removeAll(variables); 
-    System.out.println(">> Global variables: " + rhsVariables); 
+    // System.out.println(">> Global variables: " + rhsVariables); 
   } 
 
   public static boolean hasDefaultRule(Vector rules)
@@ -309,7 +309,7 @@ public class CGRule
           } 
         } 
 
-        System.out.println(">>> found metafeature " + f + " for " + var); 
+        // System.out.println(">>> found metafeature " + f + " for " + var); 
         if (res.contains(f)) { } 
         else 
         { res.add(f); }
@@ -618,8 +618,8 @@ public class CGRule
   public static String applyMetafeature(String mffeat, 
                                         ASTTerm term,
                                         CGSpec cgs, Vector entities)
-  { System.out.println(">***> Applying " + mffeat + " to ASTTerm " + term); 
-    System.out.println(); 
+  { // System.out.println(">***> Applying " + mffeat + " to ASTTerm " + term); 
+    // System.out.println(); 
     /* JOptionPane.showMessageDialog(null, 
       "Trying to compute: " + mffeat + " of: " + term + 
               " in: " + ASTTerm.metafeatures,   "",
@@ -632,7 +632,7 @@ public class CGRule
     { CGSpec template = CSTL.getTemplate(mffeat + ".cstl"); 
           
       if (template != null) 
-      { System.out.println(">>> Applying CSTL script " + mffeat + ".cstl to " + term); 
+      { System.err.println("!>> Applying CSTL script " + mffeat + ".cstl to " + term); 
 
         String repl = null; 
         repl = term.cg(template);
@@ -651,6 +651,9 @@ public class CGRule
 
     if ("hashCode".equals(mffeat))
     { return "" + term.hashCode(); }   
+
+    if ("tag".equals(mffeat))
+    { return "" + term.getTag(); }   
 
     if ("trimQuotes".equals(mffeat)) 
     { String rep = term.cg(cgs); 
@@ -942,22 +945,22 @@ public class CGRule
  
      if (cgs.hasRuleset(mffeat))
      { // System.out.println(">***> Valid ruleset " + mffeat);  
-       System.out.println(); 
+       // System.out.println(); 
        String repl = cgs.applyRuleset(mffeat,term);
-       System.out.println(">***> Applying ruleset " + mffeat + " to ASTTerm " + term); 
-       System.out.println(); 
+       // System.out.println(">***> Applying ruleset " + mffeat + " to ASTTerm " + term); 
+       // System.out.println(); 
 
        if (repl != null) 
        { return repl; } 
        else 
-       { System.out.println(">!!!> cannot apply ruleset: " + mffeat + " to " + term); 
+       { System.err.println(">!!!> cannot apply ruleset: " + mffeat + " to " + term); 
  
          if (term.hasMetafeature(mffeat))
          { String replx = term.getMetafeatureValue(mffeat); 
            if (replx != null) 
            { return replx; }
            else 
-           { System.out.println(">!!!> no metafeature: " + mffeat + " of " + term); 
+           { System.err.println(">!!!> no metafeature: " + mffeat + " of " + term); 
            } 
          }
          else if (ASTTerm.hasTaggedValue(term,mffeat))
@@ -965,7 +968,7 @@ public class CGRule
            if (replx != null) 
            { return replx; }
            else 
-           { System.out.println(">!!!> no tagged value: " + mffeat + " of " + term); 
+           { System.err.println(">!!!> no tagged value: " + mffeat + " of " + term); 
            } 
          }       
          else if (term instanceof ASTSymbolTerm)
@@ -974,19 +977,19 @@ public class CGRule
            return replx;  
          } // specialised symbol functions go here.
          else if (CSTL.hasTemplate(mffeat + ".cstl")) 
-         { System.out.println(">>> Template exists: " + 
-                                 mffeat + ".cstl"); 
+         { // System.out.println(">>> Template exists: " + 
+           //                       mffeat + ".cstl"); 
            CGSpec newcgs = CSTL.getTemplate(mffeat + ".cstl"); 
-           System.out.println(); 
+           // System.out.println(); 
            String replx = term.cg(newcgs);
             
            if (replx != null) 
            { return replx; } 
          } 
          else 
-         { System.out.println("!! No template " + mffeat + ".cstl exists"); 
-           System.out.println(">>> Trying to load template ./cg/" + mffeat + ".cstl"); 
-           System.out.println(); 
+         { System.err.println("!! No template " + mffeat + ".cstl exists"); 
+           System.err.println(">>> Trying to load template ./cg/" + mffeat + ".cstl"); 
+           // System.out.println(); 
 
            File sub = new File("./cg/" + mffeat + ".cstl");
       
@@ -1019,9 +1022,9 @@ public class CGRule
     // of the value of eargs[j] metafeature
     // in the rule rhs
     
-    System.out.println(">***> Metafeatures of rule " + this + " are " + metafeatures); 
-    System.out.println(">***> LHS tokens: " + lhsTokens); 
-    System.out.println(); 
+    // System.out.println(">***> Metafeatures of rule " + this + " are " + metafeatures); 
+    // System.out.println(">***> LHS tokens: " + lhsTokens); 
+    // System.out.println(); 
 
     Vector entities = cgs.entities; 
     Vector types = cgs.types; 
@@ -1071,15 +1074,15 @@ public class CGRule
       // Actually the argument corresponding to _k
 
       // System.out.println(">***> Trying to apply metafeature " + mffeat + " to " + eargs + "[" + k + "]"); 
-      System.out.println(); 
+      // System.out.println(); 
 
       // The variable is a normal LHS variable: 
 
       if (k >= 1 && k <= eargs.size())
       { Object obj = eargs.get(k-1);
   
-        System.out.println(">***> Applying metafeature " + mffeat + " to " + obj + " : " + obj.getClass().getName()); 
-        System.out.println(); 
+        // System.out.println(">***> Applying metafeature " + mffeat + " to " + obj + " : " + obj.getClass().getName()); 
+        // System.out.println(); 
 
         if ("defaultValue".equals(mffeat) && obj instanceof Type)
         { Type ee = (Type) obj; 
@@ -1097,7 +1100,7 @@ public class CGRule
             Entity esub = ee.getDefaultSubclass(); 
             if (esub != null) 
             { repl = esub.getName(); 
-              System.out.println(">--> Replacing " + mf + " by " + repl); 
+              // System.out.println(">--> Replacing " + mf + " by " + repl); 
               res = res.replace(mf,repl);
             }
           } 
@@ -1105,7 +1108,7 @@ public class CGRule
           { Type etype = (Type) obj; 
             Type tsub = etype.defaultSubtype(entities);
             repl = tsub.cg(cgs);  
-            System.out.println(">--> Replacing " + mf + " by " + repl); 
+            // System.out.println(">--> Replacing " + mf + " by " + repl); 
             res = res.replace(mf,repl);  
           }
        /*   else if (obj instanceof ModelElement)
@@ -1128,7 +1131,7 @@ public class CGRule
         { Expression e = (Expression) obj; 
           Type t = e.getElementType(); 
           // System.out.println(">--> Element type of " + e + " is: " + t);
-          System.out.println(); 
+          // System.out.println(); 
  
           if (t == null) 
           { t = new Type("OclAny", null); } 
@@ -1177,6 +1180,11 @@ public class CGRule
           String repl = e + ""; 
           res = replaceByMetafeatureValue(res,mf,repl);
         }
+        else if ("tag".equals(mffeat) && 
+                 obj instanceof ASTTerm)
+        { String repl = "" + ((ASTTerm) obj).getTag(); 
+          res = replaceByMetafeatureValue(res,mf,repl);
+        }   
         else if ("name".equals(mffeat) && 
                  obj instanceof ASTTerm)
         { ASTTerm tt = (ASTTerm) obj; 
@@ -1290,7 +1298,7 @@ public class CGRule
         { Expression e = (Expression) obj; 
           Attribute fp = e.formalParameter; 
 
-          System.out.println(">>** Replacing " + e + "`formalName by " + fp); 
+          // System.out.println(">>** Replacing " + e + "`formalName by " + fp); 
 		  
           if (fp != null) 
           { String repl = fp.getName(); 
@@ -1304,7 +1312,7 @@ public class CGRule
         { Expression e = (Expression) obj; 
           int upper = e.upperBound(); 
 		  
-          System.out.println(">> Replacing " + e + "`upper by " + upper); 
+          // System.out.println(">> Replacing " + e + "`upper by " + upper); 
 		  
           res = res.replace(mf,upper + ""); 
         }
@@ -1313,7 +1321,7 @@ public class CGRule
         { Attribute e = (Attribute) obj; 
           int upper = e.upperBound(); 
 		  
-          System.out.println(">> Replacing " + e + "`upper by " + upper); 
+          // System.out.println(">> Replacing " + e + "`upper by " + upper); 
 		  
           res = res.replace(mf,upper + ""); 
         }
@@ -1322,7 +1330,7 @@ public class CGRule
         { Expression e = (Expression) obj; 
           int lower = e.lowerBound(); 
 		  
-          System.out.println(">> Replacing " + e + "`lower by " + lower); 
+          // System.out.println(">> Replacing " + e + "`lower by " + lower); 
 		  
           res = res.replace(mf,lower + ""); 
         }
@@ -1331,7 +1339,7 @@ public class CGRule
         { Attribute e = (Attribute) obj; 
           int lower = e.lowerBound(); 
 		  
-          System.out.println(">> Replacing " + e + "`lower by " + lower); 
+          // System.out.println(">> Replacing " + e + "`lower by " + lower); 
 		  
           res = res.replace(mf,lower + ""); 
         }
@@ -1347,7 +1355,7 @@ public class CGRule
         else if (CSTL.hasTemplate(mffeat + ".cstl")) 
         { CGSpec template = CSTL.getTemplate(mffeat + ".cstl"); 
           if (template != null) 
-          { System.out.println(">>> Applying CSTL template " + mffeat + ".cstl to " + obj); 
+          { System.err.println(">>> Applying CSTL template " + mffeat + ".cstl to " + obj); 
 
             String repl = null; 
             if (obj instanceof ModelElement)
@@ -1383,14 +1391,14 @@ public class CGRule
             { res = 
                 replaceByMetafeatureValue(res,mf,repl);
             }  // _1`file for template file.cstl
-            System.out.println(">>> Replaced form is: " + res); 
+            // System.out.println(">>> Replaced form is: " + res); 
           } 
         } 
         else if (obj instanceof ASTTerm)
         { ASTTerm term = (ASTTerm) obj; 
 
-          System.out.println(">***> Applying " + mffeat + " to ASTTerm " + obj); 
-          System.out.println(); 
+          // System.out.println(">***> Applying " + mffeat + " to ASTTerm " + obj); 
+          // System.out.println(); 
           
           if ("type".equals(mffeat))
           { String repl = ASTTerm.getType(term);
@@ -1401,8 +1409,8 @@ public class CGRule
                 repl = tt + "";
               } 
             } 
-            System.out.println(">-->--> Type of " + term + " is " + repl); 
-            System.out.println(); 
+            // System.out.println(">-->--> Type of " + term + " is " + repl); 
+            // System.out.println(); 
  
             if (repl != null)   
             { res = replaceByMetafeatureValue(res,mf,repl); }  
@@ -1418,8 +1426,8 @@ public class CGRule
               } 
             } 
 
-            JOptionPane.showInputDialog(">-->--> Element type of " + term + " is " + repl); 
-            System.out.println(); 
+            // JOptionPane.showInputDialog(">-->--> Element type of " + term + " is " + repl); 
+            // System.out.println(); 
  
             if (repl != null)   
             { res = replaceByMetafeatureValue(res,mf,repl); }  
@@ -1667,11 +1675,11 @@ public class CGRule
             res = replaceByMetafeatureValue(res,mf,repl);
           }   
           else if (cgs.hasRuleset(mffeat))
-          { System.out.println(">***> Valid ruleset " + mffeat);  
-            System.out.println(); 
+          { System.err.println(">***> Valid ruleset " + mffeat);  
+            // System.out.println(); 
             String repl = cgs.applyRuleset(mffeat,(ASTTerm) obj);
-            System.out.println(">***> Applying ruleset " + mffeat + " to ASTTerm " + obj); 
-            System.out.println(); 
+            System.err.println(">***> Applying ruleset " + mffeat + " to ASTTerm " + obj); 
+            // System.out.println(); 
 
             if (repl != null) 
             { res = 
@@ -1679,7 +1687,7 @@ public class CGRule
             } 
           } 
           else 
-          { System.out.println(">!!!> no ruleset: " + mffeat); 
+          { System.err.println(">!!!> no ruleset: " + mffeat); 
             if (term.hasMetafeature(mffeat))
             { String repl = term.getMetafeatureValue(mffeat); 
               if (repl != null) 
@@ -1687,7 +1695,7 @@ public class CGRule
                   replaceByMetafeatureValue(res,mf,repl); 
               }
               else 
-              { System.out.println(">!!!> no metafeature: " + mffeat + " of " + term); 
+              { System.err.println(">!!!> no metafeature: " + mffeat + " of " + term); 
               } 
             }
             else if (ASTTerm.hasTaggedValue(term,mffeat))
@@ -1697,7 +1705,7 @@ public class CGRule
                   replaceByMetafeatureValue(res,mf,repl); 
               }
               else 
-              { System.out.println(">!!!> no tagged value: " + mffeat + " of " + term); 
+              { System.err.println(">!!!> no tagged value: " + mffeat + " of " + term); 
               } 
             }
             else if (term instanceof ASTSymbolTerm)
@@ -1707,10 +1715,10 @@ public class CGRule
                   replaceByMetafeatureValue(res,mf,repl); 
             }
             else if (CSTL.hasTemplate(mffeat + ".cstl")) 
-            { System.out.println(">>> Template exists: " + 
+            { System.err.println(">>> Template exists: " + 
                                  mffeat + ".cstl"); 
               CGSpec newcgs = CSTL.getTemplate(mffeat + ".cstl"); 
-              System.out.println(); 
+              // System.out.println(); 
               String repl = ((ASTTerm) obj).cg(newcgs);
             
               if (repl != null) 
@@ -1719,9 +1727,9 @@ public class CGRule
               } 
             } 
             else 
-            { System.out.println("!! No template " + mffeat + ".cstl exists"); 
-              System.out.println(">>> Trying to load template ./cg/" + mffeat + ".cstl"); 
-              System.out.println(); 
+            { System.err.println("!! No template " + mffeat + ".cstl exists"); 
+              System.err.println(">>> Trying to load template ./cg/" + mffeat + ".cstl"); 
+              // System.out.println(); 
 
               File sub = new File("./cg/" + mffeat + ".cstl");
       
@@ -1738,26 +1746,26 @@ public class CGRule
         }
         else if (obj instanceof String && 
                  cgs.hasRuleset(mffeat))
-        { System.out.println(">***> Valid ruleset " + mffeat);  
-          System.out.println();
+        { System.err.println(">***> Valid ruleset " + mffeat);  
+          System.err.println();
           ASTSymbolTerm asymbol = new ASTSymbolTerm(obj + "");  
           String repl = cgs.applyRuleset(mffeat, asymbol);
-          System.out.println(">***> Applying ruleset " + mffeat + " to ASTSymbolTerm " + obj); 
-          System.out.println(); 
+          System.err.println(">***> Applying ruleset " + mffeat + " to ASTSymbolTerm " + obj); 
+          System.err.println(); 
 
           if (repl != null) 
           { res = replaceByMetafeatureValue(res,mf,repl); } 
         }  // Other string functions could be added.  
         else if (obj instanceof Vector) // Of ASTTerm
         { Vector v = (Vector) obj;
-          System.out.println(">***> Applying " + mffeat + " to vector of terms " + v);
-          System.out.println(); 
+          System.err.println(">***> Applying " + mffeat + " to vector of terms " + v);
+          System.err.println(); 
   
           String repl = "";
           
           if (cgs.hasRuleset(mffeat))
-          { System.out.println(">***> Valid ruleset " + mffeat);  
-            System.out.println(); 
+          { System.err.println(">***> Valid ruleset " + mffeat);  
+            System.err.println(); 
             String replv = ""; 
             for (int p = 0; p < v.size(); p++)
             { if (v.get(p) instanceof ASTTerm)
@@ -1818,8 +1826,8 @@ public class CGRule
             if (lind + mf.length() < rhs.length()) 
             { sep = rhs.charAt(lind + mf.length()) + ""; } 
 
-            System.out.println(">>> Separator character is " +
-                               sep); 
+            // System.out.println(">>> Separator character is " +
+            //                    sep); 
 
             String replv = ""; 
             for (int p = 0; p < v.size(); p++)
@@ -1861,10 +1869,10 @@ public class CGRule
             res = replaceByMetafeatureValue(res,mf,replv); 
           }          
           else if (CSTL.hasTemplate(mffeat + ".cstl")) 
-          { System.out.println(">>> Template exists: " + 
+          { System.err.println(">>> Template exists: " + 
                                  mffeat + ".cstl"); 
             CGSpec newcgs = CSTL.getTemplate(mffeat + ".cstl"); 
-            System.out.println(); 
+            System.err.println(); 
             String replv = ""; 
             for (int p = 0; p < v.size(); p++)
             { if (v.get(p) instanceof ASTTerm)
@@ -1877,9 +1885,9 @@ public class CGRule
                   replaceByMetafeatureValue(res,mf,replv); 
           } 
           else 
-          { System.out.println("!! No template " + mffeat + ".cstl exists"); 
-            System.out.println(">>> Trying to load template ./cg/" + mffeat + ".cstl"); 
-            System.out.println(); 
+          { System.err.println("!! No template " + mffeat + ".cstl exists"); 
+            System.err.println(">>> Trying to load template ./cg/" + mffeat + ".cstl"); 
+            System.err.println(); 
 
             File sub = new File("./cg/" + mffeat + ".cstl");
       
@@ -1901,7 +1909,7 @@ public class CGRule
             } 
           }
 
-          System.out.println(">> Applied vector rule: " + res); 
+          // System.out.println(">> Applied vector rule: " + res); 
         }   
         else 
         { System.err.println("!! Warning: could not apply metafeature " + mffeat + " to " + obj); } 
@@ -1913,15 +1921,15 @@ public class CGRule
     // Extend this to allow users to define their own metafeatures in the specification
     // def: _x`f = _x.expr for some abstract syntax OCL expr. 
  
-    System.out.println(">***> RHS after replacement of metafeatures: " + res); 
-    System.out.println(); 
+    // System.out.println(">***> RHS after replacement of metafeatures: " + res); 
+    // System.out.println(); 
 
     for (int x = 0; x < variables.size() && x < args.size(); 
          x++)
     { String var = (String) variables.get(x);
       String arg = (String) args.get(x);
       String arg1 = correctNewlines(arg); 
-      System.out.println(">--> Replacing " + var + " by " + arg1); 
+      // System.out.println(">--> Replacing " + var + " by " + arg1); 
       res = res.replace(var,arg1);
     } // Assuming the variables occur in same order as args
 
@@ -1933,7 +1941,7 @@ public class CGRule
         // String mffeat = mf.substring(3,mf.length());
         if (rhs.startsWith("_0"))
         { String metaop = rhs.substring(3); 
-          System.out.println(">--> External call " + metaop);
+          System.err.println(">--> External call " + metaop);
           res = ASTTerm.cgtlOperation(metaop,eargs); 
         }  
         continue; 
@@ -1943,7 +1951,7 @@ public class CGRule
       if (varValue != null) 
       { res = res.replace(rvar,varValue); 
 
-        System.out.println(">--> Replacing global variable " + rvar + " by " + varValue); 
+        // System.out.println(">--> Replacing global variable " + rvar + " by " + varValue); 
       }
     } 
 
@@ -1977,7 +1985,7 @@ public class CGRule
       { String var = (String) variables.get(x);
         String arg = m.group(x+1);
         // String arg1 = correctNewlines(arg); 
-        System.out.println(">--> Replacing " + var + " by " + arg); 
+        // System.out.println(">--> Replacing " + var + " by " + arg); 
         res = res.replaceAll(var,arg);
       }
     } 
@@ -1986,13 +1994,13 @@ public class CGRule
      Vector matchings = new Vector(); 
      boolean found = checkPatternList(actualText,matchings); 
      if (found && matchings.size() >= variableCount() && matchings.size() > 0) 
-     { System.out.println(">-->> Match of " + actualText + " to " + lhspatternlist);
+     { // System.out.println(">-->> Match of " + actualText + " to " + lhspatternlist);
        for (int i = 0; i < variables.size(); i++) 
-	   { String var = variables.get(i) + ""; 
-	     String arg = (String) matchings.get(i); 
-		 System.out.println(">--> Replacing " + var + " by " + arg); 
+       { String var = variables.get(i) + ""; 
+         String arg = (String) matchings.get(i); 
+         // System.out.println(">--> Replacing " + var + " by " + arg); 
          res = res.replace(var,arg);
-      } 
+       } 
 	}  
 	
     return res;
@@ -2002,7 +2010,7 @@ public class CGRule
                                            String mf,
                                            String repl)
   { String repl1 = correctNewlines(repl); 
-    System.out.println(">--> Replacing metafeature " + mf + " by " + repl1); 
+    // System.out.println(">--> Replacing metafeature " + mf + " by " + repl1); 
     // res = res.replaceAll(mf,repl1);
     res = res.replace(mf,repl1);
     return res; 

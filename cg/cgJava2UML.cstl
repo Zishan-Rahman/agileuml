@@ -26,6 +26,7 @@ TreeMap |-->Map
 HashMap |-->Map
 Hashtable |-->Map
 SortedMap |-->Map
+SequencedMap |-->Map
 Properties |-->Map
 JsonObject |-->Map
 JSONObject |-->Map
@@ -43,6 +44,7 @@ ArrayList |-->Sequence
 List |-->Sequence
 AbstractList |-->Sequence
 LinkedList |-->Sequence
+LinkedHashSet |-->Sequence
 Stack |-->Sequence
 Queue |-->Sequence
 Deque |-->Sequence
@@ -81,12 +83,13 @@ MultiSet |-->Sequence
 Bag |-->Sequence
 HashBag |-->Sequence
 TreeList |-->Sequence
+SequencedCollection |-->Sequence
+SequencedSet |-->Sequence
 
 Set |-->Set
 TreeSet |-->Set
 SortedSet |-->Set
 HashSet |-->Set
-LinkedHashSet |-->Set
 EnumSet |-->Set
 
 JsonString |-->String
@@ -262,7 +265,8 @@ ThreadGroup |-->OclProcessGroup
 
 Predicate _1 |-->Function(_1,boolean)
 Function _1 |-->Function_1
-Comparator _1 |-->Function(_1,(_1,boolean))
+BiFunction _1 |-->Function(_1`second, Function(_1`fourth, _1`sixth))
+Comparator _1 |-->Function(_1, Function(_1,boolean))
 AtomicReference _1 |-->_1
 Consumer _1 |-->Function(_1, void)
 
@@ -277,6 +281,7 @@ HashMap _1 |-->Map_1`collectionParameters
 TreeMap _1 |-->Map_1`collectionParameters
 Hashtable _1 |-->Map_1`collectionParameters
 SortedMap _1 |-->Map_1`collectionParameters
+SequencedMap _1 |-->Map_1`collectionParameters
 ImmutableMap _1 |-->Map_1`collectionParameters
 EnumMap _1  |-->Map_1`collectionParameters
 Pair _1 |-->Map(String,OclAny)
@@ -289,6 +294,8 @@ ArrayList _1 |-->Sequence_1`collectionParameters
 List _1 |-->Sequence_1`collectionParameters
 Vector _1 |-->Sequence_1`collectionParameters
 LinkedList _1 |-->Sequence_1`collectionParameters
+
+LinkedHashSet _1 |-->Sequence_1`collectionParameters
 Stack _1 |-->Sequence_1`collectionParameters
 Queue _1 |-->Sequence_1`collectionParameters
 Deque _1 |-->Sequence_1`collectionParameters
@@ -303,6 +310,8 @@ PriorityQueue _1 |-->Sequence_1`collectionParameters
 Bag _1 |-->Sequence_1`collectionParameters
 TreeBag _1 |-->Sequence_1`collectionParameters
 
+SequencedCollection _1 |-->Sequence_1`collectionParameters
+SequencedSet _1 |-->Sequence_1`collectionParameters
 SetUniqueList _1 |-->Sequence_1`collectionParameters
 ListOrderedSet _1 |-->Sequence_1`collectionParameters
 Bag _1 |-->Sequence_1`collectionParameters
@@ -313,7 +322,6 @@ Set _1 |-->Set_1`collectionParameters
 TreeSet _1 |-->Set_1`collectionParameters
 HashSet _1 |-->Set_1`collectionParameters
 SortedSet _1 |-->Set_1`collectionParameters
-LinkedHashSet _1 |-->Set_1`collectionParameters
 EnumSet _1 |-->Set_1`collectionParameters
 
 Map . Entry |-->Map
@@ -805,7 +813,9 @@ _1 _2 |-->_2`processVarDecs<action> _66 _1, _2`variableName _1,  _2`elemType _1`
 
 
 variableName::
+_1 |-->_1`variableName<when> _1 localVariableDeclaration
 _1 |-->_1`variableName<when> _1 variableDeclarator
+_1 _2 |-->_2`variableName<when> _2 variableDeclarators
 _1 , _2 |-->_1`variableName<when> _1 variableDeclarator
 _1 = _2 |-->_1
 _1 [ ] |-->_1
@@ -833,6 +843,10 @@ _1 |-->    var _1 : _1`getOclType<action> _1 _1`getOclType
 
 
 initialisationValue::
+_1 |-->_1`initialisationValue<when> _1 localVariableDeclaration
+_1 _2 |-->_2`initialisationValue<when> _2 variableDeclarators
+_1 |-->_1`initialisationValue<when> _1 variableDeclarator
+_1 , _2 |-->_1`initialisationValue<when> _1 variableDeclarator
 _1 = _2 |-->_2
 
 
@@ -974,16 +988,24 @@ containsKey ( _1 ) |-->->includesKey(_1)
 containsValue ( _1 ) |-->->includesValue(_1)
 isEmpty ( ) |-->->isEmpty()
 clear ( ) |-->
+reversed ( ) |-->->reverse()
 clone ( ) |-->->union(Map{})
 
 keys ( ) |-->->keys()->iterator()
 values ( ) |-->->values()
+sequencedValues ( ) |-->->values()
 keySet ( ) |-->->keys()
+sequencedKeySet ( ) |-->->keys()
 entrySet ( ) |-->->asSet()
+sequencedEntrySet ( ) |-->->asSet()
 elements ( ) |-->->values()->iterator()
 
 getKey ( ) |-->->keys()->any()
 getValue ( ) |-->->values->any()
+firstEntry ( ) |-->->asSequence()->first()
+lastEntry ( ) |-->->asSequence()->last()
+pollFirstEntry ( ) |-->->asSequence()->first()
+pollLastEntry ( ) |-->->asSequence()->last()
 
 firstKey ( ) |-->->keys()->min()
 lastKey ( ) |-->->keys()->max()
@@ -1019,11 +1041,20 @@ containsValue ( _1 ) |-->boolean
 isEmpty ( ) |-->boolean
 clear ( ) |-->void
 clone ( ) |-->Map
+reversed ( ) |-->Map
+
+firstEntry ( ) |-->Map
+lastEntry ( ) |-->Map
+pollFirstEntry ( ) |-->Map
+pollLastEntry ( ) |-->Map
 
 keys ( ) |-->OclIterator
 values ( ) |-->Sequence
+sequencedValues ( ) |-->Sequence
 keySet ( ) |-->Set
+sequencedKeySet ( ) |-->Set
 entrySet ( ) |-->Set
+sequencedEntrySet ( ) |-->Set
 elements ( ) |-->OclIterator
 
 getKey ( ) |-->OclAny
@@ -1043,11 +1074,16 @@ _1 |-->OclAny
 mapMethodCallSideEffect::
 put ( _1 ) |-->->union(Map{_1`first |-> _1`last})
 putIfAbsent ( _1 ) |-->->union(Map{_1`first |-> _1`last})
+putFirst ( _1 ) |-->->prepend(Map{_1`first |-> _1`last})
+putLast ( _1 ) |-->->append(Map{_1`first |-> _1`last})
+
 setProperty ( _1 ) |-->->union(Map{_1`first |-> _1`last})
 putAll ( _1 ) |-->->union(_1)
 removeAll ( _1 ) |--> - _1
 retainAll ( _1 ) |-->->intersection(_1)
 remove ( _1 ) |-->->antirestrict(Set{_1})
+pollLastEntry ( ) |-->->front()
+pollFirstEntry ( ) |-->->tail()
 clear ( ) |-->->intersection(Map{})
 
 
@@ -1112,6 +1148,7 @@ add ( _1 ) |-->boolean
 addAll ( _1 ) |-->boolean
 push ( _1 ) |-->boolean
 
+reversed ( ) |-->Sequence
 removeElementAt ( _1 ) |-->Sequence
 removeElement ( _1 ) |-->Sequence
 remove ( ) |-->OclIterator
@@ -1169,6 +1206,7 @@ _1 ( _2 ) |-->._1(_2)
 collectionMethodCallSideEffect::
 pop ( ) |-->->front()
 take ( ) |-->->front()
+
 removeAll ( _1 ) |--> - _1
 retainAll ( _1 ) |-->->intersection(_1)
 removeIf ( _1 ) |-->->reject( _var | (_1)->apply(_var) )
@@ -1224,7 +1262,10 @@ _1 _2 |-->_2
 methodCallSideEffect::
 pop ( ) |-->->front()
 take ( ) |-->->front()
+
 put ( _1 ) |-->->union(Map{_1`first |-> _1`last})
+putFirst ( _1 ) |-->->union(Map{_1`first |-> _1`last})
+putLast ( _1 ) |-->->union(Map{_1`first |-> _1`last})
 putAll ( _1 ) |-->->union(_1)
 removeAll ( _1 ) |--> - _1
 retainAll ( _1 ) |-->->intersection(_1)
@@ -1247,6 +1288,8 @@ take ( ) |-->->front()
 poll ( ) |-->->sort()->tail()
 pollFirst ( ) |-->->tail()
 pollLast ( ) |-->->front()
+pollFirstEntry ( ) |-->->tail()
+pollLastEntry ( ) |-->->front()
 
 replaceAll ( _1 ) |-->    _1`first := _1`first->collect( x1 | if x1 = _1`third then _1`last else x1 endif )
 
@@ -1695,6 +1738,7 @@ charValue ( ) |-->+""
 
 test ( _1 ) |-->->apply(_1)
 accept ( _1 ) |-->->apply(_1)
+apply ( _1 ) |-->->apply(_1`first)->apply(_1`last)<when> _1 multiple
 apply ( _1 ) |-->->apply(_1)
 
 toString ( ) |-->+""
@@ -1750,6 +1794,7 @@ removeLast ( ) |-->->last()
 set ( _1 ) |-->->at(_1`first+1)
 pop ( ) |-->->last()
 take ( ) |-->->last()
+reversed ( ) |-->->reverse()
 poll ( ) |-->->min()
 pollFirst ( ) |-->->first()
 pollLast ( ) |-->->last()
@@ -2670,13 +2715,18 @@ _1 ( _2 ) |-->_1(_2)
 
 
 lambdaParameters::
-( _1 ) |-->lambda _1 : OclAny in 
-( _* ) |-->_*`lambdaParameter
-_1 |-->lambda _1 : OclAny in
+( _1 ) |-->lambda _1`first : OclAny in lambda _1`last : OclAny in <when> _1 multiple
+( _1 ) |-->lambda _1 : OclAny in
+( _1 _* ) |-->lambda _1 : OclAny in _*`lambdaParameter
+_1 _* |-->_1`lambdaParameter _*`lambdaParameter
+_1 |-->lambda _1`tag : OclAny in _1`lambdaParameter
 
 
 lambdaParameter::
 , |-->
+( |-->
+) |-->
+_1 _* |-->_*`lambdaParameter
 _1 |-->lambda _1 : OclAny in
 
 
@@ -2685,7 +2735,7 @@ _1 |-->_1
 
 
 lambdaExpression::
-_1 -> _2 |-->lambda _1 in (_2`updateForm & _2`queryForm)<when> _2`isAssignment true
+_1 -> _2 |-->_1`lambdaParameters (_2`updateForm & _2`queryForm)<when> _2`isAssignment true
 _1 -> _2 |-->_1 (_2)
 
 
@@ -3590,10 +3640,14 @@ BitSet _1 |-->MathLib.toBitSequence_1
 
 Set _1 |-->Set{}_1`collectionCreationRest
 HashSet _1 |-->Set{}_1`collectionCreationRest
-LinkedHashSet _1 |-->Set{}_1`collectionCreationRest
+
 TreeSet _1 |-->Set{}_1`collectionCreationRest
 SortedSet |-->Set{}_1`collectionCreationRest
 EnumSet |-->Set{}_1`collectionCreationRest
+
+SequencedCollection |-->Sequence{}_1`collectionCreationRest
+SequencedSet |-->Sequence{}_1`collectionCreationRest
+LinkedHashSet _1 |-->Sequence{}_1`collectionCreationRest
 
 Vector _1 |-->Sequence{}_1`collectionCreationRest
 List _1 |-->Sequence{}_1`collectionCreationRest
@@ -3633,6 +3687,7 @@ TreeMap _1 |-->Map{}_1`collectionCreationRest
 ImmutableMap _1 |-->Map{}_1`collectionCreationRest
 JsonObject _1 |-->Map{}_1`collectionCreationRest
 JSONObject _1 |-->Map{}_1`collectionCreationRest
+SequencedMap _1 |-->Map{}_1`collectionCreationRest
 LinkedHashMap _1 |-->Map{}_1`collectionCreationRest
 NavigableMap _1 |-->Map{}_1`collectionCreationRest
 ConcurrentNavigableMap _1 |-->Map{}_1`collectionCreationRest
@@ -3699,6 +3754,8 @@ HashSet _1 |-->true
 LinkedHashSet _1 |-->true
 TreeSet _1 |-->true
 SortedSet _1 |-->true
+SequencedCollection _1 |-->true
+SequencedSet _1 |-->true
 EnumSet _1 |-->true
 
 Vector _1 |-->true
@@ -3725,6 +3782,7 @@ Hashtable _1 |-->true
 HashMap _1 |-->true
 TreeMap _1 |-->true
 EnumMap _1 |-->true
+SequencedMap _1 |-->true
 LinkedHashMap _1 |-->true
 NavigableMap _1 |-->true
 ConcurrentNavigableMap _1 |-->true
@@ -3819,6 +3877,7 @@ TreeMap |-->Map
 HashMap |-->Map
 Hashtable |-->Map
 SortedMap |-->Map
+SequencedMap |-->Map
 Properties |-->Map
 JsonObject |-->Map
 JSONObject |-->Map
@@ -3863,7 +3922,10 @@ TreeSet |-->Set
 SortedSet |-->Set
 HashSet |-->Set
 EnumSet |-->Set
-LinkedHashSet |-->Set
+
+LinkedHashSet |-->Sequence
+SequencedCollection |-->Sequence
+SequencedSet |-->Sequence
 
 JsonString |-->String
 Integer |-->int
@@ -4046,6 +4108,7 @@ ArrayList _1 |-->Sequence{}
 List _1 |-->Sequence{}
 Vector _1 |-->Sequence{}
 LinkedList _1 |-->Sequence{}
+LinkedHashSet _1 |-->Sequence{}
 Stack _1 |-->Sequence{}
 Queue _1 |-->Sequence{}
 BlockingQueue _1 |-->Sequence{}
@@ -4061,13 +4124,14 @@ HashBag _1 |-->Sequence{}
 TreeList _1 |-->Sequence{}
 
 Stream _1 |-->Sequence{}
+SequencedSet _1 |-->Sequence{}
+SequencedCollection _1 |-->Sequence{}
 
 Comparator _1 |-->OclComparator_1.newOclComparator
 
 Set _1 |-->Set{}
 TreeSet _1 |-->Set{}
 HashSet _1 |-->Set{}
-LinkedHashSet _1 |-->Set{}
 SortedSet _1 |-->Set{}
 EnumSet _1 |-->Set{}
 
@@ -4243,6 +4307,7 @@ if _1 _2 else _3 |-->    if _1 then _2 else _3 ;
 
 if _1 _2 |-->    if _1 then _2 else skip ; 
 
+for ( _1 ) _2 |-->  _1 _2`noSemiStatement _1`forIncrement ) ; <when> _2 statement 
 for ( _1 ) _2 |-->  _1 _2 _1`forIncrement ) ; 
  
 switch _1 { _2 _* } |-->\n    for _x : Integer.subrange(1,1) do\n      ( var _switchval : _1`type ;\n        _switchval := _1 ; \n_2\n_* )\n
@@ -4291,6 +4356,7 @@ if _1 _2 else _3 |-->    if _1 then _2 else _3
 
 if _1 _2 |-->    if _1 then _2 else skip
 
+for ( _1 ) _2 |-->  _1 _2`noSemiStatement _1`forIncrement )<when> _2 statement 
 for ( _1 ) _2 |-->  _1 _2 _1`forIncrement ) 
  
 switch _1 { _2 _* } |-->\n    for _x : Integer.subrange(1,1) do\n      ( var _switchval : _1`type ;\n        _switchval := _1 ; \n_2\n_* )\n
@@ -4339,6 +4405,8 @@ _1 |-->_1
 
 
 forIncrement::
+_1 ; _2 ; _3 |--> <when> _1`singleVariableDeclaration true, _3`singleVariableIncrement true, _1`variableName _3`incrementedVariable, _1`variableName _2`lowerBound
+
 _1 ; _2 ; _3 |--> ; _3`expressionListUpdateForm
 _1 ; ; _2 |--> ; _2`expressionListUpdateForm
 _1 ; ; |-->
@@ -4350,6 +4418,8 @@ _1 |-->
 
 
 forControl::
+_1 ; _2 ; _3 |-->  for _1`variableName : Integer.subrange(_1`initialisationValue, _2`upperBound) do ( <when> _1`singleVariableDeclaration true, _3`singleVariableIncrement true, _1`variableName _3`incrementedVariable, _1`variableName _2`lowerBound
+
 _1 ; _2 ; _3 |-->  _1 ; while _2 do (
 _1 ; ; _2 |-->  _1 ; while true do (
 _1 ; ; |-->  _1 ; while true do (
@@ -4363,6 +4433,59 @@ _1 |-->  for (_1) do (
 forInit::
 _1 |-->_1<when> _1 localVariableDeclaration
 _1 |-->_1`expressionListUpdateForm<when> _1 expressionList
+
+
+singleVariableDeclaration::
+_1 |-->_1`singleVariableDeclaration<when> _1 localVariableDeclaration
+int _2 |-->_2`singleVariableDeclaration<when> _2 variableDeclarators
+long _2 |-->_2`singleVariableDeclaration<when> _2 variableDeclarators
+short _2 |-->_2`singleVariableDeclaration<when> _2 variableDeclarators
+byte _2 |-->_2`singleVariableDeclaration<when> _2 variableDeclarators
+_1 _2 |-->false
+_1 |-->true<when> _1 variableDeclarator
+_1 , _2 |-->false
+_1 |-->false
+
+
+lowerBound::
+_1 < _2 |-->_1
+_1 <= _2 |-->_1
+_1 |-->_1`lowerBound<when> _1 expression
+_1 |-->Math_NINFINITY
+_* |-->Math_NINFINITY
+
+
+upperBound::
+_1 < _2 |-->(_2)-1
+_1 <= _2 |-->_2
+_1 |-->_1`upperBound<when> _1 expression
+_1 |-->Math_PINFINITY
+_* |-->Math_PINFINITY
+
+
+singleVariableIncrement::
+_1 |-->_1`singleVariableIncrement<when> _1 expression
+_1 ++ |-->true
+++ _1 |-->true
+_1 = _2 |-->true<when> _2`lhsOfPlusOne _1
+_1 = _2 |-->false
+_1 |-->false
+_* |-->false
+
+
+incrementedVariable::
+_1 |-->_1`incrementedVariable<when> _1 expression
+_1 ++ |-->_1
+++ _1 |-->_1
+_1 = _2 |-->_1<when> _2`lhsOfPlusOne _1
+_1 = _2 |-->
+_1 |-->
+_* |-->
+
+
+lhsOfPlusOne::
+_1 + 1 |-->_1
+_* |-->
 
 
 enhancedForControl::

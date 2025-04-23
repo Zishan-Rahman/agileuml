@@ -103,7 +103,7 @@ public class ASTSymbolTerm extends ASTTerm
   { return symbol; } 
 
   public String cgRules(CGSpec cgs, Vector rules)
-  { System.out.println(">>> cgRules for " + this + " " + rules); 
+  { // System.out.println(">>> cgRules for " + this + " " + rules); 
 
     if (rules == null) 
     { return symbol; } 
@@ -113,7 +113,7 @@ public class ASTSymbolTerm extends ASTTerm
       Vector tokens = r.lhsTokens; 
       Vector vars = r.getVariables(); 
 
-      System.out.println("> Rule " + r + " has tokens " + tokens + " variables " + vars);
+      // System.out.println("> Rule " + r + " has tokens " + tokens + " variables " + vars);
 
       if (vars.size() > 1 || tokens.size() > 1)
       { // System.out.println("> Rule " + r + " has too many variables/tokens to match basic term " + this); 
@@ -435,7 +435,7 @@ public class ASTSymbolTerm extends ASTTerm
   public String toKM3type()
   { String res = toKM3();
 
-    System.out.println("+++ toKM3type on symbol " + symbol + " " + res + " " + modelElement); 
+    // System.out.println("+++ toKM3type on symbol " + symbol + " " + res + " " + modelElement); 
  
     if (modelElement == null) 
     { Entity ee = (Entity) ModelElement.lookupByName(symbol,
@@ -578,6 +578,8 @@ public class ASTSymbolTerm extends ASTTerm
     } 
 
     if ("Collection".equals(symbol) || 
+        "SequencedCollection".equals(symbol) || 
+        "SequencedSet".equals(symbol) || 
         "Iterable".equals(symbol) || 
         "AbstractCollection".equals(symbol))
     { modelElement = new Type("Sequence", null); 
@@ -620,6 +622,7 @@ public class ASTSymbolTerm extends ASTTerm
  
     if ("Vector".equals(symbol) || "Stack".equals(symbol) ||
         "LinkedList".equals(symbol) || 
+        "LinkedHashSet".equals(symbol) || 
         "AbstractList".equals(symbol) ||
         "AbstractSequentialList".equals(symbol) ||
         "Queue".equals(symbol) ||
@@ -679,7 +682,7 @@ public class ASTSymbolTerm extends ASTTerm
     { modelElement = new Type("Set", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Set"; 
-    }
+    } // OrderedSet for LinkedHashSet
  
     if ("TreeSet".equals(symbol) || 
         "SortedSet".equals(symbol)) 
@@ -718,6 +721,7 @@ public class ASTSymbolTerm extends ASTTerm
     } 
 
     if ("HashMap".equals(symbol) || 
+        "SequencedMap".equals(symbol) || 
         "LinkedHashMap".equals(symbol) || 
         "EnumMap".equals(symbol) || 
         "Hashtable".equals(symbol) || 
@@ -725,7 +729,7 @@ public class ASTSymbolTerm extends ASTTerm
     { modelElement = new Type("Map", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Map"; 
-    }
+    } // OrderedMap for LinkedHashMap
  
     if ("TreeMap".equals(symbol) || 
         "SortedMap".equals(symbol)) 

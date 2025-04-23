@@ -101,7 +101,7 @@ public void findPlugins()
       for (int j = 0; j < subfiles.length; j++)
       { if (subfiles[j].equals(dirfiles[i] + ".jar"))
         { plugins.add(dirfiles[i]);
-          System.out.println("Found plugin: " + dirfiles[i]); 
+          // System.out.println("Found plugin: " + dirfiles[i]); 
           continue;
         }
       }
@@ -321,12 +321,21 @@ public void findPlugins()
     fileMenu.addSeparator(); 
 
     JMenuItem loadGenericMI = 
-      new JMenuItem("From Java AST",openIcon);
+      new JMenuItem("From Java Source",openIcon);
     loadGenericMI.addActionListener(this);
     loadGenericMI.setToolTipText(
-      "Creates UML/OCL from AST produced by ANTLR Java parser, in output/ast.txt");
+      "Creates UML/OCL from source Java code");
     // loadDataMI.setMnemonic(KeyEvent.VK_L);
     fileMenu.add(loadGenericMI);
+
+    JMenuItem fromPython = 
+      new JMenuItem("From Python Source",openIcon);
+    fromPython.addActionListener(this);
+    fromPython.setToolTipText(
+      "Creates UML/OCL from source Python code");
+    fileMenu.add(fromPython);
+
+    fileMenu.addSeparator(); 
 
     JMenuItem fromCMI = 
       new JMenuItem("From C AST",openIcon);
@@ -357,13 +366,6 @@ public void findPlugins()
     fromCobol.setToolTipText(
       "Creates UML/OCL from AST produced by ANTLR Cobol85 parser, in output/ast.txt");
     fileMenu.add(fromCobol);
-
-    JMenuItem fromPython = 
-      new JMenuItem("From Python AST",openIcon);
-    fromPython.addActionListener(this);
-    fromPython.setToolTipText(
-      "Creates UML/OCL from AST produced by ANTLR Python parser, in output/ast.txt");
-    fileMenu.add(fromPython);
 
     JMenuItem fromPascal = 
       new JMenuItem("From Pascal AST",openIcon);
@@ -1572,6 +1574,9 @@ public void findPlugins()
     helpMI.addActionListener(this);
   }
 
+  public UCDArea getArea()
+  { return ucdArea; } 
+
   public void setInvariants(Vector invs) 
   { invariants = invs; } 
 
@@ -1879,8 +1884,14 @@ public void findPlugins()
       { ucdArea.loadQVT();
          // saved = true; 
       }
-      else if (label.equals("From Java AST")) 
-      { ucdArea.loadGenericUseCase();
+      else if (label.equals("From Java Source")) 
+      { String fname = JOptionPane.showInputDialog("Enter Java file name: "); 
+        ucdArea.loadFromJavaAST(fname);
+        saved = true; 
+      }
+      else if (label.equals("From Python Source")) 
+      { String fname = JOptionPane.showInputDialog("Enter Python file name: "); 
+        ucdArea.loadFromPython(fname);
         saved = true; 
       }
       else if (label.equals("From C AST")) 
@@ -1897,10 +1908,6 @@ public void findPlugins()
       }
       else if (label.equals("From COBOL AST")) 
       { ucdArea.loadFromCobol();
-        saved = true; 
-      }
-      else if (label.equals("From Python AST")) 
-      { ucdArea.loadFromPython();
         saved = true; 
       }
       else if (label.equals("From Pascal AST")) 

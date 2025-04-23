@@ -887,6 +887,10 @@ class OclMaplet<K,T>
 
   public static <T> HashSet<T> front(HashSet<T> a)
   { HashSet<T> res = new HashSet<T>(); 
+
+    if (a.isEmpty())
+    { return res; } 
+
     T lst = null; 
     for (T x : a)
     { res.add(x); 
@@ -897,12 +901,12 @@ class OclMaplet<K,T>
   }
 
   public static <T> TreeSet<T> front(TreeSet<T> a)
-  { TreeSet<T> res = new TreeSet<T>(); 
-    T lst = null; 
-    for (T x : a)
-    { res.add(x); 
-      lst = x; 
-    } 
+  { TreeSet<T> res = (TreeSet<T>) a.clone(); 
+
+    if (a.isEmpty())
+    { return res; } 
+
+    T lst = a.last(); 
     res.remove(lst); 
     return res; 
   }
@@ -916,25 +920,32 @@ class OclMaplet<K,T>
 
   public static <T> HashSet<T> tail(HashSet<T> a)
   { HashSet<T> res = new HashSet<T>(); 
+
+    if (a.isEmpty())
+    { return res; } 
+
     T fst = null; 
+
     for (T x : a)
     { res.add(x); 
-      if (fst == null) { fst = x; } 
+      if (fst == null) 
+      { fst = x; } 
     } 
+
     res.remove(fst); 
     return res; 
   }
 
   public static <T> TreeSet<T> tail(TreeSet<T> a)
-  { TreeSet<T> res = new TreeSet<T>(); 
-    T fst = null; 
-    for (T x : a)
-    { res.add(x); 
-      if (fst == null) { fst = x; } 
-    } 
+  { TreeSet<T> res = (TreeSet<T>) a.clone(); 
+
+    if (a.isEmpty())
+    { return res; } 
+
+    T fst = a.first(); 
     res.remove(fst); 
     return res; 
-  }
+  } 
 
   public static <T extends Comparable> ArrayList<T> sort(Collection<T> a)
   { ArrayList<T> res = new ArrayList<T>();
@@ -1138,13 +1149,15 @@ class OclMaplet<K,T>
 
 
     public static <T> T any(Collection<T> v)
-    { for (T o : v) { return o; }
+    { for (T o : v) 
+      { return o; }
       return null;
     }
 
 
     public static <T> T first(Collection<T> v)
-    { for (T o : v) { return o; }
+    { for (T o : v) 
+      { return o; }
       return null;
     }
 
@@ -1154,13 +1167,20 @@ class OclMaplet<K,T>
       return v.get(v.size() - 1);
     }
 
-    public static <T> T last(Set<T> v)
+    public static <T> T last(HashSet<T> v)
     { int n = v.size(); 
       if (n == 0) { return null; }
       T res = null; 
       for (T o : v)
       { res = o; } 
       return res;
+    }
+
+    public static <T> T last(TreeSet<T> v)
+    { int n = v.size(); 
+      if (n == 0) 
+      { return null; }
+      return v.last();
     }
 
     public static <T> ArrayList<List<T>> subcollections(ArrayList<T> v)
@@ -1655,6 +1675,42 @@ class OclMaplet<K,T>
     return res;
   }
 
+  public static <D,R> TreeMap<D,R> tail(TreeMap<D,R> m)
+  { 
+    TreeMap<D,R> res = (TreeMap<D,R>) m.clone();
+	if (res.isEmpty()) { return res; }
+	D k = m.firstKey(); 
+    res.remove(k);
+    return res;
+  }
+
+  public static <D,R> TreeMap<D,R> front(TreeMap<D,R> m)
+  { 
+    TreeMap<D,R> res = (TreeMap<D,R>) m.clone();
+	if (res.isEmpty()) { return res; }
+	D k = m.lastKey(); 
+    res.remove(k);
+    return res;
+  }
+
+  public static <D,R> TreeMap<D,R> first(TreeMap<D,R> m)
+  { 
+    TreeMap<D,R> res = new TreeMap<D,R>();
+	if (m.isEmpty()) { return res; }
+	D k = m.firstKey(); 
+    res.put(k, m.get(k));
+    return res;
+  }
+
+  public static <D,R> TreeMap<D,R> last(TreeMap<D,R> m)
+  { 
+    TreeMap<D,R> res = new TreeMap<D,R>();
+	if (m.isEmpty()) { return res; }
+	D k = m.lastKey(); 
+    res.put(k, m.get(k));
+    return res;
+  }
+
   public static <D,R> HashMap<D,R> excludingMapValue(HashMap<D,R> m, R v)
   { // m->antirestrict(m->keys()->select(k | m->at(k) = v)) O(m.size)
     HashMap<D,R> res = new HashMap<D,R>();
@@ -1978,4 +2034,20 @@ class OclMaplet<K,T>
    res.add(buff.toString().trim());
    return res;
  }  
+ 
+  /* public static void main(String[] args)
+  { TreeMap<String,Integer> tm = new TreeMap<String,Integer>(); 
+    tm.put("a", 1); tm.put("c", 2); tm.put("b", 4); 
+    System.out.println(Ocl.tail(tm)); 
+	System.out.println(Ocl.front(tm));
+	System.out.println(Ocl.first(tm));
+	System.out.println(Ocl.last(tm));
+	
+	TreeSet<String> ss = new TreeSet<String>(); 
+	ss.add("e"); ss.add("a"); ss.add("p"); ss.add("b"); 
+	System.out.println(Ocl.tail(ss)); 
+	System.out.println(Ocl.front(ss)); 
+	System.out.println(Ocl.first(ss)); 
+	System.out.println(Ocl.last(ss)); 
+  } */ 
 }
