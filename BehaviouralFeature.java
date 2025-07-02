@@ -360,7 +360,9 @@ public class BehaviouralFeature extends ModelElement
         tt = new Type(entpar); 
         pars.add(tt); 
       } 
-      System.out.println(">> Added type parameter " + tt); 
+
+      System.out.println(">> Added type parameter " + tt + 
+                         " to operation " + this); 
     } 
 
     typeParameters = pars;  
@@ -1777,7 +1779,9 @@ public class BehaviouralFeature extends ModelElement
     { if (Statement.hasResultDeclaration(stat))
       { return stat; } 
 
-      Attribute att = new Attribute("result",resultType,ModelElement.INTERNAL); 
+      Attribute att = 
+        new Attribute("result",resultType,
+                      ModelElement.INTERNAL); 
       att.setElementType(elementType); 
         // newparams.add(att);
 
@@ -1786,12 +1790,14 @@ public class BehaviouralFeature extends ModelElement
 
       Statement newstat = new SequenceStatement(); 
         // ReturnStatement returnstat = null; 
-      CreationStatement cres = new CreationStatement(resultType + "", "result");
+      CreationStatement cres = 
+        new CreationStatement(resultType + "", "result");
       cres.setInstanceType(resultType);
       if (elementType != null) 
       { cres.setElementType(elementType); }    
       ((SequenceStatement) newstat).addStatement(cres);
-	     // returnstat = new ReturnStatement(new BasicExpression(att));   
+
+  // returnstat = new ReturnStatement(new BasicExpression(att));   
   
       ((SequenceStatement) newstat).addStatement(stat); 
         
@@ -2958,7 +2964,8 @@ public class BehaviouralFeature extends ModelElement
       else if (vartypes.get(key) instanceof Type) 
       { Type vtype = (Type) vartypes.get(key); 
         if (key != null && vtype != null) 
-        { Attribute att = new Attribute(key,vtype,ModelElement.INTERNAL); 
+        { Attribute att = 
+             new Attribute(key,vtype,ModelElement.INTERNAL); 
           parameters.add(att);
         }  
       } // and avoid duplicates
@@ -2975,7 +2982,8 @@ public class BehaviouralFeature extends ModelElement
       Type vtype = (Type) vartypes.get(key);
       Type vetype = (Type) velemtypes.get(key);  
       if (key != null && vtype != null) 
-      { Attribute att = new Attribute(key,vtype,ModelElement.INTERNAL); 
+      { Attribute att = 
+           new Attribute(key,vtype,ModelElement.INTERNAL); 
         att.setElementType(vetype); 
         parameters.add(att); 
       } // and avoid duplicates
@@ -4281,11 +4289,21 @@ public class BehaviouralFeature extends ModelElement
 
   public void simplifyOCL() 
   { if (pre != null) 
-    { pre = pre.simplifyOCL(); } 
+    { pre = pre.simplifyOCL(); }
+ 
     if (post != null) 
     { post = post.simplifyOCL(); } 
-    if (activity != null) 
-    { activity = activity.optimiseOCL(); }  
+
+    if (activity != null && 
+        Statement.isCumulativeRecursion(this,activity))
+    { activity = 
+        Statement.simplifyCumulativeRecursion(this,activity);
+      System.out.println(">>> " + activity + " is a cumulative recursion");  
+    } 
+    else if (activity != null) 
+    { activity = activity.optimiseOCL(); 
+      System.out.println(">>> " + activity + " is not a cumulative recursion");
+    }  
   } 
 
   public Map energyAnalysis(Vector redUses, Vector amberUses)
@@ -4360,12 +4378,72 @@ public class BehaviouralFeature extends ModelElement
 
     Vector unusedVars = checkParameterNames(); 
     if (unusedVars.size() > 0) 
-    { amberUses.add("!! Unused parameters: " + unusedVars + "\n" + 
+    { amberUses.add("!! Unused parameters in " + name + ": " + 
+             unusedVars + "\n" + 
              ">>> Use remove unused parameters refactoring"); 
       int ascore = (int) res.get("amber");
       ascore = ascore + unusedVars.size();
       res.set("amber", ascore);
     } 
+
+    Vector opuses = this.operationsUsedIn();
+
+    System.out.println(">>> Operations " + opuses + 
+                       " are used in " + name); 
+
+    if (opuses.contains(entity + "::" + name) && 
+        activity != null)
+    { boolean tailrec = Statement.isTailRecursive(this, name, 
+                                                  activity); 
+      System.err.println(); 
+
+      if (tailrec) 
+      { System.err.println("!! Tail recursive operation! " + 
+            name + "\n" +  
+            "!! Use 'Replace recursion by loop' refactoring"); 
+      } 
+      else 
+      { boolean semitail = 
+          Statement.isSemiTailRecursive(this, name, activity); 
+        if (semitail) 
+        { System.err.println("!! Semi-tail-recursion in " + 
+            name + "\n" +  
+            "!! Use 'Replace recursion by loop' refactoring");
+        }
+        else 
+        { System.err.println("!!! Non-tail-recursion in " + 
+            name + "\n" +  
+            "!!! Use 'Make operation cached' refactoring");
+        }  
+      } 
+
+      System.err.println(); 
+    }
+    else if (opuses.contains(entity + "::" + name) && 
+             activity == null && post != null)  
+    { Vector cases = Expression.caselist(post); 
+      boolean istailrec = 
+         isTailRecursive(cases); 
+
+      System.err.println(); 
+      if (istailrec)
+      { System.err.println("!! Tail recursive operation! " + 
+            name + "\n" +  
+            "!! Use 'Replace recursion by loop' refactoring"); 
+      } 
+      else if (isSemiTailRecursive(cases))
+      { System.err.println("!! Semi-tail-recursion in " + 
+            name + "\n" +  
+            "!! Use 'Make operation cached' refactoring"); 
+      } 
+      else 
+      { System.err.println("!!! Non-tail-recursion in " + 
+            name + "\n" +  
+            "!!! Use 'Make operation cached' refactoring"); 
+      } 
+
+      System.err.println(); 
+    }	 
 
     return res; 
   } 
@@ -5763,14 +5841,16 @@ public class BehaviouralFeature extends ModelElement
         pre = pre.substitute(use,repl);   
       }  // union, subtract?
       
-      Expression inexp = new BinaryExpression(":",exbe,use.objectRef); 
+      Expression inexp = 
+         new BinaryExpression(":",exbe,use.objectRef); 
       pre = new BinaryExpression("=>",inexp,pre);
     } // or exbe /: objs & this
     uses.remove(0); 
     return wpc(pre,uses,exbe,op,feat,ord,valbe); 
   }
 
-  public Statement generateDesign(Entity ent, Vector entities, Vector types)
+  public Statement generateDesign(Entity ent, 
+                           Vector entities, Vector types)
   { Statement res = new SequenceStatement(); 
     Vector localEntities = allTypeParameterEntities(ent); 
     localEntities.addAll(entities); 
@@ -5836,7 +5916,8 @@ public class BehaviouralFeature extends ModelElement
     if (resultType != null && 
         !("void".equals(resultType.getName())))
     { resT = resultType + ""; 
-      Attribute r = new Attribute("result", resultType, ModelElement.INTERNAL); 
+      Attribute r = new Attribute("result", 
+                          resultType, ModelElement.INTERNAL); 
       r.setElementType(elementType); 
       atts.add(r); 
       BasicExpression rbe = new BasicExpression(r); 
@@ -5858,15 +5939,46 @@ public class BehaviouralFeature extends ModelElement
 
     if (query && isNoRecursion())
     { Vector cases = Expression.caselist(post); 
-	
-      // System.out.println(">>> Caselist = " + cases); 
-	  
+      Vector valueReturns = new Vector(); 
+      Vector tailReturns = new Vector(); 
+      Vector semitailReturns = new Vector(); 
+      Vector nontailReturns = new Vector(); 
+
+      this.recursiveExpressions(cases, valueReturns,
+                                tailReturns, 
+                                semitailReturns, 
+                                nontailReturns); 
+
+      if (valueReturns.size() == 1 && 
+          nontailReturns.size() == 0 && 
+          semitailReturns.size() > 0)
+      { System.err.println("!! Semi-tail-recursion in " + 
+            name + "\n" + 
+            "Value returns = " + valueReturns + 
+            "Semi-tail returns: " + semitailReturns);
+ 
+        Statement init = semiTailInitialisation(
+                             cases, valueReturns); 
+      
+        Statement qstat = 
+          designQueryListSemiTail(cases, resT, env0, 
+                  valueReturns, types, localEntities, atts);
+        qstat.setBrackets(true);
+ 
+        WhileStatement ws = 
+          new WhileStatement(
+            new BasicExpression(true), qstat);
+        SequenceStatement code = new SequenceStatement();  
+        code.addStatement(init); 
+        code.addStatement(ws); 
+        return code;  
+      } // Needs initialisation and different treatment 
+        // of simple returns. 
+
       Statement qstat = 
         designQueryList(cases, resT, env0, 
                         types, localEntities, atts);
-      
-      // System.out.println(">>> qstat for no recursion = " + qstat); 
-	  
+      	  
       qstat.setBrackets(true); 
       WhileStatement ws = 
          new WhileStatement(new BasicExpression(true), qstat); 
@@ -5895,7 +6007,8 @@ public class BehaviouralFeature extends ModelElement
       { stat = post.generateDesign(env0, true); } 
  
       ((SequenceStatement) res).addStatement(stat); 
-      if (resultType != null && !("void".equals(resultType.getName()))) 
+      if (resultType != null && 
+          !("void".equals(resultType.getName()))) 
       { ((SequenceStatement) res).addStatement(rets); }  
 
       return res; 
@@ -6104,9 +6217,13 @@ public class BehaviouralFeature extends ModelElement
     { return "  public " + genPars + resT + " " + name + "(" + pars + ");\n"; } 
 
     if (query)
-    { return buildQueryOp(ent,name,resultType,resT,entities,types); }
+    { return buildQueryOp(ent,name,resultType,resT,
+                          entities,types); 
+    }
     else 
-    { return buildUpdateOp(ent,name,resultType,resT,entities,types); }
+    { return buildUpdateOp(ent,name,resultType,resT,
+                           entities,types); 
+    }
   } // ignore return type for update ops for now. 
 
   public String getOperationCodeJava6(Entity ent, Vector entities, Vector types)
@@ -7813,6 +7930,204 @@ public class BehaviouralFeature extends ModelElement
     return designBasicCase(postcond, resT, env0, types, entities, atts); 
   } */
 
+  public Statement designQueryListSemiTail(Vector postconds, 
+                                   String resT,
+                                   java.util.Map env0,
+                                   Vector valueReturns,  
+                                   Vector types, 
+                                   Vector entities, 
+                                   Vector atts)
+  { if (postconds.size() == 0)
+    { return new SequenceStatement(); } 
+
+    Expression postcond = (Expression) postconds.get(0); 
+    Statement fst = designBasicCaseSemiTail(postcond,resT,
+                                    env0,valueReturns,
+                                    types,entities,atts);
+    if (postconds.size() == 1) 
+    { return fst; } 
+
+    Vector ptail = new Vector(); 
+    ptail.addAll(postconds); 
+    ptail.remove(0); 
+ 
+    if ((postcond instanceof BinaryExpression) &&  
+        "=>".equals(((BinaryExpression) postcond).operator))
+    { Expression next = (Expression) postconds.get(1); 
+
+      if ((next instanceof BinaryExpression) &&
+          "=>".equals(((BinaryExpression) next).operator)) 
+      { Statement elsepart = 
+           designQueryListSemiTail(ptail,resT,env0,       
+                           valueReturns,types,entities,atts);
+
+        if (fst instanceof ConditionalStatement)  
+        { ((ConditionalStatement) fst).setElse(elsepart);
+           // Statement.combineIfStatements(fst,elsepart);
+          return fst;
+        } 
+        else 
+        { SequenceStatement res = new SequenceStatement(); 
+          res.addStatement(fst); res.addStatement(elsepart); 
+          return res;
+        }   
+      } 
+      else 
+      { Statement stat = 
+           designQueryListSemiTail(ptail,resT,
+                           env0,valueReturns,
+                           types,entities,atts); 
+        SequenceStatement res = new SequenceStatement(); 
+        res.addStatement(fst); 
+        res.addStatement(stat); 
+        return res; 
+      } 
+    }      
+    else 
+    { Statement stat = 
+         designQueryListSemiTail(ptail,resT,
+                                 env0,valueReturns,
+                                 types,entities,atts); 
+      SequenceStatement res = new SequenceStatement(); 
+      res.addStatement(fst); 
+      res.addStatement(stat); 
+      return res;
+    }  // sequencing of fst and ptail
+  } 
+
+  public boolean isTailRecursive(Vector postconds)
+  { 
+    for (int i = 0; i < postconds.size(); i++) 
+    { Expression postcond = (Expression) postconds.get(i); 
+      boolean fst = isTailRecursiveBasicCase(postcond);
+      if (fst) { } 
+      else 
+      { return false; } 
+    } 
+
+    return true;  
+  } 
+
+  public void recursiveExpressions(Vector postconds,
+                 Vector valueReturns, 
+                 Vector tailReturns,
+                 Vector semitailReturns, 
+                 Vector nontailReturns)
+  { for (int i = 0; i < postconds.size(); i++) 
+    { Expression expr = (Expression) postconds.get(i); 
+      expr.recursiveExpressions(this,valueReturns,
+                                  tailReturns,
+                                  semitailReturns,
+                                  nontailReturns);  
+    } 
+  } 
+
+  public boolean isSemiTailRecursive(Vector postconds)
+  { // All recursive calls are either tail or semitail
+
+    Vector rets = getReturnValues(postconds); 
+
+    /* 
+    for (int i = 0; i < postconds.size(); i++) 
+    { Expression postcond = (Expression) postconds.get(i); 
+      boolean fst = isTailRecursiveBasicCase(postcond);
+      boolean semi = isSemiTailRecursiveBasicCase(postcond);
+      if (fst || semi) { } 
+      else 
+      { return false; } 
+    } */ 
+
+    String nme = this.getName(); 
+    Vector names = new Vector(); 
+    names.add(nme); 
+
+    Vector valueReturns = new Vector(); 
+    Vector tailReturns = new Vector(); 
+    Vector semitailReturns = new Vector(); 
+    Vector nontailReturns = new Vector(); 
+
+    for (int i = 0; i < rets.size(); i++) 
+    { Expression expr = (Expression) rets.get(i); 
+      Vector uses = expr.variablesUsedIn(names); 
+      if (uses.size() == 0) 
+      { valueReturns.add(expr); } 
+      else if (expr.isSelfCall(this))
+      { tailReturns.add(expr); } 
+      else 
+      { expr.recursiveExpressions(this,valueReturns,
+                                  tailReturns,
+                                  semitailReturns,
+                                  nontailReturns); 
+      } 
+    } 
+
+    if (valueReturns.size() == 1 && 
+        nontailReturns.size() == 0)
+    { return true; } 
+
+    System.err.println("!! Non-tail recursion in " + name + 
+         ":\n!! simple returns: " + valueReturns + 
+         " tail returns: " + tailReturns + 
+         " semi-tail returns: " + semitailReturns + 
+         " non-tail returns: " + nontailReturns); 
+
+    return false;   
+  } 
+
+  public Vector getReturnValues(Vector postconds)
+  { Vector res = new Vector(); 
+
+    // The RHS of => and of result = ...
+    // otherwise the entire expression
+
+    for (int i = 0; i < postconds.size(); i++) 
+    { Expression postcond = (Expression) postconds.get(i); 
+      Expression fst = getReturnValueBasicCase(postcond);
+      if (fst == null) { } 
+      else 
+      { res.add(fst); } 
+    } 
+
+    return res;  
+  } 
+
+  public Statement semiTailInitialisation(Vector cases, 
+                                     Vector nonrecReturns)
+  { /* String nme = this.getName(); 
+    Vector names = new Vector(); 
+    names.add(nme); */ 
+
+    BasicExpression _result = 
+      BasicExpression.newVariableBasicExpression("result"); 
+    _result.setType(this.getResultType()); 
+
+    /* 
+    Vector rets = getReturnValues(cases); 
+    
+    Vector semitailReturns = new Vector(); 
+
+    for (int i = 0; i < rets.size(); i++) 
+    { Expression expr = (Expression) rets.get(i); 
+      Vector uses = expr.variablesUsedIn(names); 
+      if (uses.size() == 0) 
+      { nonrecReturns.add(expr); } 
+      else if (expr.isSelfCall(this))
+      { } 
+      else if (expr instanceof BinaryExpression && 
+        ((BinaryExpression) expr).isSemiTailRecursion(this)) 
+      { semitailReturns.add(expr); } 
+      else 
+      { } 
+    } */ 
+
+    // Should only be 1 nonrecReturns
+
+    Expression baseValue = (Expression) nonrecReturns.get(0); 
+    CreationStatement init = 
+       new CreationStatement(_result, baseValue); 
+    return init;
+  }  
+
   private Statement designBasicCase(Expression pst,
                   String resT, java.util.Map env0,
                   Vector types, Vector entities, Vector atts)
@@ -7862,9 +8177,9 @@ public class BehaviouralFeature extends ModelElement
         } 
 
         Statement cs = new ConditionalStatement(test, ifpart);
-        System.out.println(); 
-        System.out.println(">-->> code for branch " + be); 
-        System.out.println(">-->> is: " + cs);
+        // System.out.println(); 
+        // System.out.println(">-->> code for branch " + be); 
+        // System.out.println(">-->> is: " + cs);
         return cs; 
       } // But may be let definitions and local variables in test. 
       else if ("=".equals(be.operator))
@@ -7873,8 +8188,9 @@ public class BehaviouralFeature extends ModelElement
             "result".equals(be.left + ""))
         { 
           if (be.right.isSelfCall(this))
-          { // recursive call to operation, replace by 
-            // parameter assignements and continue
+          { // Direct recursive call to operation, replace by 
+            // parameter assignments ; continue
+
             ContinueStatement ctn = new ContinueStatement(); 
             Statement assgns = 
                          parameterAssignments(be.right); 
@@ -7883,6 +8199,38 @@ public class BehaviouralFeature extends ModelElement
             else 
             { SequenceStatement ss = new SequenceStatement(); 
               ss.addStatements((SequenceStatement) assgns); 
+              ss.addStatement(ctn);
+              ss.setBrackets(true);  
+              return ss; 
+            } 
+          } 
+          else if (be.right instanceof BinaryExpression && 
+                   ((BinaryExpression) 
+                       be.right).isSemiTailRecursion(this))
+          { // update result, then 
+            // parameter assignments ; continue
+            BinaryExpression beright = 
+                  (BinaryExpression) be.right; 
+            Expression rhs = 
+              beright.replacedSemiTailRecursion(this, 
+                                                 be.left);
+            AssignStatement updateResult = 
+              new AssignStatement(be.left, rhs);  
+            ContinueStatement ctn = new ContinueStatement();
+            Expression selfcall = 
+                 beright.getSelfCall(this);  
+            Statement assgns = 
+                         parameterAssignments(selfcall); 
+            SequenceStatement ss = new SequenceStatement(); 
+            ss.addStatement(updateResult); 
+  
+            if (assgns == null) 
+            { ss.addStatement(ctn); 
+              ss.setBrackets(true); 
+              return ss; 
+            } 
+            else 
+            { ss.addStatements((SequenceStatement) assgns); 
               ss.addStatement(ctn);
               ss.setBrackets(true);  
               return ss; 
@@ -7924,7 +8272,268 @@ public class BehaviouralFeature extends ModelElement
         } 
       } 
     }
+
     return pst.generateDesign(env0, true);
+  }
+
+  private Statement designBasicCaseSemiTail(Expression pst,
+                  String resT, java.util.Map env0,
+                  Vector valueReturns, 
+                  Vector types, Vector entities, Vector atts)
+  { if (pst instanceof BinaryExpression) 
+    { BinaryExpression be = (BinaryExpression) pst; 
+      if ("=>".equals(be.operator))
+      { Expression test = be.left; 
+
+        Constraint virtualCon = new Constraint(test,be.right); 
+
+        Vector pars = new Vector(); 
+        pars.addAll(getParameters()); 
+        Vector lvars = new Vector(); 
+        virtualCon.secondaryVariables(lvars,pars); 
+
+        Vector allvars = new Vector(); 
+        Vector allpreds = new Vector(); 
+        Vector qvars1 = new Vector(); 
+        Vector lvars1 = new Vector(); 
+        Vector pars1 = ModelElement.getNames(pars); 
+        Vector v0 = new Vector(); 
+        BasicExpression betrue = new BasicExpression(true); 
+        v0.add(betrue); 
+        v0.add(betrue.clone()); 
+        Vector splitante = 
+           test.splitToCond0Cond1Pred(v0,pars1,qvars1,
+                                 lvars1,allvars,allpreds); 
+        // System.out.println(">>> Quantified local = " + qvars1 + " Let local = " + lvars1 + " All: " + allvars); 
+       
+        Expression ante1 = (Expression) splitante.get(0); 
+        Expression ante2 = (Expression) splitante.get(1); 
+
+        // System.out.println(">>> Variable quantifiers: " + ante1); 
+        // System.out.println(">>> Assumptions: " + ante2);
+
+        Statement ifpart = 
+           // new ImplicitInvocationStatement(be.right); 
+           designBasicCaseSemiTail(be.right, resT, env0, 
+                           valueReturns, 
+                           types, entities, atts); 
+
+        if (qvars1.size() > 0 || lvars1.size() > 0)   
+                                 // allvars.size() > 0) 
+        { Statement forloop = 
+              virtualCon.q2LoopsPred(
+                        allvars,qvars1,lvars1,ifpart); 
+          return forloop; 
+        } 
+
+        Statement cs = new ConditionalStatement(test, ifpart);
+        // System.out.println(); 
+        // System.out.println(">-->> code for branch " + be); 
+        // System.out.println(">-->> is: " + cs);
+        return cs; 
+      } // But may be let definitions and local variables in test. 
+      else if ("=".equals(be.operator))
+      { Expression beleft = be.left; 
+        if (isNoRecursion() &&  
+            "result".equals(be.left + ""))
+        { 
+          if (be.right.isSelfCall(this))
+          { // Direct recursive call to operation, replace by 
+            // parameter assignments ; continue
+
+            ContinueStatement ctn = new ContinueStatement(); 
+            Statement assgns = 
+                         parameterAssignments(be.right); 
+            if (assgns == null) 
+            { return ctn; } 
+            else 
+            { SequenceStatement ss = new SequenceStatement(); 
+              ss.addStatements((SequenceStatement) assgns); 
+              ss.addStatement(ctn);
+              ss.setBrackets(true);  
+              return ss; 
+            } 
+          } 
+          else if (be.right instanceof BinaryExpression && 
+                   ((BinaryExpression) 
+                       be.right).isSemiTailRecursion(this))
+          { // update result, then 
+            // parameter assignments ; continue
+            BinaryExpression beright = 
+                  (BinaryExpression) be.right; 
+            Expression rhs = 
+              beright.replacedSemiTailRecursion(this, 
+                                                 be.left);
+            AssignStatement updateResult = 
+              new AssignStatement(be.left, rhs);  
+            ContinueStatement ctn = new ContinueStatement();
+            Expression selfcall = 
+                 beright.getSelfCall(this);  
+            Statement assgns = 
+                         parameterAssignments(selfcall); 
+            SequenceStatement ss = new SequenceStatement(); 
+            ss.addStatement(updateResult); 
+  
+            if (assgns == null) 
+            { ss.addStatement(ctn); 
+              ss.setBrackets(true); 
+              return ss; 
+            } 
+            else 
+            { ss.addStatements((SequenceStatement) assgns); 
+              ss.addStatement(ctn);
+              ss.setBrackets(true);  
+              return ss; 
+            } 
+          } 
+          else if (valueReturns.contains(be.right))
+          { BasicExpression _result = 
+              BasicExpression.newVariableBasicExpression(
+                 "result", this.getResultType()); 
+            return new ReturnStatement(_result); 
+          } 
+          else 
+          { Statement retr = 
+                new ReturnStatement(be.right); 
+            return retr;  
+          } 
+        } 
+        else if (env0.containsValue(be.left + "") || 
+                 "result".equals(be.left + "") ||
+                 ModelElement.getNames(
+                       parameters).contains(be.left + ""))
+        { return new AssignStatement(be.left, be.right); } 
+          // or attribute of ent
+        else if (entity != null && 
+                 entity.hasFeature(be.left + "")) 
+        { return new AssignStatement(be.left, be.right); }
+        else // declare it
+        { Type t = be.left.getType(); 
+          /* JOptionPane.showMessageDialog(null, 
+            "Declaring new local variable  " + be.left + " : " + t + "   in:\n" + this,               
+            "Implicit variable declaration", 
+            JOptionPane.INFORMATION_MESSAGE); */  
+          if (t == null) 
+          { t = new Type("OclAny", null); }
+          CreationStatement cs = 
+            new CreationStatement(t.getJava(), be.left + ""); 
+          cs.setInstanceType(t); 
+          cs.setElementType(t.getElementType()); 
+          cs.setFrozen(true); // it must be a constant
+          AssignStatement ast = new AssignStatement(be.left, be.right);
+          SequenceStatement sst = new SequenceStatement(); 
+          sst.addStatement(cs); 
+          sst.addStatement(ast); 
+          return sst;  
+        } 
+      } 
+    }
+
+    return pst.generateDesignSemiTail(this, env0, 
+                               valueReturns, true);
+  }
+
+  private boolean isTailRecursiveBasicCase(Expression pst)
+  { Vector names = new Vector(); 
+    names.add(name); 
+
+    if (pst instanceof BinaryExpression) 
+    { BinaryExpression be = (BinaryExpression) pst; 
+      if ("=>".equals(be.operator))
+      { Expression test = be.left; 
+
+        Vector vars1 =
+          test.variablesUsedIn(names);
+
+        if (vars1.size() > 0)
+        { System.err.println("!! Error: operation called in test expression -- not tail recursive"); 
+          return false; 
+        } 
+
+        boolean ifpart = 
+           isTailRecursiveBasicCase(be.right); 
+
+        return ifpart; 
+      } 
+      else if ("=".equals(be.operator))
+      { Expression beleft = be.left;
+        Expression beright = be.right;
+        Vector vars2 =
+            beright.variablesUsedIn(names);
+
+        if ("result".equals(beleft + ""))
+        { return beright.isTailRecursion(this); } 
+      } 
+    }
+
+    return pst.isTailRecursion(this); 
+  }
+
+  private boolean isSemiTailRecursiveBasicCase(Expression pst)
+  { Vector names = new Vector(); 
+    names.add(name); 
+
+    if (pst instanceof BinaryExpression) 
+    { BinaryExpression be = (BinaryExpression) pst; 
+      if ("=>".equals(be.operator))
+      { Expression test = be.left; 
+
+        Vector vars1 =
+          test.variablesUsedIn(names);
+
+        if (vars1.contains(name))
+        { System.err.println("!! ERROR: operation called in test expression -- not semi-tail recursive"); 
+          return false; 
+        } 
+
+        boolean ifpart = 
+           isSemiTailRecursiveBasicCase(be.right); 
+
+        return ifpart; 
+      } 
+      else if ("=".equals(be.operator))
+      { Expression beleft = be.left;
+        Expression beright = be.right;
+        Vector vars2 =
+            beright.variablesUsedIn(names);
+
+        if ("result".equals(beleft + ""))
+        { boolean istail = beright.isTailRecursion(this); 
+          if (istail) { return true; } 
+ 
+          return (beright instanceof BinaryExpression) &&      
+            ((BinaryExpression) beright).isSemiTailRecursion(
+                                                       this); 
+        } 
+      } // and all the semi cases must be aligned. 
+    }
+
+    boolean istail = pst.isTailRecursion(this); 
+    if (istail) { return true; } 
+
+    return (pst instanceof BinaryExpression) && 
+      ((BinaryExpression) pst).isSemiTailRecursion(this); 
+  }
+
+  private Expression getReturnValueBasicCase(Expression pst)
+  { 
+    if (pst instanceof BinaryExpression) 
+    { BinaryExpression be = (BinaryExpression) pst; 
+      if ("=>".equals(be.operator))
+      { 
+        Expression ifpart = 
+           getReturnValueBasicCase(be.right); 
+
+        return ifpart; 
+      } 
+      else if ("=".equals(be.operator))
+      { 
+        if ("result".equals(be.left + ""))
+        { return be.right; } 
+      } 
+    }
+
+    return pst; 
   }
 
   // assume it is a conjunction of implications
@@ -11413,25 +12022,44 @@ public class BehaviouralFeature extends ModelElement
     // 
 
     Statement oldact = act; 
+
     if (oldact == null) 
     { oldact = activity; } 
+
     if (oldact == null) 
     { return act; } 
 
     String nme = getName(); 
 
-    Statement loopBdy =             
-       Statement.replaceSelfCallsByContinue(
+    boolean semitail = 
+          Statement.isSemiTailRecursive(this, nme, activity); 
+        
+    Statement loopBdy = null; 
+
+    if (semitail)
+    { Vector inits = new Vector(); 
+      loopBdy = 
+        Statement.replaceSemiTailCallsByContinue(
+                                     this,nme,oldact,
+                                     inits); 
+      WhileStatement ws = new WhileStatement(
+                                 new BasicExpression(true),
+                                 loopBdy);
+      SequenceStatement res = new SequenceStatement(); 
+      res.addStatements(inits); 
+      res.addStatement(ws); 
+      return res;  
+    } 
+    else 
+    { loopBdy =             
+         Statement.replaceSelfCallsByContinue(
                                      this,nme,oldact);
 
-    WhileStatement ws = new WhileStatement(
+      WhileStatement ws = new WhileStatement(
                                  new BasicExpression(true),
                                  loopBdy); 
-
-    System.out.println(">>> Restructured code: " + ws); 
-    System.out.println(); 
-
-    return ws;
+      return ws; 
+    } 
   }
 
   public Statement selfCalls2Loops(Statement act)

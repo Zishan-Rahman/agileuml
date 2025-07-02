@@ -396,6 +396,12 @@ public class ASTSymbolTerm extends ASTTerm
   public String queryForm()
   { return toKM3(); } 
 
+  public Vector expressionListToKM3()
+  { // if ("argumentExpressionList".equals(tag))
+    Vector res = new Vector();
+    return res;  
+  }
+
   public String getJavaLabel()
   { return null; } 
 
@@ -637,7 +643,8 @@ public class ASTSymbolTerm extends ASTTerm
     { modelElement = new Type("Sequence", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence"; 
-    }
+    } // OrderedSet for ListOrderedSet, SetUniqueList,
+      // LinkedHashSet
 
     if ("PriorityQueue".equals(symbol) ||
         "PriorityBlockingQueue".equals(symbol) || 
@@ -656,7 +663,8 @@ public class ASTSymbolTerm extends ASTTerm
     }
 
     if ("Bag".equals(symbol) || "HashBag".equals(symbol) ||
-        "TreeList".equals(symbol))
+        "TreeList".equals(symbol) || 
+        "FixedSizeList".equals(symbol))
     { modelElement = new Type("Sequence", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence";
@@ -674,10 +682,11 @@ public class ASTSymbolTerm extends ASTTerm
     { modelElement = new Type("Sequence", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence"; 
-    } 
+    } // Should be a Bag
 
  
     if ("Set".equals(symbol) || "HashSet".equals(symbol) ||
+        "NavigableSet".equals(symbol) ||
         "EnumSet".equals(symbol)) 
     { modelElement = new Type("Set", null); 
       expression = new BasicExpression((Type) modelElement); 

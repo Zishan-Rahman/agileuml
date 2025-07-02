@@ -57,15 +57,379 @@ abstract class Statement implements Cloneable
     return false; 
   } 
 
+  public static boolean isCumulativeRecursion(
+                    BehaviouralFeature bf, Statement stat)
+  { // stat involves semi-tail recursive calls to bf & only one 
+    // base return statement
+
+    if (stat == null) 
+    { return false; }
+
+    Vector pars = bf.getParameters(); 
+    if (pars.size() >= 1) 
+    { /* 1st one should be integer, used for recursion */ } 
+    else 
+    { return false; } 
+
+    Attribute par = (Attribute) pars.get(0); 
+    Type partype = par.getType(); 
+
+    if ("int".equals(partype.getName()) || 
+        "long".equals(partype.getName()))
+    { } 
+    else 
+    { return false; } 
+
+    String pname = par.getName(); 
+
+    String nme = bf.getName(); 
+    Vector names = new Vector(); 
+    names.add(nme); 
+
+    if (stat instanceof ConditionalStatement) 
+    { ConditionalStatement conds = 
+        (ConditionalStatement) stat; 
+      Expression tst = conds.getTest(); 
+      Statement statif = conds.getIf();
+      Statement statelse = conds.getElse();
+
+      // Test: = or <= or < between par and
+      // expression without par 
+      // if statement doesn't have par or nme
+      // else statement has only tail/semitail
+      // recursive calls. 
+
+      boolean boundedAbove = false; 
+      boolean boundedBelow = false; 
+
+      if (tst instanceof BinaryExpression && 
+          ((BinaryExpression) tst).variableBoundedAbove(pname) 
+          &&
+          statif instanceof ReturnStatement)
+      { Vector names2 = new Vector(); 
+        names2.add(nme); 
+        names2.add(pname); 
+        Vector ifvars = 
+          statif.variablesUsedIn(names2); 
+        if (ifvars.contains(nme) || ifvars.contains(pname))
+        { return false; }
+        boundedAbove = true; 
+      } 
+      else // other case of variableBoundedBelow
+      if (tst instanceof BinaryExpression && 
+          ((BinaryExpression) tst).variableBoundedBelow(pname) 
+          &&
+          statelse instanceof ReturnStatement)
+      { Vector names2 = new Vector(); 
+        names2.add(nme); 
+        names2.add(pname); 
+        Vector elsevars = 
+          statelse.variablesUsedIn(names2); 
+        if (elsevars.contains(nme) || 
+            elsevars.contains(pname))
+        { return false; }
+        boundedBelow = true; 
+      } 
+      else 
+      { return false; } 
+    }       
+
+    Vector rets = getReturnValues(stat); 
+    
+    int nontail = 0; 
+    int nonrecursive = 0; 
+    int tailrecursive = 0;
+    int semitail = 0;  
+
+    Vector semitails = new Vector(); 
+
+    for (int i = 0; i < rets.size(); i++) 
+    { Expression expr = (Expression) rets.get(i); 
+      Vector uses = expr.variablesUsedIn(names); 
+      if (uses.size() == 0) 
+      { nonrecursive++; } 
+      else if (expr.isSelfCallDecrement(bf, pname))
+      { tailrecursive++; } 
+      else if (expr instanceof BinaryExpression && 
+        ((BinaryExpression) 
+           expr).isSemiTailRecursionDecrement(bf, pname)) 
+      { semitail++; 
+        semitails.add(expr); 
+      } 
+      else 
+      { nontail++; } 
+    } 
+
+    System.err.println(">> " + bf + " has " + 
+         nonrecursive + " non-recursive returns, " + 
+         tailrecursive + " tail recursive decrement returns,\n>>" + 
+         " and " + 
+         nontail + " non-tail recursive returns,\n>> " + 
+         semitail + " semi-tail recursive decrement returns: " + 
+         semitails);
+
+    if (nonrecursive == 1 &&  
+        semitail >= 1 && nontail == 0)
+    { if (BinaryExpression.allOperatorsSame(semitails))
+      { BinaryExpression rec = 
+                   (BinaryExpression) semitails.get(0);
+        String op = rec.getOperator(); // + or *
+        if ("+".equals(op) || "*".equals(op))
+        { return true; } 
+      } 
+    }  
+
+    return false;  
+  } 
+
+  public static Expression conditionalBranches2Expressions(
+      Statement st, BehaviouralFeature bf, String op, String par,
+      Vector nonrecs, Vector tailrecs, Vector semirecs) 
+  { // Assume code is ReturnStatement's nested in Conditionals
+
+    if (st instanceof ReturnStatement) 
+    { ReturnStatement rs = (ReturnStatement) st; 
+      Expression retval = rs.getValue(); 
+
+      if (nonrecs.contains(retval))
+      { return retval; } 
+    
+      if (tailrecs.contains(retval))
+      { // 0 if +, 1 if *
+        Expression ifvalue = null; 
+
+        if ("+".equals(op))
+        { ifvalue = new BasicExpression(0); } 
+        else
+        { ifvalue = new BasicExpression(1); } 
+        return ifvalue;
+      } // Not included in sum/product
+      
+      if (semirecs.contains(retval) && 
+          retval instanceof BinaryExpression)
+      { // extract value part of sum or product
+        return 
+          ((BinaryExpression) 
+              retval).replacedSemiTailRecursionDecrement(
+                                                   bf, par);
+      } 
+    }
+
+    if (st instanceof ConditionalStatement)
+    { ConditionalStatement cs = (ConditionalStatement) st;
+      Expression tst = cs.getTest();
+      Statement ifc = cs.getIf(); 
+      Statement elsec = cs.getElse(); 
+ 
+      Expression ifexpr = 
+        Statement.conditionalBranches2Expressions(ifc, 
+                 bf, op, par, nonrecs, tailrecs, semirecs);
+      Expression remainder = 
+        Statement.conditionalBranches2Expressions(
+                 elsec, bf, op, par, 
+                 nonrecs, tailrecs, semirecs); 
+
+      return 
+         new ConditionalExpression(tst, ifexpr, remainder);
+    }
+     
+    return null; 
+  } 
+
+
+  public static Statement simplifyCumulativeRecursion(
+                     BehaviouralFeature bf, Statement stat)
+  { // Replace  if n <= lbound then return expr0
+    //          else return expr*bf(n-1)
+    // By return of  
+    // expr0*Integer.subrange(lbound+1,n)->collect(n|expr)->prd() 
+    
+    Attribute par = bf.getParameter(0); 
+    String pname = par.getName(); 
+    String nme = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(nme); 
+
+    ConditionalStatement conds = 
+        (ConditionalStatement) stat; 
+    BinaryExpression tst = (BinaryExpression) conds.getTest(); 
+    Statement statif = conds.getIf();
+    Statement statelse = conds.getElse();
+
+    Expression n0 = null;  // tst.variableBoundAbove(pname);
+    Expression expr0 = null;  // statif.getValue();
+    Expression iterbound = null;   
+
+    boolean boundedAbove = false; 
+    boolean boundedBelow = false; 
+
+    if (tst instanceof BinaryExpression && 
+        ((BinaryExpression) tst).variableBoundedAbove(pname) &&
+        statif instanceof ReturnStatement)
+    { BinaryExpression btest = (BinaryExpression) tst; 
+      Vector names2 = new Vector(); 
+      names2.add(nme); 
+      names2.add(pname); 
+      Vector ifvars = 
+          statif.variablesUsedIn(names2); 
+      if (ifvars.contains(nme) || ifvars.contains(pname))
+      { return stat; }
+      boundedAbove = true;
+      n0 = btest.variableBoundAbove(pname);
+      iterbound = btest.iterationBoundAbove(pname); 
+      expr0 = ((ReturnStatement) statif).getValue();  
+    } 
+    else // other case of variableBoundedBelow
+      if (tst instanceof BinaryExpression && 
+          ((BinaryExpression) tst).variableBoundedBelow(pname) &&
+          statelse instanceof ReturnStatement)
+      { BinaryExpression btest = (BinaryExpression) tst; 
+        Vector names2 = new Vector(); 
+        names2.add(nme); 
+        names2.add(pname); 
+        Vector elsevars = 
+          statelse.variablesUsedIn(names2); 
+        if (elsevars.contains(nme) || 
+            elsevars.contains(pname))
+        { return stat; }
+        boundedBelow = true; 
+        n0 = btest.variableBoundBelow(pname);
+        iterbound = btest.iterationBoundBelow(pname); 
+        expr0 = ((ReturnStatement) statelse).getValue();  
+      } 
+      else 
+      { return stat; }       
+
+    Vector pars = new Vector(); 
+    pars.add(n0); 
+    Expression parexpr = new BasicExpression(par);  
+    pars.add(parexpr); 
+
+    Vector pars1 = new Vector(); 
+    pars1.add(iterbound); 
+    pars1.add(parexpr); 
+
+    Vector rets = getReturnValues(stat); 
+    
+    int nontail = 0; 
+    int nonrecursive = 0; 
+    int tailrecursive = 0;
+    int semitail = 0;  
+
+    Vector nonrecs = new Vector(); 
+    Vector tailrecs = new Vector(); 
+    Vector semirecs = new Vector(); 
+
+    for (int i = 0; i < rets.size(); i++) 
+    { Expression expr = (Expression) rets.get(i); 
+      Vector uses = expr.variablesUsedIn(names); 
+      if (uses.size() == 0) 
+      { nonrecursive++;
+        nonrecs.add(expr); 
+      } 
+      else if (expr.isSelfCallDecrement(bf,pname))
+      { tailrecursive++; 
+        tailrecs.add(expr); 
+      } 
+      else if (expr instanceof BinaryExpression && 
+        ((BinaryExpression) 
+             expr).isSemiTailRecursionDecrement(bf,pname)) 
+      { semitail++; 
+        semirecs.add(expr); 
+      } 
+      else 
+      { nontail++; } 
+    } 
+
+    if (semitail == 1 && tailrecursive == 0)
+    { // Just single else case return expr*self.bf(n-1)
+      BinaryExpression rec = 
+                (BinaryExpression) semirecs.get(0);
+      String op = rec.getOperator(); // + or * 
+
+      Expression expr = 
+        rec.replacedSemiTailRecursionDecrement(bf,pname); 
+
+      Expression subrange = 
+        BasicExpression.newFunctionBasicExpression("subrange", 
+                                            "Integer", pars);
+      Type subrangetype = new Type("Sequence", null); 
+      subrangetype.setElementType(new Type("int", null)); 
+      subrange.setType(subrangetype); 
+
+      Expression rng = 
+        new BinaryExpression(":", parexpr, subrange);  
+      Expression col = 
+        new BinaryExpression("|C", rng, expr); 
+
+      if (op.equals("+"))
+      { Expression sumexpr = 
+          new UnaryExpression("->sum", col); 
+        Expression res = 
+          new BinaryExpression("+", expr0, sumexpr); 
+        return new ReturnStatement(res); 
+      } 
+
+      if (op.equals("*"))
+      { Expression prdexpr = 
+          new UnaryExpression("->prd", col); 
+        Expression res = 
+          new BinaryExpression("*", expr0, prdexpr); 
+        return new ReturnStatement(res); 
+      } 
+    }
+    else if (semitail >= 1) // general case
+    { BinaryExpression rec = 
+          (BinaryExpression) semirecs.get(0);
+      String op = rec.getOperator(); // + or * 
+    
+      Expression collectexpr = 
+        Statement.conditionalBranches2Expressions(
+                        stat, bf, op, 
+                        pname, nonrecs, tailrecs, semirecs); 
+
+      Expression subrange = 
+        BasicExpression.newFunctionBasicExpression("subrange", 
+                                            "Integer", pars1);
+      Type subrangetype = new Type("Sequence", null); 
+      subrangetype.setElementType(new Type("int", null)); 
+      subrange.setType(subrangetype); 
+
+      Expression rng = 
+        new BinaryExpression(":", parexpr, subrange);  
+      Expression col = 
+        new BinaryExpression("|C", rng, collectexpr); 
+
+      if (op.equals("+"))
+      { Expression sumexpr = 
+          new UnaryExpression("->sum", col); 
+        return new ReturnStatement(sumexpr); 
+      } 
+
+      if (op.equals("*"))
+      { Expression prdexpr = 
+          new UnaryExpression("->prd", col); 
+        return new ReturnStatement(prdexpr); 
+      } 
+    } 
+
+    return stat; 
+  } 
+
   public static Statement cumulativeCode(Expression var,
                                          Expression rng, 
                                          Statement st)
   { if (st == null) 
     { return null; }
 
+    System.out.println(">> Converting cumulative code: " + var + 
+                       " : " + rng + " @ " + st); 
+
     if (st instanceof AssignStatement)
-    { // patterns are s := s + var
+    { // patterns are s := s + var, s := s + var*var,
       // s := s * var, s := s - var, s := s / var
+      // s := s & var, s := s or var
       // Also same with expr instead of var,
       // not involving var or s. 
 
@@ -673,7 +1037,8 @@ abstract class Statement implements Cloneable
         bright.setBrackets(false); 
 
         // it is x : st
-        if ((x + "").equals(bleft + "") && 
+        if (":".equals(bexpr.getOperator()) && 
+            (x + "").equals(bleft + "") && 
             (st + "").equals(bright + ""))
         { return true; } 
       }  
@@ -1047,9 +1412,179 @@ abstract class Statement implements Cloneable
   // collection operation uses at each nesting level
   // level |-> [expr1, expr2, ...] with iterators vars
 
+
+  public static boolean isSemiTailRecursive(
+            BehaviouralFeature bf, String nme, Statement st)
+  { // There is only one return that does not involve bf
+    // There is only one non-tail return involving bf
+    // All other returns are direct calls of bf
+
+    // More generally, all non-tail returns have same operator 
+    // (numeric +, *, or ->including or ->union on sets/bags)
+ 
+    Vector names = new Vector(); 
+    names.add(nme); 
+
+    Vector rets = getReturnValues(st); 
+    
+    int nontail = 0; 
+    int nonrecursive = 0; 
+    int tailrecursive = 0;
+    int semitail = 0;  
+
+    for (int i = 0; i < rets.size(); i++) 
+    { Expression expr = (Expression) rets.get(i); 
+      Vector uses = expr.variablesUsedIn(names); 
+      if (uses.size() == 0) 
+      { nonrecursive++; } 
+      else if (expr.isSelfCall(bf))
+      { tailrecursive++; } 
+      else if (expr instanceof BinaryExpression && 
+        ((BinaryExpression) expr).isSemiTailRecursion(bf)) 
+      { semitail++; } 
+      else 
+      { nontail++; } 
+    } 
+
+    System.err.println(">> " + nme + " has " + 
+         nonrecursive + " non-recursive returns, " + 
+         tailrecursive + " tail recursive returns,\n>>" + 
+         " and " + 
+         nontail + " non-tail recursive returns,\n>> " + 
+         semitail + " semi-tail recursive returns: " + rets);
+
+    if (nonrecursive == 1 && semitail == 1 && nontail == 0)
+    { return true; } 
+    return false;  
+  } 
+
+  public static boolean isTailRecursive(
+            BehaviouralFeature bf, String nme, Statement st)
+  { // if all calls of bf are direct calls in invocation 
+    // statements or return statements. 
+
+    if (st == null) 
+    { return true; }
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+      Vector stats = sq.getStatements();
+
+      for (int i = 0; i < stats.size(); i++) 
+      { Statement stat = (Statement) stats.get(i); 
+        if (stat.isTailRecursive(bf,nme,stat)) { } 
+        else 
+        { return false; } 
+      } 
+
+      return true; 
+    } 
+
+    Vector names = new Vector(); 
+    names.add(nme); 
+
+    if (st instanceof InvocationStatement)
+    { InvocationStatement invok = 
+        (InvocationStatement) st;
+      
+      Expression expr = invok.getCallExp();
+      Vector vars1 =
+        expr.variablesUsedIn(names);
+    
+      if (expr != null && expr.isSelfCall(bf))
+      { return true; } 
+      else if (expr != null && vars1.size() > 0)
+      { return false; } // call to bf within an expression
+
+      return true; // null expression or no occurrence of bf 
+    } 
+
+    if (st instanceof ImplicitInvocationStatement)
+    { ImplicitInvocationStatement invok = 
+        (ImplicitInvocationStatement) st;
+      
+      Expression expr = invok.getCallExp();
+      Vector vars1 =
+        expr.variablesUsedIn(names);
+    
+      if (expr != null && expr.isSelfCall(bf))
+      { return true; } 
+      else if (expr != null && vars1.size() > 0)
+      { return false; } // call to bf within an expression
+
+      return true; // null expression or no occurrence of bf 
+    } 
+
+    if (st instanceof ReturnStatement)
+    { ReturnStatement retstat = (ReturnStatement) st; 
+      
+      Expression expr = retstat.getReturnValue();
+
+      if (expr == null) { return true; } 
+
+      Vector vars1 =
+        expr.variablesUsedIn(names);
+ 
+      // System.out.println(">> " + expr.isSelfCall(bf) + " " + vars1); 
+
+      if (expr.isSelfCall(bf))
+      { return true; } 
+      
+      if (vars1.size() > 0)
+      { return false; } // call to bf within an expression
+
+      return true; // no occurrence of bf 
+    } 
+
+    if (st instanceof ConditionalStatement) 
+    { ConditionalStatement cs = (ConditionalStatement) st; 
+    
+      if (Statement.isTailRecursive(bf,nme,cs.ifPart()))
+      { return Statement.isTailRecursive(
+                                 bf,nme,cs.elsePart()); 
+      } 
+    
+      return false; 
+    } 
+
+    if (st instanceof WhileStatement) 
+    { return false; } 
+    // Nested loops cannot be handled within a recursion. 
+
+    if (st instanceof TryStatement) 
+    { TryStatement ts = (TryStatement) st; 
+
+      if (Statement.isTailRecursive(bf,nme,ts.getBody())) 
+      { Vector stats = ts.getClauses(); 
+        for (int i = 0; i < stats.size(); i++) 
+        { if (stats.get(i) instanceof Statement)
+          { Statement stat = (Statement) stats.get(i); 
+            if (Statement.isTailRecursive(bf,nme,stat)) { } 
+            else 
+            { return false; } 
+          }
+          else 
+          { return false; } 
+        }  
+      }
+      else 
+      { return false; }
+  
+      if (ts.getEndStatement() == null) 
+      { return true; } 
+
+      return Statement.isTailRecursive(
+                               bf,nme,ts.getEndStatement()); 
+    } 
+
+    return true;
+  } // Other cases, for all other forms of statement. 
+
   public static boolean endsWithSelfCall(
             BehaviouralFeature bf, String nme, Statement st)
-  { if (st == null) 
+  { // if every branch ends with a self-call
+
+    if (st == null) 
     { return false; }
  
     if (st instanceof SequenceStatement) 
@@ -1078,15 +1613,18 @@ abstract class Statement implements Cloneable
  
       if (expr != null && expr.isSelfCall(bf))
       { return true; } 
+    
       return false; 
     } 
 
     if (st instanceof ConditionalStatement) 
     { ConditionalStatement cs = (ConditionalStatement) st; 
+    
       if (Statement.endsWithSelfCall(bf,nme,cs.ifPart()))
       { return Statement.endsWithSelfCall(
                                  bf,nme,cs.elsePart()); 
       } 
+    
       return false; 
     } 
 
@@ -1111,8 +1649,11 @@ abstract class Statement implements Cloneable
         }  
       }
       else 
-      { return false; }  
-      if (ts.getEndStatement() == null) { return false; } 
+      { return false; }
+  
+      if (ts.getEndStatement() == null) 
+      { return false; } 
+
       return Statement.endsWithSelfCall(
                                bf,nme,ts.getEndStatement()); 
     } 
@@ -1346,6 +1887,13 @@ abstract class Statement implements Cloneable
     return Statement.endsWithExit(stat); 
   } 
 
+  public static boolean isControlFlowEnd(Statement stat)
+  { if (Statement.hasSingleStatement(stat)) { } 
+    else 
+    { return false; } 
+
+    return Statement.endsWithControlFlowBreak(stat); 
+  } 
 
   public static Statement replaceReturnBySkip(Statement st)
   { if (st == null) 
@@ -2012,7 +2560,7 @@ abstract class Statement implements Cloneable
   { // sequence statement of branch elements except 
     // self.nme() replaced by continue
 
-    System.out.println("+++ REPLACING: " + branch);
+    // System.out.println("+++ REPLACING: " + branch);
 
     Vector vect = new Vector(); 
     if (branch.get(0) instanceof Vector)
@@ -2020,7 +2568,7 @@ abstract class Statement implements Cloneable
 
       if (vect.get(0) instanceof Vector)
       { vect = (Vector) vect.get(0); 
-        System.out.println("+++ REPLACING code: " + vect);
+        // System.out.println("+++ REPLACING code: " + vect);
 
         if (vect.size() == 4 && 
             "if".equals(vect.get(0) + ""))      
@@ -2076,14 +2624,15 @@ abstract class Statement implements Cloneable
     if (st instanceof InvocationStatement)
     { InvocationStatement invok = 
         (InvocationStatement) st;
-      Statement res = new ContinueStatement();  
       
       Expression expr = invok.getCallExp();
  
       // if ((expr + "").startsWith("self." + nme + "("))
       if (expr != null && expr.isSelfCall(bf))
-      { Statement passigns = 
+      { Statement res = new ContinueStatement();  
+        Statement passigns = 
              bf.parameterAssignments(expr);
+
         if (passigns == null) 
         { return res; } 
         else if (passigns instanceof SequenceStatement)
@@ -2096,14 +2645,15 @@ abstract class Statement implements Cloneable
 
     if (st instanceof ReturnStatement)
     { ReturnStatement retstat = (ReturnStatement) st; 
-      Statement res = new ContinueStatement();  
       
       Expression expr = retstat.getReturnValue();
  
       // if ((expr + "").startsWith("self." + nme + "("))
       if (expr != null && expr.isSelfCall(bf))
-      { Statement passigns = 
+      { Statement res = new ContinueStatement();  
+        Statement passigns = 
              bf.parameterAssignments(expr);
+        
         if (passigns == null) 
         { return res; } 
         else if (passigns instanceof SequenceStatement)
@@ -2183,6 +2733,219 @@ abstract class Statement implements Cloneable
       Statement newend =
         Statement.replaceSelfCallsByContinue(
                bf, nme, endstat); 
+      Statement newtry = 
+        new TryStatement(newbdy, newstats, newend); 
+      return newtry; 
+    } 
+
+    return st;
+  } // Other cases, for all other forms of statement. 
+
+  public static Statement replaceSemiTailCallsByContinue(
+           BehaviouralFeature bf, String nme, Statement st, 
+           Vector inits)
+  { Vector names = new Vector(); 
+    names.add(nme); 
+
+    BasicExpression _result = 
+      BasicExpression.newVariableBasicExpression("_result"); 
+    _result.setType(bf.getResultType()); 
+
+    Vector rets = getReturnValues(st); 
+    
+    Vector nonrecReturns = new Vector(); 
+    Vector semitailReturns = new Vector(); 
+
+    for (int i = 0; i < rets.size(); i++) 
+    { Expression expr = (Expression) rets.get(i); 
+      Vector uses = expr.variablesUsedIn(names); 
+      if (uses.size() == 0) 
+      { nonrecReturns.add(expr); } 
+      else if (expr.isSelfCall(bf))
+      { } 
+      else if (expr instanceof BinaryExpression && 
+        ((BinaryExpression) expr).isSemiTailRecursion(bf)) 
+      { semitailReturns.add(expr); } 
+      else 
+      { } 
+    } 
+
+    Expression baseValue = (Expression) nonrecReturns.get(0); 
+    CreationStatement init = 
+       new CreationStatement(_result, baseValue); 
+    inits.add(init); 
+
+    return Statement.replaceSelfCallsByContinue(bf, nme, st,
+              _result, nonrecReturns, semitailReturns); 
+  } 
+
+  public static Statement replaceSelfCallsByContinue(
+           BehaviouralFeature bf, String nme, Statement st,
+           BasicExpression _result, 
+           Vector nonrecReturns, Vector semitailReturns)
+  { // self.nme(exprs) replaced by pars := exprs; continue
+    // Likewise for tail-recursive return self.nme(exprs)
+    // Non-recursive return replaced by return _result
+    // Non-tail return expr*self.nme(exprs) replaced by
+    // _result := expr*_result; pars := exprs; continue
+    // 
+    // Any branch that does not terminate in nme call/return
+    // or exit/return is ended by break. 
+
+    if (st == null) 
+    { return st; }
+
+    if (st instanceof InvocationStatement)
+    { InvocationStatement invok = 
+        (InvocationStatement) st;
+      
+      Expression expr = invok.getCallExp();
+ 
+      // if ((expr + "").startsWith("self." + nme + "("))
+      if (expr != null && expr.isSelfCall(bf))
+      { Statement res = new ContinueStatement();  
+        Statement passigns = 
+             bf.parameterAssignments(expr);
+
+        if (passigns == null) 
+        { return res; } 
+        else if (passigns instanceof SequenceStatement)
+        { ((SequenceStatement) passigns).addStatement(res); 
+          return passigns; 
+        } // passigns.setBrackets(true) 
+      }
+      return st; 
+    } 
+
+    if (st instanceof ReturnStatement)
+    { ReturnStatement retstat = (ReturnStatement) st; 
+      
+      Expression expr = retstat.getReturnValue();
+
+      // System.out.println(">> Return expression " + expr + 
+      //             " Semi-tail returns: " + semitailReturns); 
+ 
+      if (nonrecReturns.contains(expr))
+      { Statement newret = new ReturnStatement(_result); 
+        return newret; 
+      } 
+
+      if (semitailReturns.contains(expr) && 
+          expr instanceof BinaryExpression)
+      { // replace call by _result, assign to _result
+        BinaryExpression bexpr = 
+              (BinaryExpression) expr; 
+
+        Expression newexpr = 
+           bexpr.replacedSemiTailRecursion(bf, _result); 
+        Expression selfcall = bexpr.getSelfCall(bf); 
+
+        if (newexpr != null && selfcall != null)
+        { Statement res = new ContinueStatement(); 
+          AssignStatement assgn = 
+            new AssignStatement(_result, newexpr); 
+          SequenceStatement ss = new SequenceStatement(); 
+          ss.addStatement(assgn);  
+          Statement passigns = 
+             bf.parameterAssignments(selfcall);
+          ss.addStatements(passigns); 
+          ss.addStatement(res); 
+          return ss; 
+        } 
+      } 
+
+      if (expr != null && expr.isSelfCall(bf))
+      { Statement res = new ContinueStatement();  
+        Statement passigns = 
+             bf.parameterAssignments(expr);
+        
+        if (passigns == null) 
+        { return res; } 
+        else if (passigns instanceof SequenceStatement)
+        { ((SequenceStatement) passigns).addStatement(res); 
+          return passigns; 
+        } 
+      }
+
+      return st; 
+    } 
+ 
+    if (st instanceof SequenceStatement) 
+    { SequenceStatement sq = (SequenceStatement) st; 
+      Vector stats = sq.getStatements();
+      Vector res = new Vector(); 
+ 
+      for (int i = 0; i < stats.size(); i++) 
+      { Statement ss = (Statement) stats.get(i); 
+        Statement newstat = 
+            Statement.replaceSelfCallsByContinue(bf,nme,ss,
+                        _result, nonrecReturns, semitailReturns); 
+
+        if (newstat != null) 
+        { res.add(newstat); } 
+      } 
+
+      // if res does not end with return, continue or exit, 
+      // add a break statement: 
+
+      SequenceStatement newss = new SequenceStatement(res);
+
+      if (Statement.endsWithReturn(newss) || 
+          Statement.endsWithContinue(newss) ||
+          Statement.endsWithSelfCall(bf,nme,st) ||  
+          Statement.endsWithBreak(newss) || 
+          Statement.endsWithExit(newss)) { } 
+      else 
+      { BreakStatement bs = new BreakStatement(); 
+        newss.addStatement(bs); 
+      } 
+
+      return newss;
+    } 
+    
+    if (st instanceof ConditionalStatement) 
+    { ConditionalStatement cs = (ConditionalStatement) st;
+      Expression tst = cs.getTest(); 
+
+      Statement ifstat = cs.ifPart();
+      Statement elsestat = cs.elsePart(); 
+      
+      Statement newif = 
+        Statement.replaceSelfCallsByContinue(bf,nme,ifstat,
+                     _result, nonrecReturns, semitailReturns); 
+      Statement newelse = 
+        Statement.replaceSelfCallsByContinue(bf,nme,elsestat,
+                     _result, nonrecReturns, semitailReturns); 
+
+      return new ConditionalStatement(tst,newif,newelse); 
+    } 
+
+    if (st instanceof TryStatement) 
+    { TryStatement ts = (TryStatement) st; 
+      Statement bdy = ts.getBody(); 
+      Statement newbdy = 
+        Statement.replaceSelfCallsByContinue(bf,nme,bdy, 
+                       _result, nonrecReturns, semitailReturns);
+   
+      Vector stats = ts.getClauses(); 
+      Vector newstats = new Vector();
+ 
+      for (int i = 0; i < stats.size(); i++) 
+      { if (stats.get(i) instanceof Statement)
+        { Statement stat = (Statement) stats.get(i); 
+          Statement newstat = 
+            Statement.replaceSelfCallsByContinue(
+                               bf,nme,stat, _result, 
+                               nonrecReturns, semitailReturns);
+          newstats.add(newstat); 
+        }  
+      }
+
+      Statement endstat = ts.getEndStatement(); 
+      Statement newend =
+        Statement.replaceSelfCallsByContinue(
+            bf, nme, endstat, _result, 
+            nonrecReturns, semitailReturns); 
       Statement newtry = 
         new TryStatement(newbdy, newstats, newend); 
       return newtry; 
@@ -3008,6 +3771,9 @@ class ReturnStatement extends Statement
   { return value; } 
 
   public Expression getReturnValue() 
+  { return value; } 
+
+  public Expression getValue() 
   { return value; } 
 
   public Expression definedness()
@@ -4864,6 +5630,9 @@ class ImplicitInvocationStatement extends Statement
   public String getOperator() 
   { return "execute"; } 
 
+  public Expression getCallExp() 
+  { return callExp; } 
+
   public boolean isSkip()
   { if ("true".equals(callExp + "")) 
     { return true; } 
@@ -5400,7 +6169,17 @@ class WhileStatement extends Statement
   { return loopTest; } 
 
   public void setTest(Expression tst)
-  { loopTest = tst; } 
+  { loopTest = tst;
+
+    if (loopRange == null &&
+        loopTest != null && 
+        loopTest instanceof BinaryExpression)
+    { BinaryExpression bexpr = (BinaryExpression) loopTest; 
+      if (bexpr.getOperator().equals(":") && 
+          (loopVar + "").equals(bexpr.getLeft() + ""))
+      { loopRange = bexpr.getRight(); } 
+    } // only meaningful for FOR loops. 
+  } 
 
   public void setBody(Statement stat)
   { body = stat; } 
@@ -5417,7 +6196,7 @@ class WhileStatement extends Statement
   public void setLoopVar(Expression lv)
   { loopVar = lv; }
 
-  public void setLoopRange(Expression expr)
+  public void setLoopRangeVarFromTest(Expression expr)
   { if (expr != null && 
         expr instanceof BinaryExpression)
     { BinaryExpression binexpr = (BinaryExpression) expr; 
@@ -5698,15 +6477,18 @@ class WhileStatement extends Statement
   { Vector newexcls = new Vector(); 
     newexcls.addAll(excl); 
     Expression lv = null; 
+
     if (loopVar != null) 
     { lv = (Expression) loopVar.clone();
       newexcls.add(lv + ""); 
     }  
+
     Expression lr = null; 
     if (loopRange != null) 
     { lr = loopRange.addContainerReference(
                                ref,var,newexcls); 
     }  
+
     Expression lt = null; 
     if (loopTest != null) 
     { lt = loopTest.addContainerReference(ref,var,newexcls); }
@@ -5733,15 +6515,24 @@ class WhileStatement extends Statement
   } 
 
   public Statement optimiseOCL()
-  { Expression lv = null; 
+  { Expression lv = loopVar; 
     if (loopVar != null) 
     { lv = (Expression) loopVar.clone(); }
+
+    // System.out.println(">>> Loop statement with " + loopVar + " " + loopRange + " " + loopTest); 
   
-    Expression lr = null; 
+    Expression lr = loopRange; 
     if (loopRange != null) 
     { lr = loopRange.simplifyOCL(); }
+    else if (loopTest != null && 
+             loopTest instanceof BinaryExpression)
+    { BinaryExpression bexpr = (BinaryExpression) loopTest; 
+      if (bexpr.getOperator().equals(":") && 
+          (lv + "").equals(bexpr.getLeft() + ""))
+      { lr = bexpr.getRight(); } 
+    } 
   
-    Expression lt = null; 
+    Expression lt = loopTest; 
     if (loopTest != null) 
     { lt = loopTest.simplifyOCL(); }
 
@@ -7471,7 +8262,10 @@ class CreationStatement extends Statement
     cs.elementType = elementType; 
     cs.declarationOnly = declarationOnly; 
     cs.initialValue = initialValue; 
-    cs.initialExpression = (Expression) initialExpression.clone(); 
+    if (initialExpression != null) 
+    { cs.initialExpression = 
+         (Expression) initialExpression.clone();
+    }  
     cs.isFrozen = isFrozen; 
     cs.variable = variable; 
     return cs; 
@@ -7534,6 +8328,17 @@ class CreationStatement extends Statement
     if (Type.isStringType(typ))
     { elementType = new Type("String", null); }  
     assignsTo = vbl + ""; 
+  }
+
+  public CreationStatement(BasicExpression var, Expression init)
+  { instanceType = var.getType(); 
+    elementType = var.getElementType(); 
+    if (Type.isStringType(instanceType))
+    { elementType = new Type("String", null); }
+  
+    initialExpression = init; 
+    createsInstanceOf = instanceType.getName(); 
+    assignsTo = var + ""; 
   }
 
   public CreationStatement defaultVersion()
@@ -8759,6 +9564,16 @@ class SequenceStatement extends Statement
 
   public void addStatements(SequenceStatement ss)
   { statements.addAll(ss.getStatements()); } 
+
+  public void addStatements(Statement st)
+  { if (st == null) 
+    { return; } 
+
+    if (st instanceof SequenceStatement)
+    { statements.addAll(
+          ((SequenceStatement) st).getStatements());
+    } 
+  }  
 
   public SequenceStatement(Statement s1, Statement s2)
   { statements = new Vector(); 
@@ -13677,7 +14492,8 @@ class AssignStatement extends Statement
   private boolean copyValue = false; 
   private String operator = ":=";  // default
   
-  /* Note that the version with a type is depricated and replaced by 
+  /* Note that the version with a type is depricated 
+     and is replaced by 
      var lhs : type := rhs */ 
 
   public AssignStatement(Expression left, Expression right)
@@ -13951,8 +14767,9 @@ class AssignStatement extends Statement
   }
 
   public Vector allVariableNames()
-  { Vector res = lhs.allVariableNames(); 
-    res = VectorUtil.union(res, rhs.allVariableNames()); 
+  { Vector res = lhs.allVariableNames();
+    if (rhs != null)  
+    { res = VectorUtil.union(res, rhs.allVariableNames()); } 
     return res; 
   } 
 
@@ -15070,7 +15887,22 @@ class ConditionalStatement extends Statement
   public Statement elsePart()
   { return elsePart; } 
 
+  public Statement getIf()
+  { return ifPart; } 
+
+  public Statement getElse()
+  { return elsePart; } 
+
+  public boolean hasSkipElse()
+  { if (elsePart == null) 
+    { return true; } 
+    return elsePart.isSkip(); 
+  } 
+
   public void setIfPart(Statement st)
+  { ifPart = st; } 
+
+  public void setIf(Statement st)
   { ifPart = st; } 
 
   public void setElsePart(Statement st)
@@ -15108,12 +15940,17 @@ class ConditionalStatement extends Statement
     return new ConditionalStatement(tst,stat,els); 
   } 
 
+
   public String cg(CGSpec cgs)
   { String etext = this + "";
     Vector args = new Vector();
 	
     if ("true".equals(test + ""))
     { return ifPart.cg(cgs); }
+
+    if ("false".equals(test + "") && 
+        elsePart != null)
+    { return elsePart.cg(cgs); }
 	
     args.add(test.cg(cgs));
     args.add(ifPart.cg(cgs));
@@ -15132,6 +15969,12 @@ class ConditionalStatement extends Statement
 	
     if ("true".equals(test + ""))
     { args.add(ifPart);
+      return args;
+    }
+
+    if ("false".equals(test + "") && 
+        elsePart != null)
+    { args.add(elsePart);
       return args;
     }
 	
@@ -15237,7 +16080,8 @@ class ConditionalStatement extends Statement
       } // valid for Set and SortedSet, not OrderedSet
     } 
 
-    if (Statement.endsWithControlFlowBreak(ifc))
+    if (elsec != null && elsec.isSkip()) { } 
+    else if (Statement.endsWithControlFlowBreak(ifc))
     { Statement skipstat = new InvocationStatement("skip");
  
       SequenceStatement ss = new SequenceStatement(); 
@@ -15325,19 +16169,35 @@ class ConditionalStatement extends Statement
           uses.set("amber", oscore + 1); 
         } 
       } 
+      else if ("->includes".equals(testbe.getOperator()) && 
+          Statement.isControlFlowEnd(ifPart) &&                  
+          (elsePart.isSkip() || 
+           Statement.isAdditionToCollection(
+                         elseStat, testbeRight, testbeLeft))) 
+      { // adds to testbeLeft only if not in there already
+
+        if (testbeLeft.hasSequenceType())
+        { oUses.add("!! Possibly using sequence " + testbeLeft + " as set in: " + this + 
+               "\n>> Recommend declaring " + testbeLeft + " as a Set or SortedSet"); 
+
+          int ascore = (int) uses.get("amber"); 
+          uses.set("amber", ascore + 1); 
+        } 
+      } 
       else if ("->excludes".equals(testbe.getOperator()) &&
                Statement.hasSingleStatement(ifPart) &&
-               (elsePart == null || elsePart.isSkip()) &&                  
+               (elsePart == null || elsePart.isSkip() ||
+                Statement.isControlFlowEnd(elsePart)) &&                  
                Statement.isAdditionToCollection(
                          ifStat, testbeRight, testbeLeft)) 
       { // adds to testbeLeft only if not in there already
 
         if (testbeLeft.hasSequenceType())
-        { rUses.add("!! Possibly using sequence " + testbeLeft + " as set in: " + this + 
+        { oUses.add("!! Possibly using sequence " + testbeLeft + " as set in: " + this + 
              "\n>> Recommend declaring " + testbeLeft + " as a Set or SortedSet"); 
 
-          int rscore = (int) uses.get("red"); 
-          uses.set("red", rscore + 1); 
+          int ascore = (int) uses.get("amber"); 
+          uses.set("amber", ascore + 1); 
         } 
         else if (testbeLeft.hasSetType())
         { oUses.add("! Redundant test on set addition " + testbeLeft + " in: " + this); 

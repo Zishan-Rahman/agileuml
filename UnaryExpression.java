@@ -445,6 +445,21 @@ public class UnaryExpression extends Expression
   public boolean isLambdaExpression()
   { return "lambda".equals(operator); } 
 
+  public boolean isTailRecursion(BehaviouralFeature bf)
+  { // bfname does not occur in this 
+
+    String bfname = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(bfname); 
+    Vector vars = variablesUsedIn(names); 
+
+    if (vars.size() == 0)
+    { return true; } 
+
+    return false; 
+  } 
+
   public Expression definedness()
   { Expression res = argument.definedness();
     if ("->last".equals(operator) || 
@@ -869,6 +884,14 @@ public void findClones(java.util.Map clones,
         arg instanceof UnaryExpression)
     { return Expression.simplifyFirst(arg); } 
 
+    if (operator.equals("->first") && 
+        arg instanceof SetExpression)
+    { return Expression.simplifyFirst(arg); } 
+
+    if (operator.equals("->first") && 
+        arg instanceof BasicExpression)
+    { return Expression.simplifyFirst(arg); } 
+
     if (operator.equals("not"))
     { return Expression.negate(arg); }
 
@@ -877,6 +900,15 @@ public void findClones(java.util.Map clones,
 
     if (operator.equals("->tail"))
     { return Expression.simplifyTail(arg); } 
+
+    if (operator.equals("->reverse"))
+    { return Expression.simplifyReverse(arg); } 
+
+    if (operator.equals("->sum"))
+    { return Expression.simplifySum(arg); } 
+
+    if (operator.equals("->prd"))
+    { return Expression.simplifyPrd(arg); } 
 
     if (operator.equals("->notEmpty") && 
         argument instanceof BinaryExpression)
@@ -1101,7 +1133,7 @@ public void findClones(java.util.Map clones,
 
       Vector vuses = variablesUsedIn(vars); 
       if (level > 1 && vuses.size() == 0)
-      { JOptionPane.showInputDialog(">> (LCE) flaw: The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
+      { System.out.println("!! (LCE) flaw: The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
           "Use Extract local variable to optimise.");
         refactorELV = true;  
       }
@@ -2451,8 +2483,8 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
         "->asSequence".equals(operator) ||
         "->asOrderedSet".equals(operator) || 
         "->sort".equals(operator))
-    { return true; } 
-	
+    { return true; } // front, tail may be sorted sets, maps
+
     if ( 
         "->reverse".equals(operator) || 
         operator.equals("->copy") )
@@ -3056,7 +3088,8 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
       { isSorted = true; }  
       
       return res; 
-    }         
+    } // bags are represented as sequences, all instances of 
+      // one element are grouped together.         
  
     if (operator.equals("->toReal") || 
         operator.equals("->sqrt") || 
@@ -3863,6 +3896,16 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
       type.setElementType(elementType); 
       multiplicity = ModelElement.MANY; 
 
+      if (operator.equals("->sort"))
+      { if (argumentType.isMap())
+        { type = new Type("Map", null); 
+          type.keyType = argumentType.keyType; 
+          type.elementType = argumentType.elementType;
+        } 
+
+        type.setSorted(true); 
+      } 
+
       if (argumentType.isCollection() || 
           argumentType.isMap()) { } 
       else 
@@ -4083,7 +4126,8 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
           operator.equals("->tail"))
       { isSorted = argument.isSorted; } 
       
-      if (argumentType.isString() || argumentType.isSorted() ||
+      if (argumentType.isString() || 
+          argumentType.isSorted() ||
           argumentType.isSequence())
       { } 
       else
@@ -4525,38 +4569,48 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
     else if (data.equals("sum"))
     { Type sumtype = argument.getElementType();  // was getType(); -- correct below 
       // System.out.println("SUM with " + sumtype + " " + type); 
+
       if (sumtype == null) 
       { sumtype = type; } 
+
       if (sumtype == null) 
       { JOptionPane.showMessageDialog(null, "No element type for: " + argument, "Type error", JOptionPane.ERROR_MESSAGE);
         return "Set.sumString(" + pre + ")"; 
       } 
+
       String tname = sumtype.getName();   // only int, long, double, String are valid
+
       if ("int".equals(tname) || "long".equals(tname) || 
           "double".equals(tname) ||
           "String".equals(tname))
       { return "Set.sum" + tname + "(" + pre + ")"; } 
       else
-      { JOptionPane.showMessageDialog(null, "Incorrect type " + tname + " for: " + this, "Type error", JOptionPane.ERROR_MESSAGE);
+      { JOptionPane.showMessageDialog(null, "Incorrect type " + tname + " for summation in " + this, "Type error", JOptionPane.ERROR_MESSAGE);
         return ""; 
       }  
     } 
     else if (data.equals("prd"))
     { Type prdtype = argument.getElementType();  // was getType(); -- correct below 
+
       if (prdtype == null) 
       { prdtype = type; } 
+
       if (prdtype == null) 
       { JOptionPane.showMessageDialog(null, 
           "No element type for: " + argument, 
           "Type error", JOptionPane.ERROR_MESSAGE);
         return "Set.prddouble(" + pre + ")"; 
       } 
-      String tname = prdtype.getName();   // only int, double, long are valid
-      if ("int".equals(tname) || "long".equals(tname) || "double".equals(tname))
+
+      String tname = prdtype.getName();   
+         // only int, double, long are valid
+
+      if ("int".equals(tname) || "long".equals(tname) || 
+          "double".equals(tname))
       { return "Set.prd" + tname + "(" + pre + ")"; } 
       else 
       { JOptionPane.showMessageDialog(null, 
-            "Incorrect type " + tname + " for: " + this, 
+            "Incorrect type " + tname + " for product in " + this, 
             "Type error", JOptionPane.ERROR_MESSAGE);
         return ""; 
       }  
@@ -4584,7 +4638,8 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
       { return "Set.closure" + entity.getName() + rel + "(new Vector())"; }  // not correct really. 
       return "Set.closure" + entity.getName() + rel + "(" + arg.queryForm(env,local) + ")";
     } 
-    else if (argument.type != null && "String".equals("" + argument.getType()))
+    else if (argument.type != null && 
+             "String".equals("" + argument.getType()))
     { // last,first,front,tail on strings
       if (data.equals("first") || data.equals("any"))
       { return "(" + pre + ".charAt(0) + \"\")"; } 
@@ -4604,7 +4659,9 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
                                       "Type error", JOptionPane.ERROR_MESSAGE);
         return "Set." + data + "(" + pre + ")"; 
       } 
+
       String ctname = compertype.getName();   // only int, double, String are valid
+
       if ("int".equals(ctname))
       { return "((Integer) Set." + data + "(" + pre + ")).intValue()"; }
       else if ("double".equals(ctname))
@@ -4630,7 +4687,7 @@ public String updateFormSubset(String language, java.util.Map env, Expression va
       else 
       { return "Set." + data + "(" + pre + ")"; }
     }  
-    else  // sum, front, tail on sequences, subcollections 
+    else  // sum, front, tail on sequences, sorted sets/maps 
           // -- separate versions for numbers & objects?
     { return "Set." + data + "(" + pre + ")"; }
 
@@ -6748,7 +6805,10 @@ private BExpression subcollectionsBinvariantForm(BExpression bsimp)
   } 
 
   public String toString()  // RSDS version of expression
-  { if (operator.equals("lambda") && accumulator != null)
+  { if (operator == null)
+    { return argument + " /* Unknown unary operator */"; } 
+
+    if (operator.equals("lambda") && accumulator != null)
     { String res = "lambda " + accumulator.getName() + " : " + accumulator.getType() + " in " + argument;
       return "(" + res + ")";
     } 
@@ -6776,7 +6836,6 @@ private BExpression subcollectionsBinvariantForm(BExpression bsimp)
       { return "(" + res + ")"; }
       return res; 
     } 
-
 
     return operator + "(" + argument + ")";  
   } 

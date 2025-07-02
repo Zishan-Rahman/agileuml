@@ -205,6 +205,443 @@ class BinaryExpression extends Expression
     return res; 
   } 
 
+  public boolean isSequenceApplication(Expression var)
+  { // It is data->at(var) 
+
+    right.setBrackets(false); 
+
+    if (left.getType() != null && left.getType().isSequence())
+    { return (var + "").equals(right + ""); } 
+ 
+    return false; 
+  } 
+
+  public boolean isSequenceApplicationIncrement(Expression var)
+  { // It is data->at(var+1)
+
+    if (left.getType() != null && 
+        left.getType().isSequence() && 
+        right instanceof BinaryExpression && 
+        "+".equals(((BinaryExpression) right).getOperator())
+       )
+    { BinaryExpression bexpr = (BinaryExpression) right; 
+      Expression bleft = bexpr.getLeft(); 
+      Expression bright = bexpr.getRight(); 
+      bleft.setBrackets(false); 
+      bright.setBrackets(false); 
+
+      // System.out.println(arrayIndex + ""); 
+ 
+      return (var + " + 1").equals(bexpr + "");  
+    } 
+
+    return false; 
+  } 
+
+  public boolean isTailRecursion(BehaviouralFeature bf)
+  { // bfname does not occur in this 
+    // or it is result = expr where expr is a tail recursion
+    // basic expression
+
+    String bfname = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(bfname); 
+    Vector vars = variablesUsedIn(names); 
+
+    if (vars.size() == 0)
+    { return true; } 
+
+    if ("=".equals(operator) && 
+        "result".equals(left + ""))
+    { return right.isTailRecursion(bf); } 
+
+    return false; 
+  } 
+
+  public boolean isSemiTailRecursion(BehaviouralFeature bf)
+  { // it is call + expr where bf not in expr
+    // or expr + call, or same with *
+    // ->including or ->union with sets. 
+
+    if ("=".equals(operator) && 
+        "result".equals(left + "") && 
+        right instanceof BinaryExpression)
+    { return 
+        ((BinaryExpression) right).isSemiTailRecursion(bf); 
+    } 
+
+    if (operator.equals("+") || operator.equals("*")) { } 
+    else 
+    { return false; } 
+
+    String bfname = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(bfname); 
+    Vector lvars = left.variablesUsedIn(names); 
+    Vector rvars = right.variablesUsedIn(names); 
+
+    // System.out.println(">> Expression " + this); 
+    // System.out.println(">> lvars: " + lvars); 
+    // System.out.println(">> rvars: " + rvars); 
+
+    if (rvars.contains(bfname) && !lvars.contains(bfname))
+    { return right.isSelfCall(bf); } 
+
+    if (lvars.contains(bfname) && !rvars.contains(bfname))
+    { return left.isSelfCall(bf); } 
+
+    return false; 
+  } 
+
+  public boolean isSemiTailRecursionDecrement(
+                     BehaviouralFeature bf, String par)
+  { // it is bf(par-1) + expr where bf not in expr
+    // or expr + bf(par-1), or same with *
+
+    if ("=".equals(operator) && 
+        "result".equals(left + "") && 
+        right instanceof BinaryExpression)
+    { return 
+        ((BinaryExpression) right).isSemiTailRecursionDecrement(
+                                                        bf, par); 
+    } 
+
+    if (operator.equals("+") || operator.equals("*")) { } 
+    else 
+    { return false; } 
+
+    String bfname = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(bfname); 
+    Vector lvars = left.variablesUsedIn(names); 
+    Vector rvars = right.variablesUsedIn(names); 
+
+    // System.out.println(">> Expression " + this); 
+    // System.out.println(">> lvars: " + lvars); 
+    // System.out.println(">> rvars: " + rvars); 
+
+    if (rvars.contains(bfname) && !lvars.contains(bfname))
+    { return right.isSelfCallDecrement(bf, par); } 
+
+    if (lvars.contains(bfname) && !rvars.contains(bfname))
+    { return left.isSelfCallDecrement(bf, par); } 
+
+    return false; 
+  } 
+
+  public Expression replacedSemiTailRecursion(
+            BehaviouralFeature bf, Expression _result)
+  { // it is _result + expr where bf not in expr
+    // or expr + _result, or same with *
+    // ->including or ->union with sets. 
+
+    /* if ("=".equals(operator) && 
+        "result".equals(left + "") && 
+        right instanceof BinaryExpression)
+    { return 
+        ((BinaryExpression) right).isSemiTailRecursion(bf); 
+    } Only for abstract constraints */ 
+
+    if (operator.equals("+") || operator.equals("*")) { } 
+    else 
+    { return null; } 
+
+    String bfname = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(bfname); 
+
+    Vector lvars = left.variablesUsedIn(names); 
+    Vector rvars = right.variablesUsedIn(names); 
+
+    if (lvars.contains(bfname)) // left is the self call
+    { return new BinaryExpression(operator, _result, right); } 
+
+    if (rvars.contains(bfname)) // right is the self call
+    { return new BinaryExpression(operator, left, _result); } 
+
+    return null; 
+  } 
+
+  public Expression replacedSemiTailRecursionDecrement(
+                           BehaviouralFeature bf, String par)
+  { // it is expr where bf not in expr
+    
+    /* if ("=".equals(operator) && 
+        "result".equals(left + "") && 
+        right instanceof BinaryExpression)
+    { return 
+        ((BinaryExpression) right).isSemiTailRecursion(bf); 
+    } Only for abstract constraints */ 
+
+    if (operator.equals("+") || operator.equals("*")) { } 
+    else 
+    { return null; } 
+
+    String bfname = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(bfname); 
+
+    Vector lvars = left.variablesUsedIn(names); 
+    Vector rvars = right.variablesUsedIn(names); 
+
+    if (lvars.contains(bfname)) // left is the self call
+    { return right; } 
+
+    if (rvars.contains(bfname)) // right is the self call
+    { return left; } 
+
+    return null; 
+  } 
+
+  public void recursiveExpressions(BehaviouralFeature bf, 
+                         Vector valueReturns, 
+                         Vector tailReturns, 
+                         Vector semitailReturns, 
+                         Vector nontailReturns)
+  { 
+    if ("=".equals(operator) && 
+        "result".equals(left + ""))
+    { right.recursiveExpressions(bf, valueReturns,
+                                  tailReturns,
+                                  semitailReturns,
+                                  nontailReturns); 
+      return; 
+    } 
+
+    String bfname = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(bfname); 
+    Vector lvars = left.variablesUsedIn(names); 
+    Vector rvars = right.variablesUsedIn(names); 
+
+    // System.out.println(">> Expression " + this); 
+    // System.out.println(">> lvars: " + lvars); 
+    // System.out.println(">> rvars: " + rvars); 
+
+    if (!rvars.contains(bfname) && !lvars.contains(bfname))
+    { valueReturns.add(this); 
+      return; 
+    } // no recursive call
+
+    if (rvars.contains(bfname) && !lvars.contains(bfname))
+    { if ("+".equals(operator) || "*".equals(operator))
+      { if (right.isSelfCall(bf))
+        { semitailReturns.add(this); 
+          return; 
+        }
+      }  
+    }  
+
+    if (lvars.contains(bfname) && !rvars.contains(bfname))
+    { if ("+".equals(operator) || "*".equals(operator))
+      { if (left.isSelfCall(bf))
+        { semitailReturns.add(this); 
+          return; 
+        }
+      } 
+    }   
+
+    nontailReturns.add(this); 
+  } 
+
+  public Expression getSelfCall(
+            BehaviouralFeature bf)
+  { 
+    /* if ("=".equals(operator) && 
+        "result".equals(left + "") && 
+        right instanceof BinaryExpression)
+    { return 
+        ((BinaryExpression) right).isSemiTailRecursion(bf); 
+    } Only for abstract constraints */ 
+
+    if (operator.equals("+") || operator.equals("*")) { } 
+    else 
+    { return null; } 
+
+    String bfname = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(bfname); 
+    Vector lvars = left.variablesUsedIn(names); 
+    Vector rvars = right.variablesUsedIn(names); 
+
+    if (rvars.contains(bfname))
+    { return right; } 
+
+    if (lvars.contains(bfname))
+    { return left; } 
+
+    return null; 
+  } 
+
+  public static boolean allOperatorsSame(Vector bexprs)
+  { if (bexprs.size() == 0) 
+    { return true; } 
+
+    if (bexprs.get(0) instanceof BinaryExpression) { } 
+    else 
+    { return false; } 
+
+    BinaryExpression bexpr = (BinaryExpression) bexprs.get(0); 
+    String op = bexpr.getOperator(); 
+
+    for (int i = 1; i < bexprs.size(); i++) 
+    { if (bexprs.get(i) instanceof BinaryExpression) { } 
+      else 
+      { return false; } 
+
+      BinaryExpression be = (BinaryExpression) bexprs.get(i); 
+      if (op.equals(be.getOperator())) { } 
+      else 
+      { return false; } 
+    } 
+
+    return true; 
+  } 
+
+  public boolean variableBoundedAbove(String var)
+  { // This is the condition for the non-recursive case,
+    // which terminates the recursion
+
+    Vector varnames = new Vector(); 
+    varnames.add(var); 
+
+    Vector lvars = left.variablesUsedIn(varnames); 
+    Vector rvars = right.variablesUsedIn(varnames); 
+
+    if (operator.equals("<") || 
+        operator.equals("<="))
+    { if (lvars.contains(var) && 
+        !rvars.contains(var))
+      { return true; }
+      return false; 
+    } // var < val, var <= val
+
+    if (operator.equals(">") || 
+        operator.equals(">="))
+    { if (rvars.contains(var) && 
+        !lvars.contains(var))
+      { return true; }
+      return false; 
+    } // val > var, val >= var
+    
+    return false; 
+  } 
+
+  public boolean variableBoundedBelow(String var)
+  { // Condition that terminates the recursion
+
+    Vector varnames = new Vector(); 
+    varnames.add(var); 
+
+    Vector lvars = left.variablesUsedIn(varnames); 
+    Vector rvars = right.variablesUsedIn(varnames); 
+
+    if (operator.equals("<") || 
+        operator.equals("<="))
+    { if (rvars.contains(var) && 
+        !lvars.contains(var))
+      { return true; }
+      return false; 
+    } // val < var, val <= var
+
+    if (operator.equals(">") || 
+        operator.equals(">="))
+    { if (lvars.contains(var) && 
+        !rvars.contains(var))
+      { return true; }
+      return false; 
+    } // var > val, var >= val
+ 
+    return false; 
+  } 
+
+  public Expression variableBoundAbove(String var)
+  { if (operator.equals("<")) // var < bnd, recursion ends at bnd
+    { return right; } 
+ 
+    if (operator.equals("<=") || operator.equals("="))
+    { return new BinaryExpression("+", right, 
+                   new BasicExpression(1)); 
+    } // recursion ends at bnd+1
+
+    if (operator.equals(">")) // bnd > var
+    { return left; } // recursion ends at bnd
+
+    if (operator.equals(">=")) // bnd >= var
+    { return new BinaryExpression("+", left, 
+                   new BasicExpression(1)); 
+    } // recursion ends at bnd+1
+
+    return null; 
+  } 
+
+  public Expression variableBoundBelow(String var)
+  { if (operator.equals("<")) // bnd < var
+    { return new BinaryExpression("+", left, 
+                   new BasicExpression(1)); 
+    } 
+    
+    if (operator.equals("<="))
+    { return left; } 
+
+    if (operator.equals(">")) // var > bnd
+    { return new BinaryExpression("+", right, 
+                   new BasicExpression(1)); 
+    } 
+
+    if (operator.equals(">="))
+    { return right; }
+
+    return null;  
+  } 
+
+  public Expression iterationBoundAbove(String var)
+  { if (operator.equals("<")) // var < bnd
+    { return new BinaryExpression("-", right, 
+                          new BasicExpression(1)); 
+    } 
+ 
+    if (operator.equals("<=") || operator.equals("="))
+    { return right; }
+    
+    if (operator.equals(">")) // bnd > var
+    { return new BinaryExpression("-", left, 
+                          new BasicExpression(1)); 
+    } 
+
+    if (operator.equals(">=")) // bnd >= var
+    { return left; } 
+
+    return null; 
+  } 
+
+  public Expression iterationBoundBelow(String var)
+  { if (operator.equals("<")) // bnd < var
+    { return left; } 
+    
+    if (operator.equals("<="))
+    { return new BinaryExpression("-", left, 
+                          new BasicExpression(1)); 
+    } 
+
+    if (operator.equals(">")) // var > bnd
+    { return right; } 
+
+    if (operator.equals(">="))
+    { return new BinaryExpression("-", right, 
+                          new BasicExpression(1));
+    } 
+
+    return null;  
+  } 
+
   public Expression definedness()
   { Expression dl = left.definedness();
     Expression dr = right.definedness();
@@ -252,8 +689,10 @@ class BinaryExpression extends Expression
   { if ("or".equals(operator))
     { return new BasicExpression(false); }
 
-    if ("#".equals(operator) || "#LC".equals(operator) || "#1".equals(operator) || "!".equals(operator) ||
-        "|".equals(operator) || "|R".equals(operator) || "|C".equals(operator))
+    if ("#".equals(operator) || "#LC".equals(operator) || 
+        "#1".equals(operator) || "!".equals(operator) ||
+        "|".equals(operator) || "|R".equals(operator) || 
+        "|C".equals(operator))
     { Expression leftdet = ((BinaryExpression) left).right.determinate(); 
       Expression rightdet = right.determinate(); 
       return (new BinaryExpression("&",leftdet,rightdet)).simplify(); 
@@ -389,14 +828,21 @@ class BinaryExpression extends Expression
      Expression leftres = null; 
      Expression rightres = null; 
 
-     if ("boolean".equals(type + "") || "int".equals(type + "") || "long".equals(type + "") || 
-         "double".equals(type + "") || "String".equals(type + ""))
+     if ("boolean".equals(type + "") || 
+         "int".equals(type + "") || 
+         "long".equals(type + "") || 
+         "double".equals(type + "") || 
+         "String".equals(type + ""))
      { return this; } 
 
-     if (operator.equals("->exists") || operator.equals("->forAll") ||
-         "->existsLC".equals(operator) || "#LC".equals(operator) ||
-         operator.equals("#") || operator.equals("!") || operator.equals("->exists1") ||
-         operator.equals("#1") || operator.equals("and") || operator.equals("or"))
+     if (operator.equals("->exists") || 
+         operator.equals("->forAll") ||
+         "->existsLC".equals(operator) || 
+         "#LC".equals(operator) ||
+         operator.equals("#") || operator.equals("!") || 
+         operator.equals("->exists1") ||
+         operator.equals("#1") || operator.equals("and") || 
+         operator.equals("or"))
      { return this; } // intended as a boolean value
 
      if (operator.equals("->select") || operator.equals("->reject") || operator.equals("->collect") ||
@@ -1257,6 +1703,9 @@ class BinaryExpression extends Expression
   { String basicString = 
              left + " " + operator + " " + right; 
      
+    if (left == null || right == null) 
+    { return basicString; } // something is very wrong
+
     if ("let".equals(operator) && 
         accumulator != null)
     { String rstring = "" + right; 
@@ -1286,7 +1735,7 @@ class BinaryExpression extends Expression
     if (operator.equals("#") && left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->exists( " + 
@@ -1295,41 +1744,45 @@ class BinaryExpression extends Expression
     else if ("#LC".equals(operator) && left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->existsLC( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("#1") && left instanceof BinaryExpression)
+    else if (operator.equals("#1") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
       basicString = rangestring + "->exists1( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     } 
-    else if (operator.equals("!") && left instanceof BinaryExpression)
+    else if (operator.equals("!") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
       basicString = rangestring + "->forAll( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     } 
-    else if (operator.equals("|") && left instanceof BinaryExpression)
+    else if (operator.equals("|") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->select( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("|C") && left instanceof BinaryExpression)
+    else if (operator.equals("|C") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->collect( " + 
@@ -1338,87 +1791,97 @@ class BinaryExpression extends Expression
     else if (operator.equals("|A") && left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->any( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("|R") && left instanceof BinaryExpression)
+    else if (operator.equals("|R") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->reject( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("|selectMinimals") && left instanceof BinaryExpression)
+    else if (operator.equals("|selectMinimals") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->selectMinimals( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("|selectMaximals") && left instanceof BinaryExpression)
+    else if (operator.equals("|selectMaximals") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->selectMaximals( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("|unionAll") && left instanceof BinaryExpression)
+    else if (operator.equals("|unionAll") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->unionAll( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("|intersectAll") && left instanceof BinaryExpression)
+    else if (operator.equals("|intersectAll") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->intersectAll( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("|concatenateAll") && left instanceof BinaryExpression)
+    else if (operator.equals("|concatenateAll") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->concatenateAll( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("|sortedBy") && left instanceof BinaryExpression)
+    else if (operator.equals("|sortedBy") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->sortedBy( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("|isUnique") && left instanceof BinaryExpression)
+    else if (operator.equals("|isUnique") && 
+             left instanceof BinaryExpression)
     { Expression range = ((BinaryExpression) left).right; 
       String rangestring = "" + range; 
-      if (range.needsBracket)
+      if (range != null && range.needsBracket)
       { rangestring = "(" + rangestring + ")"; } 
 
       basicString = rangestring + "->isUnique( " + 
              ((BinaryExpression) left).left + " | " + right + " )";
     }
-    else if (operator.equals("->including") && keyValue != null) 
+    else if (operator.equals("->including") && 
+             keyValue != null) 
     { basicString = left + "->including(" + keyValue + ", " + right + ")"; } 
-    else if (operator.equals("->excluding") && keyValue != null) 
+    else if (operator.equals("->excluding") && 
+             keyValue != null) 
     { basicString = left + "->excluding(" + keyValue + ", " + right + ")"; } 
     else if (operator.equals("->includesAll") || 
              operator.equals("->collect") || 
@@ -2850,11 +3313,15 @@ class BinaryExpression extends Expression
         { res.addAll(expr.allPreTerms()); } 
       } 
     } // and "let"
-    else if ("!".equals(operator) || "#".equals(operator) || "|A".equals(operator) || 
-        "#1".equals(operator) || "|".equals(operator) || operator.equals("#LC") ||
+    else if ("!".equals(operator) || "#".equals(operator) || 
+             "|A".equals(operator) || 
+        "#1".equals(operator) || "|".equals(operator) || 
+        operator.equals("#LC") ||
         "|R".equals(operator) || "|C".equals(operator) || 
-        "|selectMinimals".equals(operator) || "|selectMaximals".equals(operator) || 
-        "|unionAll".equals(operator) || "|intersectAll".equals(operator) ||
+        "|selectMinimals".equals(operator) || 
+        "|selectMaximals".equals(operator) || 
+        "|unionAll".equals(operator) || 
+        "|intersectAll".equals(operator) ||
         "|concatenateAll".equals(operator))
     { // discard pre-terms of features of the left.left
       // because these are invalid
@@ -3006,11 +3473,15 @@ class BinaryExpression extends Expression
       return VectorUtil.union(ss1,ss2);
     } 
 
-    if (operator.equals("!") || operator.equals("#") || operator.equals("#LC") ||
-        operator.equals("#1") || operator.equals("|") || operator.equals("|R") ||
+    if (operator.equals("!") || operator.equals("#") || 
+        operator.equals("#LC") ||
+        operator.equals("#1") || operator.equals("|") || 
+        operator.equals("|R") ||
         operator.equals("|A") || operator.equals("|C") ||
-        "|selectMinimals".equals(operator) || "|selectMaximals".equals(operator) || 
-        "|unionAll".equals(operator) || "|intersectAll".equals(operator) ||
+        "|selectMinimals".equals(operator) || 
+        "|selectMaximals".equals(operator) || 
+        "|unionAll".equals(operator) || 
+        "|intersectAll".equals(operator) ||
         "|concatenateAll".equals(operator))
     { Vector ss = right.getBaseEntityUses(); 
       if (left instanceof BinaryExpression)
@@ -4065,7 +4536,7 @@ public void findClones(java.util.Map clones,
       type.setElementType(scope.elementType); 
       elementType = scope.elementType; 
       multiplicity = ModelElement.MANY; 
-    }    
+    } // but maps can be sorted, also   
     else if (operator.equals("->collect"))   
     { if (left.isCollection() || left.isMap()) { } 
       else 
@@ -5397,30 +5868,31 @@ public void findClones(java.util.Map clones,
              "|sortedBy".equals(operator) || 
              "|selectMinimals".equals(operator) || 
              "|selectMaximals".equals(operator))
-    { BinaryExpression lexp = (BinaryExpression) left; 
+    { BinaryExpression lexp = (BinaryExpression) left;
+      Expression scope = lexp.right; 
+ 
       boolean lrt = 
-        lexp.right.typeCheck(types,entities,contexts,env); 
+        scope.typeCheck(types,entities,contexts,env); 
 
-      // lexp.right must be multiple 
+      // scope must be multiple 
 
-      Type et = lexp.right.elementType;
+      Type et = scope.elementType;
 
-      // but if lexp.right.isMap, actually the keyType
+      // but if scope.isMap, actually the keyType
 
       if (et == null) 
-      { Type tt = lexp.right.getType(); 
+      { Type tt = scope.getType(); 
         if (tt != null) 
         { et = tt.getElementType(); } 
       }  
 
-      System.out.println(">> *** Type of " + lexp.right + " = " + lexp.right.type + "(" + et + ")"); 
+      // System.out.println(">> *** Type of " + scope + " = " + scope.type + "(" + et + ")"); 
 
       if (et == null)
-      { System.err.println("!! Warning: no element type for " + lexp.right + " in " + this + " in environment " + env); 
-        // JOptionPane.showMessageDialog(null, "no element type for " + lexp.right + " in " + this, 
-        //      "Type error", JOptionPane.ERROR_MESSAGE);
+      { System.err.println("!! Warning: no element type for " + scope + " in " + this + " in environment " + env); 
+
         Attribute attr = 
-          (Attribute) ModelElement.lookupByName(lexp.right + "", env); 
+          (Attribute) ModelElement.lookupByName(scope + "", env); 
 
         if (attr != null && 
             !Type.isVacuousType(attr.getElementType()))
@@ -5444,15 +5916,15 @@ public void findClones(java.util.Map clones,
       lexp.typeCheck(types,entities,contexts,env1); 
       boolean rtc = 
         right.typeCheck(types,entities,context,env1);
-      Type stleft = lexp.right.getType(); 
+      Type stleft = scope.getType(); 
       Type stright = right.getType();
-      Entity seleft = lexp.right.getEntity();
+      Entity seleft = scope.getEntity();
       tcSelect(stleft,stright,seleft); 
 
       if (operator.equals("|") || operator.equals("|R") || 
           operator.equals("|selectMinimals") || 
           operator.equals("|selectMaximals"))
-      { isSorted = lexp.right.isSorted; } 
+      { isSorted = scope.isSorted; } 
 
       return true; 
     }        
@@ -6445,7 +6917,7 @@ public void findClones(java.util.Map clones,
       { type.setSorted(true); } 
 
       return; 
-    } 
+    } // sorting a map
     else if (Type.isSequenceType(tleft))
     { type = new Type("Sequence",null); } 
     else if (operator.equals("->sortedBy") || 
@@ -6458,9 +6930,8 @@ public void findClones(java.util.Map clones,
     else if (Type.isSetType(tleft)) 
     { type = new Type("Set",null); } 
     else 
-    { System.err.println("!!TYPE ERROR!!: LHS of select/reject must be a collection! " + this); 
-      // JOptionPane.showMessageDialog(null, "LHS of " + this + " must be a collection", 
-      //                                    "Type error", JOptionPane.ERROR_MESSAGE);
+    { System.err.println("!!TYPE ERROR!!: LHS of select/reject must be a collection or map! " + this);
+ 
       type = new Type("Set",null); 
       // return; 
     } 
@@ -6979,7 +7450,7 @@ public boolean conflictsWithIn(String op, Expression el,
       }   
    
       return "Set.sortedBy(" + lqf + ", " + col + ")"; 
-    } 
+    } // only a single sorting criteria, not a sequence
 
     if (operator.equals("->count"))
     { return "Set.count(" + lqf + "," + rw + ")"; } 
@@ -7998,7 +8469,8 @@ public boolean conflictsWithIn(String op, Expression el,
     { return collectQueryFormJava7(lqf,rqf,rprim,env,local); } 
 
     if (operator.equals("|A") || operator.equals("->any"))   
-    { String getany = anyQueryFormJava7(lqf,rqf,rprim,env,local); 
+    { String getany = 
+                anyQueryFormJava7(lqf,rqf,rprim,env,local); 
       if (Type.isPrimitiveType(type))
       { return unwrapJava7(getany); } 
       return "((" + typ + ") " + getany + ")"; 
@@ -8029,7 +8501,7 @@ public boolean conflictsWithIn(String op, Expression el,
       return "((" + jType + ") Ocl.maximalElements(" + lqf + ", ((ArrayList<Comparable>) " + col + ")))"; 
     } 
 
-    if (operator.equals("|selectMinimals"))
+    if (operator.equals("|selectMaximals"))
     { String col = 
         collectQueryFormJava7(lqf,rqf,rprim,env,local); 
       BinaryExpression leftbe = (BinaryExpression) left; 
@@ -11827,9 +12299,10 @@ public boolean conflictsWithIn(String op, Expression el,
   } 
 
 
-  private String collectQueryForm(String lqf, String rqf, boolean rprim,
-                                 java.util.Map env, 
-                                 boolean local) 
+  private String collectQueryForm(String lqf, String rqf, 
+                                  boolean rprim,
+                                  java.util.Map env, 
+                                  boolean local) 
   { // collect_ind(lqf) where ind is a unique index for left and right
     Vector uses = right.getVariableUses(); 
     Vector pars = new Vector(); 
@@ -11844,14 +12317,14 @@ public boolean conflictsWithIn(String op, Expression el,
     // Should only have one element, the owner of the operation in which 
     // this occurs. Others are localentity and its superclasses.
 
-
-
     java.util.Map env1 = (java.util.Map) ((java.util.HashMap) env).clone(); 
 
     if (operator.equals("|C") || 
         operator.equals("|unionAll") || 
         operator.equals("|intersectAll") || 
         operator.equals("|concatenateAll") || 
+        operator.equals("|selectMinimals") || 
+        operator.equals("|selectMaximals") || 
         operator.equals("|sortedBy") || 
         operator.equals("|isUnique")) 
     { BinaryExpression beleft = (BinaryExpression) left; 
@@ -11860,8 +12333,8 @@ public boolean conflictsWithIn(String op, Expression el,
       collectvar = beleft.left + ""; 
       if (beleft.right == null || beleft.right.elementType == null)
       { System.err.println("!! DESIGN ERROR: no element type for: " + beleft);
-        JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
-                                      "Design error", JOptionPane.ERROR_MESSAGE);
+        /* JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
+             "Design error", JOptionPane.ERROR_MESSAGE); */
       }
       else  
       { localentity = beleft.right.elementType.getEntity(); }  
@@ -11869,8 +12342,8 @@ public boolean conflictsWithIn(String op, Expression el,
     else 
     { if (left.elementType == null) 
       { System.err.println("!! DESIGN ERROR: no element type for: " + left);                
-	    JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
-                                      "Design error", JOptionPane.ERROR_MESSAGE);
+	   /* JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
+             "Design error", JOptionPane.ERROR_MESSAGE); */ 
       } 
       else
       { localentity = left.elementType.getEntity(); }  
@@ -11949,6 +12422,8 @@ public boolean conflictsWithIn(String op, Expression el,
         operator.equals("|unionAll") || 
         operator.equals("|intersectAll") || 
         operator.equals("|concatenateAll") || 
+        operator.equals("|selectMinimals") || 
+        operator.equals("|selectMaximals") || 
         operator.equals("|sortedBy") || 
         operator.equals("|isUnique")) 
     { BinaryExpression beleft = (BinaryExpression) left; 
@@ -11957,17 +12432,17 @@ public boolean conflictsWithIn(String op, Expression el,
       collectvar = beleft.left + ""; 
       if (beleft.right == null || beleft.right.elementType == null)
       { System.err.println("!! TYPE ERROR: no element type of: " + beleft);
-        JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
-                                      "Design error", JOptionPane.ERROR_MESSAGE);
+        /* JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
+             "Design error", JOptionPane.ERROR_MESSAGE); */ 
       }
       else  
       { localentity = beleft.right.elementType.getEntity(); }  
     }  
     else 
     { if (left.elementType == null) 
-      { System.err.println("DESIGN ERROR: no element type for: " + left); 
-        JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
-                                      "Design error", JOptionPane.ERROR_MESSAGE);
+      { System.err.println("!! DESIGN ERROR: no element type for: " + left); 
+        /* JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
+             "Design error", JOptionPane.ERROR_MESSAGE); */ 
       } 
       else
       { localentity = left.elementType.getEntity(); }  
@@ -12048,11 +12523,15 @@ public boolean conflictsWithIn(String op, Expression el,
     String collectvar = null; 
     Expression collectleft = left;
 
-    Entity localentity = left.entity; // left.elementType.getEntity();
+    Entity localentity = left.entity; 
+        // left.elementType.getEntity();
+
     if (operator.equals("|C") || 
         operator.equals("|unionAll") || 
         operator.equals("|intersectAll") || 
         operator.equals("|concatenateAll") || 
+        operator.equals("|selectMinimals") || 
+        operator.equals("|selectMaximals") || 
         operator.equals("|sortedBy") || 
         operator.equals("|isUnique")) 
     { BinaryExpression beleft = (BinaryExpression) left; 
@@ -12060,10 +12539,7 @@ public boolean conflictsWithIn(String op, Expression el,
       collectleft = beleft.right; 
       collectvar = beleft.left + ""; 
       if (beleft.right == null || beleft.right.elementType == null)
-      { System.err.println("!! TYPE ERROR: no element type of: " + beleft);
-        JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
-                                      "Design error", JOptionPane.ERROR_MESSAGE);
-      }
+      { System.err.println("!! TYPE ERROR: no element type of: " + beleft); }
       else  
       { localentity = beleft.right.elementType.getEntity(); } // May be null if primitive, String, etc
 
@@ -12075,8 +12551,8 @@ public boolean conflictsWithIn(String op, Expression el,
     else 
     { if (left.elementType == null) 
       { System.err.println("DESIGN ERROR: no element type for: " + left); 
-        JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
-                                      "Design error", JOptionPane.ERROR_MESSAGE);
+        /* JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
+                                      "Design error", JOptionPane.ERROR_MESSAGE); */ 
       } 
       else
       { localentity = left.elementType.getEntity(); }  
@@ -12167,6 +12643,8 @@ public boolean conflictsWithIn(String op, Expression el,
         operator.equals("|unionAll") || 
         operator.equals("|intersectAll") || 
         operator.equals("|concatenateAll") || 
+        operator.equals("|selectMinimals") || 
+        operator.equals("|selectMaximals") || 
         operator.equals("|sortedBy") || 
         operator.equals("|isUnique")) 
     { BinaryExpression beleft = (BinaryExpression) left; 
@@ -12175,8 +12653,8 @@ public boolean conflictsWithIn(String op, Expression el,
       collectvar = beleft.left + ""; 
       if (beleft.right == null || beleft.right.elementType == null)
       { System.err.println("!! TYPE ERROR: no element type of: " + beleft);
-        JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
-                                      "Design error", JOptionPane.ERROR_MESSAGE);
+        /* JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
+              "Design error", JOptionPane.ERROR_MESSAGE); */ 
       }
       else  
       { localentity = beleft.right.elementType.getEntity(); }  
@@ -12190,9 +12668,9 @@ public boolean conflictsWithIn(String op, Expression el,
     }  
     else 
     { if (left.elementType == null) 
-      { System.err.println("DESIGN ERROR: no element type for: " + left); 
-        JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
-           "Design error", JOptionPane.ERROR_MESSAGE);
+      { System.err.println("DESIGN ERROR!!: no element type for: " + left); 
+        /* JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
+           "Design error", JOptionPane.ERROR_MESSAGE); */ 
       } 
       else
       { localentity = left.elementType.getEntity(); }  
@@ -12235,7 +12713,7 @@ public boolean conflictsWithIn(String op, Expression el,
     for (int i = 0; i < uses.size(); i++) 
     { BasicExpression use = (BasicExpression) uses.get(i);
 
-      System.out.println(">> Variable use: " + use + " " + use.getType() + " " + use.arrayType + " " + use.getElementType()); 
+      // System.out.println(">> Variable use: " + use + " " + use.getType() + " " + use.arrayType + " " + use.getElementType()); 
  
       if (parnames.contains(use.data) || (use.data + "").equals(collectvar) || 
           (collectvar == null && (use.data + "").equals("self"))) 
@@ -12290,6 +12768,8 @@ public boolean conflictsWithIn(String op, Expression el,
         operator.equals("|unionAll") || 
         operator.equals("|intersectAll") || 
         operator.equals("|concatenateAll") || 
+        operator.equals("|selectMinimals") || 
+        operator.equals("|selectMaximals") || 
         operator.equals("|sortedBy") || 
         operator.equals("|isUnique")) 
     { BinaryExpression beleft = (BinaryExpression) left; 
@@ -12298,8 +12778,8 @@ public boolean conflictsWithIn(String op, Expression el,
       collectvar = beleft.left + ""; 
       if (beleft.right == null || beleft.right.elementType == null)
       { System.err.println("!! TYPE ERROR: no element type of: " + beleft);
-        JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
-                                      "Design error", JOptionPane.ERROR_MESSAGE);
+        /* JOptionPane.showMessageDialog(null, "no element type for " + beleft + " in " + this, 
+             "Design error", JOptionPane.ERROR_MESSAGE); */ 
       }
       else  
       { localentity = beleft.right.elementType.getEntity(); }  
@@ -12317,8 +12797,8 @@ public boolean conflictsWithIn(String op, Expression el,
     else 
     { if (left.elementType == null) 
       { System.err.println("DESIGN ERROR: no element type for: " + left);
-        JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
-                                      "Design error", JOptionPane.ERROR_MESSAGE);
+        /* JOptionPane.showMessageDialog(null, "no element type for " + left + " in " + this, 
+             "Design error", JOptionPane.ERROR_MESSAGE); */
       } 
       else
       { localentity = left.elementType.getEntity(); }  
@@ -14954,6 +15434,47 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
   return new SequenceStatement(); // preds.size() == 0 
 }
 
+public Statement generateDesignSemiTail(BehaviouralFeature bf, 
+          java.util.Map env, Vector valueReturns, boolean local)
+{ 
+  if (operator.equals("=") && "result".equals(left + "") && 
+      valueReturns.contains(right))
+  { return new ReturnStatement(right); }
+
+  // Or a semi-tail call - replace expr*call by expr*result
+  if (operator.equals("=") && "result".equals(left + "") &&
+      right instanceof BinaryExpression && 
+      ((BinaryExpression) right).isSemiTailRecursion(bf))
+  { // update result, then 
+    // parameter assignments ; continue
+    BinaryExpression beright = 
+                  (BinaryExpression) right; 
+    Expression rhs = 
+       beright.replacedSemiTailRecursion(bf,left); 
+    AssignStatement updateResult = 
+       new AssignStatement(left, rhs);  
+    ContinueStatement ctn = new ContinueStatement();
+    Expression selfcall = 
+                 beright.getSelfCall(bf);  
+    Statement assgns = bf.parameterAssignments(selfcall); 
+    SequenceStatement ss = new SequenceStatement(); 
+    ss.addStatement(updateResult); 
+  
+    if (assgns == null) 
+    { ss.addStatement(ctn); 
+      ss.setBrackets(true); 
+      return ss; 
+    } 
+    else 
+    { ss.addStatements((SequenceStatement) assgns); 
+      ss.addStatement(ctn);
+      ss.setBrackets(true);  
+      return ss; 
+    } 
+  } 
+
+  return generateDesign(env, local); 
+} 
 
   public Statement generateDesign(java.util.Map env, boolean local)
   { String val2;
@@ -15058,7 +15579,8 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
 
     if (operator.equals("=") && left instanceof BasicExpression)
     { return new AssignStatement(left, right); }
-    else if (operator.equals("=") && left instanceof BinaryExpression)
+    else if (operator.equals("=") && 
+             left instanceof BinaryExpression)
     { BinaryExpression leftbe = (BinaryExpression) left; 
       if ("+".equals(leftbe.operator) && left.isString() && 
           leftbe.left.isAssignable() && 
@@ -20804,11 +21326,24 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
     // c->size() > 0 replaced by c->notEmpty()
     // c->size() = 0 replaced by c->isEmpty()
 
+    // Integer.subrange(a,b)->collect(x | sq[x]) replaced by
+    //     sq.subrange(a,b)
+    // Integer.subrange(a,b)->collect(x | sq[x+1]) replaced by
+    //     sq.subrange(a+1,b+1)
+
+
     Expression lexpr = left.simplifyOCL(); 
     Expression rexpr = right.simplifyOCL(); 
 
     if ("->at".equals(operator)) 
     { return Expression.simplifyAt(lexpr, rexpr); } 
+
+    if ("|C".equals(operator))
+    { BinaryExpression beleft = (BinaryExpression) lexpr; 
+      Expression lvar = beleft.getLeft(); 
+      Expression lcoll = beleft.getRight(); 
+      return Expression.simplifyCollect(lvar, lcoll, rexpr); 
+    } 
 
     if ("->union".equals(operator) && 
         lexpr instanceof SetExpression && 
@@ -21385,7 +21920,8 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
              left instanceof BasicExpression && 
              ((BasicExpression) left).isOperationCall())
     { // redundant results computation
-      aUses.add("! OCL efficiency smell (OES): Redundant results computation in: " + this);
+
+      aUses.add("!! OCL efficiency smell (OES): Redundant results computation in: " + this);
       int ascore = (int) res.get("amber"); 
       res.set("amber", ascore+1); 
     } 
@@ -21395,7 +21931,7 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
                     ((BinaryExpression) left).getOperator()))
     { // redundant results computation
 
-      aUses.add("! OCL efficiency smell (OES): Redundant results computation in: " + this);
+      aUses.add("!! OCL efficiency smell (OES): Redundant results computation in: " + this);
       int ascore = (int) res.get("amber"); 
       res.set("amber", ascore+1); 
     } 
@@ -21408,7 +21944,6 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
                                       Vector vars)
   { //  level |-> [x.setAt(i,y), etc]
 
-    left.collectionOperatorUses(level,res,vars); 
 
     if (operator.equals("->including") ||
         operator.equals("->prepend") ||
@@ -21428,7 +21963,8 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
         operator.equals("->union") ||
         operator.equals("->restrict") ||
         operator.equals("->antirestrict"))
-    { Vector opers = (Vector) res.get(level); 
+    { left.collectionOperatorUses(level,res,vars); 
+      Vector opers = (Vector) res.get(level); 
       if (opers == null) 
       { opers = new Vector(); } 
       opers.add(this); 
@@ -21436,17 +21972,19 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
 
       Vector vuses = variablesUsedIn(vars); 
       if (level > 1 && vuses.size() == 0)
-      { JOptionPane.showInputDialog(">> (LCE) flaw: The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
+      { System.out.println("!! (LCE) flaw: The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
           "Use Extract local variable to optimise."); 
         refactorELV = true; 
       }
 
+      right.collectionOperatorUses(level,res,vars); 
       return res; 
     } 
 
     if (operator.equals("->count") ||
         operator.equals("->at"))
-    { Vector opers = (Vector) res.get(level); 
+    { left.collectionOperatorUses(level,res,vars); 
+      Vector opers = (Vector) res.get(level); 
       if (opers == null) 
       { opers = new Vector(); } 
       opers.add(this); 
@@ -21454,11 +21992,12 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
 
       Vector vuses = variablesUsedIn(vars); 
       if (level > 1 && vuses.size() == 0)
-      { JOptionPane.showInputDialog(">> (LCE) flaw: The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
+      { System.out.println("!! (LCE) flaw: The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
           "Use Extract local variable to optimise."); 
         refactorELV = true; 
       }
 
+      right.collectionOperatorUses(level,res,vars); 
       return res; 
     } 
 
@@ -21470,8 +22009,11 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
         operator.equals("->exists1") ||
         operator.equals("->isUnique") ||
         operator.equals("->iterate") ||  
+        operator.equals("->selectMinimals") ||
+        operator.equals("->selectMaximals") ||  
         operator.equals("->sortedBy"))
-    { Vector opers = (Vector) res.get(level); 
+    { left.collectionOperatorUses(level,res,vars); 
+      Vector opers = (Vector) res.get(level); 
       if (opers == null) 
       { opers = new Vector(); } 
       opers.add(this); 
@@ -21479,7 +22021,7 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
 
       Vector vuses = variablesUsedIn(vars); 
       if (level > 1 && vuses.size() == 0)
-      { JOptionPane.showInputDialog(">> (LCE) flaw: The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
+      { System.out.println("!! (LCE) flaw: The expression " + this + " is independent of the iterator variables " + vars + "\n" + 
           "Use Extract local variable to optimise.");
         refactorELV = true;  
       }
@@ -21501,14 +22043,19 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
         operator.equals("|unionAll") || 
         operator.equals("|intersectAll") || 
         operator.equals("|concatenateAll") || 
+        operator.equals("|selectMinimals") || 
+        operator.equals("|selectMaximals") || 
         operator.equals("|sortedBy"))
-    { Vector opers = (Vector) res.get(level); 
+    { BinaryExpression iter = (BinaryExpression) left; 
+      Expression col = iter.getRight(); 
+      col.collectionOperatorUses(level,res,vars); 
+
+      Vector opers = (Vector) res.get(level); 
       if (opers == null) 
       { opers = new Vector(); } 
       opers.add(this); 
       res.put(level, opers); 
 
-      BinaryExpression iter = (BinaryExpression) left; 
       String var = "" + iter.getLeft(); 
       
       Vector newvars = new Vector(); 
@@ -21519,6 +22066,7 @@ public Statement existsLC(Vector preds, Expression eset, Expression etest,
       return res; 
     } 
 
+    left.collectionOperatorUses(level,res,vars); 
     right.collectionOperatorUses(level,res,vars); 
 
     return res; 

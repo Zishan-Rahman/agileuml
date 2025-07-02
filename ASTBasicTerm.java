@@ -1330,7 +1330,8 @@ public class ASTBasicTerm extends ASTTerm
     } 
 
     if ("Bag".equals(value) || "HashBag".equals(value) ||
-        "TreeList".equals(value))
+        "TreeList".equals(value) || 
+        "FixedSizeList".equals(value))
     { modelElement = new Type("Sequence", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence";
@@ -1398,6 +1399,7 @@ public class ASTBasicTerm extends ASTTerm
     } 
 
     if ("Set".equals(value) || "HashSet".equals(value) ||
+        "NavigableSet".equals(value) ||
         "EnumSet".equals(value))
     { modelElement = new Type("Set", null); 
       expression = new BasicExpression((Type) modelElement); 
@@ -2038,6 +2040,12 @@ public class ASTBasicTerm extends ASTTerm
     return null; 
   } 
 
+  public Vector expressionListToKM3()
+  { // if ("argumentExpressionList".equals(tag))
+    Vector res = new Vector();
+    return res;  
+  }
+
   public String toKM3type()
   { if (ASTTerm.entities == null) 
     { ASTTerm.entities = new Vector(); } 
@@ -2388,7 +2396,7 @@ public class ASTBasicTerm extends ASTTerm
     { modelElement = new Type("Sequence", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence"; 
-    }
+    } // ListOrderedSet and SetUniqueList are OrderedSet
  
     if ("PriorityQueue".equals(value) ||
         "PriorityBlockingQueue".equals(value) ||
@@ -2408,7 +2416,8 @@ public class ASTBasicTerm extends ASTTerm
     } 
 
     if ("Bag".equals(value) || "HashBag".equals(value) ||
-        "TreeList".equals(value))
+        "TreeList".equals(value) || 
+        "FixedSizeList".equals(value))
     { modelElement = new Type("Sequence", null); 
       expression = new BasicExpression((Type) modelElement); 
       return "Sequence";
@@ -2451,6 +2460,7 @@ public class ASTBasicTerm extends ASTTerm
 
     if ("Set".equals(value) ||
         "HashSet".equals(value) || 
+        "NavigableSet".equals(value) ||
         "EnumSet".equals(value))
     { modelElement = new Type("Set", null); 
       expression = new BasicExpression((Type) modelElement); 

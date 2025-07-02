@@ -372,6 +372,40 @@ class BasicExpression extends Expression
   public void setArrayType(Type tt) 
   { arrayType = tt; } 
 
+  public boolean isSequenceApplication(Expression var)
+  { // It is data[var] 
+
+    if (arrayIndex != null)
+    { arrayIndex.setBrackets(false); } 
+
+    if (arrayType != null && arrayType.isSequence())
+    { return (var + "").equals(arrayIndex + ""); } 
+ 
+    return false; 
+  } 
+
+  public boolean isSequenceApplicationIncrement(Expression var)
+  { // It is data[var+1]
+
+    if (arrayType != null && arrayType.isSequence() && 
+        arrayIndex instanceof BinaryExpression && 
+        "+".equals(
+          ((BinaryExpression) arrayIndex).getOperator())
+       )
+    { BinaryExpression bexpr = (BinaryExpression) arrayIndex; 
+      Expression bleft = bexpr.getLeft(); 
+      Expression bright = bexpr.getRight(); 
+      bleft.setBrackets(false); 
+      bright.setBrackets(false); 
+
+      // System.out.println(arrayIndex + ""); 
+ 
+      return (var + " + 1").equals(arrayIndex + "");  
+    } 
+
+    return false; 
+  } 
+
   public static BasicExpression newASTBasicExpression(ASTTerm t)
   { BasicExpression res = new BasicExpression(""); 
     if (t instanceof ASTBasicTerm)
@@ -1353,7 +1387,8 @@ class BasicExpression extends Expression
     { BehaviouralFeature bf = entity.getDefinedOperation(data);  
       if (bf == null) { return false; } 
       Attribute p1 = bf.getParameter(0); 
-      if (Type.isSequenceType(p1.getType()) && !Type.isCollectionType(type))
+      if (Type.isSequenceType(p1.getType()) && 
+          !Type.isCollectionType(type))
       { return true; } 
     } 
     return false; 
@@ -6376,9 +6411,11 @@ class BasicExpression extends Expression
   public boolean isOperationCall()
   { if (isEvent && parameters != null) 
     { return true; } 
+
     if (umlkind == UPDATEOP ||
         umlkind == QUERY)
     { return true; } 
+
     return false; 
   } 
 
@@ -10094,20 +10131,26 @@ class BasicExpression extends Expression
     } // version with array? obj.r[i] for each obj: objs? 
     return data;
   }
- 
+
+  public Statement generateDesignSemiTail(
+            BehaviouralFeature bf,
+            java.util.Map env, Vector exprs, boolean local) 
+  { return generateDesign(env, local); } 
+
   public Statement generateDesign(java.util.Map env, boolean local) 
   { // if multiple objectRef:  for (v : objectRef) { v.data(pars) } 
     // otherwise  objectRef.data(pars)
     // objs.isDeleted  is a call  KillAllE(objs)
 
-    if (isEvent || umlkind == Expression.UPDATEOP) // an operation of entity
+    if (isEvent || 
+        umlkind == Expression.UPDATEOP) 
     { if (entity != null) 
       { BehaviouralFeature bf = entity.getDefinedOperation(data); 
         if (bf != null && bf.isStatic())
         { InvocationStatement res = new InvocationStatement(this); 
           return res; 
         } 
-      } 
+      } // an operation of entity
 
       if (objectRef != null && objectRef.isMultiple())
       { String v = Identifier.nextIdentifier("v_"); 
@@ -10128,7 +10171,8 @@ class BasicExpression extends Expression
       return res; 
     } 
     
-    if (umlkind == Expression.FUNCTION && data.equals("isDeleted"))
+    if (umlkind == Expression.FUNCTION && 
+        data.equals("isDeleted"))
     { if (objectRef.umlkind == Expression.CLASSID && (objectRef instanceof BasicExpression) && 
           ((BasicExpression) objectRef).arrayIndex == null) 
       { BasicExpression killset = new BasicExpression("allInstances"); 
@@ -16825,7 +16869,8 @@ public Statement generateDesignSubtract(Expression rhs)
   { Vector res = new Vector(); // of Expression
 
     if (("Sum".equals(data) || "Prd".equals(data)) && 
-        "Integer".equals(objectRef + "") && parameters != null && parameters.size() > 3)
+        "Integer".equals(objectRef + "") && 
+        parameters != null && parameters.size() > 3)
     { Expression par1 = (Expression) parameters.get(0); 
       Expression par2 = (Expression) parameters.get(1);
       Expression par3 = (Expression) parameters.get(2); 
@@ -16871,7 +16916,8 @@ public Statement generateDesignSubtract(Expression rhs)
   { Vector res = new Vector(); // of String
 
     if (("Sum".equals(data) || "Prd".equals(data)) && 
-        "Integer".equals(objectRef + "") && parameters != null && parameters.size() > 3)
+        "Integer".equals(objectRef + "") && 
+        parameters != null && parameters.size() > 3)
     { Expression par1 = (Expression) parameters.get(0); 
       Expression par2 = (Expression) parameters.get(1);
       Expression par3 = (Expression) parameters.get(2); 
@@ -16895,7 +16941,9 @@ public Statement generateDesignSubtract(Expression rhs)
     { res.addAll(objectRef.allVariableNames()); }
 
     if (arrayIndex != null)
-    { res = VectorUtil.union(res,arrayIndex.allVariableNames()); }
+    { res = VectorUtil.union(res,
+                          arrayIndex.allVariableNames()); 
+    }
 
     if (parameters != null) 
     { for (int i = 0; i < parameters.size(); i++) 
@@ -17003,23 +17051,35 @@ public Statement generateDesignSubtract(Expression rhs)
 
   public Vector allOperationsUsedIn()
   { Vector res = new Vector();
-    if (umlkind == UPDATEOP || umlkind == QUERY || isEvent)
+
+    /* System.out.println(">>> KIND of " + this + " is " + 
+                       Expression.ofKind(umlkind)); */ 
+
+    if (umlkind == UPDATEOP || umlkind == QUERY || 
+        isEvent)
     { res.add(entity + "::" + data); }
+
     if (objectRef != null)
     { res.addAll(objectRef.allOperationsUsedIn()); }
+
     if (arrayIndex != null) 
     { res.addAll(arrayIndex.allOperationsUsedIn()); } 
+
     if (parameters != null) 
     { for (int i = 0; i < parameters.size(); i++) 
       { Expression par = (Expression) parameters.get(i); 
         res.addAll(par.allOperationsUsedIn()); 
       } 
     } 
+
     return res;
   } 
 
   public boolean isSelfCall(BehaviouralFeature bf)
   { String nme = bf.getName();
+
+    if (arrayIndex != null) 
+    { return false; } 
  
     if (isSelfCall(nme))
     { return true; } 
@@ -17028,6 +17088,26 @@ public Statement generateDesignSubtract(Expression rhs)
     if (bf.isStatic() && owner != null) 
     { String ename = owner.getName(); 
       if (isSelfCall(ename,nme))
+      { return true; } 
+    } 
+
+    return false;  
+  } 
+
+  public boolean isSelfCallDecrement(BehaviouralFeature bf, 
+                                     String par)
+  { String nme = bf.getName();
+
+    if (arrayIndex != null) 
+    { return false; } 
+ 
+    if (isSelfCallDecrement(bf, nme, par))
+    { return true; } 
+
+    Entity owner = bf.getEntity(); 
+    if (bf.isStatic() && owner != null) 
+    { String ename = owner.getName(); 
+      if (isSelfCallDecrement(ename, nme, par))
       { return true; } 
     } 
 
@@ -17043,6 +17123,36 @@ public Statement generateDesignSubtract(Expression rhs)
     return false;  
   }
 
+  public boolean isSelfCallDecrement(BehaviouralFeature bf, 
+                                     String nme, String par)
+  { if (data.equals(nme) && 
+        "self".equals(objectRef + "") && 
+        parameters.size() >= 1 && 
+        (umlkind == UPDATEOP || umlkind == QUERY ||
+         isEvent)) 
+    { Expression par0 = (Expression) parameters.get(0);
+      par0.setBrackets(false);  
+
+      if ((par0 + "").equals(par + " - 1")) { } 
+      else 
+      { return false; }
+ 
+      Vector pars = bf.getParameters(); 
+      for (int i = 1; i < pars.size(); i++) 
+      { Attribute attr = (Attribute) pars.get(i); 
+        Expression pari = (Expression) parameters.get(i); 
+        pari.setBrackets(false); 
+        if (attr.getName().equals(pari + "")) { } 
+        else 
+        { return false; } 
+      } 
+
+      return true; 
+    }
+ 
+    return false;  
+  }
+
   public boolean isSelfCall(String ename, String nme)
   { if (data.equals(nme) && 
         ename.equals(objectRef + "") && 
@@ -17051,6 +17161,82 @@ public Statement generateDesignSubtract(Expression rhs)
     { return true; } 
     return false;  
   }
+
+  public boolean isSelfCallDecrement(String ename, String nme, 
+                                     String par)
+  { if (data.equals(nme) && 
+        ename.equals(objectRef + "") && 
+        parameters.size() == 1 &&
+        (umlkind == UPDATEOP || umlkind == QUERY ||
+         isEvent)) 
+    { Expression par0 = (Expression) parameters.get(0);
+      par0.setBrackets(false);  
+      return (par0 + "").equals(par + " - 1"); 
+    }
+ 
+    return false;  
+  }
+
+  public boolean isTailRecursion(BehaviouralFeature bf)
+  { // either bfname does not occur in this, or 
+    // this is a self call of bfname. 
+
+    String bfname = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(bfname); 
+    Vector vars = variablesUsedIn(names); 
+
+    if (vars.size() == 0)
+    { return true; } 
+
+    if (parameters != null)
+    { for (int i = 0; i < parameters.size(); i++) 
+      { Expression par = (Expression) parameters.get(i); 
+        Vector pvars = par.variablesUsedIn(names); 
+        if (pvars.size() > 0) 
+        { return false; } // bf cannot occur in any parameter
+      } 
+    } 
+
+    return isSelfCall(bf); 
+  } 
+
+  public void recursiveExpressions(BehaviouralFeature bf, 
+                           Vector valueReturns, 
+                           Vector tailReturns, 
+                           Vector semitailReturns, 
+                           Vector nontailReturns)
+  { 
+    String bfname = bf.getName(); 
+
+    Vector names = new Vector(); 
+    names.add(bfname); 
+    Vector vars = variablesUsedIn(names); 
+
+    if (vars.size() == 0)
+    { valueReturns.add(this); 
+      return; 
+    } 
+
+    if (parameters != null)
+    { for (int i = 0; i < parameters.size(); i++) 
+      { Expression par = (Expression) parameters.get(i); 
+        par.setBrackets(false); 
+
+        Vector pvars = par.variablesUsedIn(names); 
+        if (pvars.size() > 0) 
+        { nontailReturns.add(this);
+          return; 
+        } 
+      } 
+    } 
+
+    if (isSelfCall(bf))
+    { tailReturns.add(this); } 
+    else 
+    { nontailReturns.add(this); }  
+  } 
 
   public Vector equivalentsUsedIn()
   { Vector res = new Vector();
@@ -17484,12 +17670,15 @@ public Statement generateDesignSubtract(Expression rhs)
   public Vector variablesUsedIn(final Vector vars)
   { Vector res = new Vector();
     String s = toString();
+
     if (vars.contains(s))
     { res.add(s); }  // eg, att, or sig1.sig
     else if (vars.contains(data))
     { res.add(data); } 
     else if (objectRef != null) 
     { res.addAll(objectRef.variablesUsedIn(vars)); } 
+    else if (arrayIndex != null) // Added 22.5.2025 
+    { res.addAll(arrayIndex.variablesUsedIn(vars)); } 
 
     if (parameters != null) 
     { for (int i = 0; i < parameters.size(); i++) 
@@ -17500,7 +17689,7 @@ public Statement generateDesignSubtract(Expression rhs)
     }  
 
     return res;
-  }
+  } // Not just variables, any kind of identifiers. 
 
   public boolean selfConsistent(final Vector vars)
   { return true; }
@@ -17730,15 +17919,22 @@ public Statement generateDesignSubtract(Expression rhs)
 
     if ("subrange".equals(data) &&
         arrayIndex == null && 
-        pars != null && 
-        pars.size() == 2 &&  
+        pars != null &&  
         (objectRef.isSequence() || 
          objectRef.isString()))
-    { Expression res = 
-        Expression.simplifySubrange(objR, 
+    { if (pars.size() == 2)
+      { Expression res = 
+          Expression.simplifySubrange(objR, 
                                     (Expression) pars.get(0), 
                                     (Expression) pars.get(1)); 
-      return res; 
+        return res;
+      } 
+      else if (pars.size() == 1)
+      { Expression res = 
+          Expression.simplifySubrange(objR, 
+                                    (Expression) pars.get(0)); 
+        return res;
+      }  
     } 
 
     BasicExpression res = (BasicExpression) clone(); 
@@ -17771,6 +17967,15 @@ public Statement generateDesignSubtract(Expression rhs)
       { Expression par = (Expression) parameters.get(i); 
         par.energyUse(res,rUses,oUses); 
       } 
+
+      if (arrayIndex != null && this.isOperationCall())
+      { // redundant results computation
+
+        oUses.add("!! OCL efficiency smell (OES): Redundant results computation in: " + this);
+        int ascore = (int) res.get("amber"); 
+        res.set("amber", ascore+1); 
+      } 
+
     } 
 
     if (umlkind == VALUE) {} 
