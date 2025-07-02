@@ -24,6 +24,7 @@
 // package com.github.alexeyr.pcg;
 
 import java.util.concurrent.atomic.AtomicLong;
+import java.math.BigInteger;
 
 /**
  * An instance of this class is used to generate a stream of
@@ -38,10 +39,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * </ul>
  */
 public class Pcg64 {
-    private long state;
-    private long inc;
+    private BigInteger state;
+    private BigInteger inc;
 
-    private final static long MULTIPLIER = 6364136223846793005L;
+    private final static BigInteger MULTIPLIER = new BigInteger("2549297995355413924").shiftLeft(64).add(new BigInteger("4865540595714422341"));
 
     /**
      * Creates a new random number generator using a {@code long} seed and a {@code long} stream number.
@@ -54,7 +55,7 @@ public class Pcg64 {
      *
      * @see   #seed(long, long)
      */
-    public Pcg64(long initState, long initSeq) {
+    public Pcg64(BigInteger initState, BigInteger initSeq) {
         seed(initState, initSeq);
     }
 
@@ -78,11 +79,11 @@ public class Pcg64 {
      * @see java.util.Random#nextInt()
      */
     public int nextInt() {
-        long oldState = state;
+        BigInteger oldState = state;
 
-        state = oldState * MULTIPLIER + inc;
-        int xorShifted = (int) ((oldState >>> 64) ^ oldState);
-        int rot = (int) (oldState >>> 122);
+        state = oldState.multiply(oldState).add(oldState);
+        int xorShifted = (int) ((oldState.intValueExact() >>> 64) ^ oldState.intValueExact());
+        int rot = (int) (oldState.intValueExact() >>> 122);
         return Integer.rotateRight(xorShifted, rot);
     }
 
@@ -227,11 +228,11 @@ public class Pcg64 {
         return nextGaussian() * standardDeviation + mean;
     }
 
-    public void seed(long initState, long initSeq) {
-        state = 0;
-        inc = 2 * initSeq + 1;
+    public void seed(BigInteger initState, BigInteger initSeq) {
+        state = BigInteger.ZERO;
+        inc = new BigInteger("2").multiply(initSeq).add(BigInteger.ONE);
         nextInt();
-        state += initState;
+        state = state.add(initState);
         nextInt();
     }
 
@@ -243,10 +244,11 @@ public class Pcg64 {
      * will have different sequences.
      */
     public void seed() {
-        seed(System.nanoTime(), streamUniquifier());
+        seed(new BigInteger("" + System.nanoTime()), new BigInteger("" + streamUniquifier()));
     }
 
     private static long streamUniquifier() {
+
         for (;;) {
             long current = streamUniquifier.get();
             long next = current * 181783497276652981L;
