@@ -634,9 +634,11 @@ abstract class Expression
     return res; 
   } 
 
+  public abstract Expression getInnerObjectRef(); 
+
   public static Expression convertToApply(Expression expr,
                                           Vector pars)
-  { Expression res = expr; 
+  { Expression res = expr; // a function call
 
     if (pars.size() == 0)
     { res = new BinaryExpression("->apply", res, new BasicExpression("null")); 
@@ -649,8 +651,9 @@ abstract class Expression
       res = new BinaryExpression("->apply",res,par);
       res.type = elemType;  
     } 
+
     return res; 
-  } 
+  } // expand spread arguments.  
 
   public static Expression convertToGenerator(Expression expr,
                                               Vector pars)
@@ -3085,6 +3088,7 @@ abstract class Expression
         return lbody.substituteEq(vname,arg); 
       } 
     } 
+
     return new BinaryExpression("->apply", func, arg); 
   }  
 

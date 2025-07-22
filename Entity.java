@@ -7969,6 +7969,7 @@ System.err.println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
       if (statText.equals(bf.getActivity() + "")) 
       { return bf; } 
     } 
+
     return null; 
   } 
 
@@ -7979,6 +7980,7 @@ System.err.println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
       if (statText.equals(bf.getActivity() + "")) 
       { return true; } 
     } 
+
     return false; 
   } 
 
@@ -9551,6 +9553,17 @@ System.err.println("++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
     return res; 
   } 
 
+  public void assertTypeInformation() // for CSTL
+  { for (int i = 0; i < attributes.size(); i++)
+    { Attribute att = (Attribute) attributes.get(i);
+      att.assertTypeInformation(); 
+    }
+
+    for (int i = 0; i < associations.size(); i++)
+    { Association ast = (Association) associations.get(i);
+      ast.assertTypeInformation(); 
+    }
+  } 
  
   public void generateJava(Vector entities, Vector types, PrintWriter out)
   { if (hasStereotype("external") || 
